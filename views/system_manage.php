@@ -64,6 +64,7 @@ class SystemManage extends View {
         $sitename = $row["sitename"];
         $mainheader = $row["mainheader"];
         $maincontent = $row["maincontent"];
+        $contact = $row["contact"];
         $icon = $row["icon"];
         
         $query->closeCursor ();
@@ -216,6 +217,9 @@ class SystemManage extends View {
             <p><label for="sitename">Nombre del sitio:</label>
                 <input type="text" id="sitename" name="sitename" value="<?= $sitename; ?>">
             </p>
+            <p><label for="contact">Dirección de contacto:</label>
+                <input type="email" id="contact" name="contact" value="<?= $contact; ?>">
+            </p>
             <p><label for="mainheader">Texto cabecera:</label>
                 <input type="text" id="mainheader" name="mainheader" value="<?= $mainheader; ?>">
             </p>
@@ -247,7 +251,7 @@ class SystemManage extends View {
         unset ($_SESSION['configid']);
         $dbconn = dbConn ();
         $query = $dbconn->prepare ("UPDATE {SystemConfig} SET
-            timezone = :timezone, alloweddomains = :domain,
+            timezone = :timezone, alloweddomains = :domain, contact = :contact,
             mainheader = :mh, maincontent = :mc, sitename = :sn
             WHERE configid = :id");
         $query->bindParam (":id", $cid, PDO::PARAM_INT);
@@ -261,7 +265,8 @@ class SystemManage extends View {
             PDO::PARAM_STR);
         $query->bindParam (":sn", $_REQUEST['sitename'],
             PDO::PARAM_STR);
-
+        $query->bindParam (":contact", $_REQUEST['contact'], 
+            PDO::PARAM_STR);
         $query->execute ();
 
         if (isset($_REQUEST["sendtest"])){

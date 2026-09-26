@@ -1,4 +1,5 @@
 # 0.3-beta
+- Added an ALTCHA captcha to the participation request form.
 - Dockerized
 - Changes in index.php for including acknowledgments in subfooter.
 - Change themes colors to neutral greys.

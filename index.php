@@ -148,7 +148,7 @@ $view->addHead ();
 			<div class="widget">
 				<!-- Personalizar con los datos reales de contacto. -->
 				<h5 class="widgetheading">Contacto</h5>
-				<address>administradora@dominio.org</address>
+				<address><?= empty (Config::$contact)?"No definido":Config::$contact; ?></address>
 			</div>
 		</div>
 	</div>
@@ -161,8 +161,9 @@ $view->addHead ();
 							<span>Powered by: <a href="https://github.com/pacoandres/mlsurvey" target="_blank">mlsurvey</a></span>
 						</p>
 						<p>
-							<span>Special thanks to: <a href="https://github.com/PHPMailer/PHPMailer" target="_blank">PHPMailer</a>
-						and <a href="https://github.com/hugerte/hugerte" target="_blank">HugeRTE</a></span>
+							<span>Special thanks to: <a href="https://github.com/PHPMailer/PHPMailer" target="_blank">PHPMailer</a>,
+						<a href="https://github.com/hugerte/hugerte" target="_blank">HugeRTE</a>
+						and <a href="https://github.com/altcha-org/altcha" target="_blank">ALTCHA</a></span>
 						</p>
 					</div>
 				</div>
@@ -173,6 +174,11 @@ $view->addHead ();
 						<li><a href="#" data-placement="top" title="Linkedin"><i class="fa fa-linkedin"></i></a></li>
 						<li><a href="#" data-placement="top" title="Pinterest"><i class="fa fa-pinterest"></i></a></li>
 						<li><a href="#" data-placement="top" title="Google plus"><i class="fa fa-google-plus"></i></a></li>
+						<!--
+						<i class="fa-brands fa-mastodon"></i>
+						<i class="fa-brands fa-bluesky"></i>
+						<i class="fa-brands fa-telegram"></i>
+						-->
 					</ul>
 				</div>
 			</div>

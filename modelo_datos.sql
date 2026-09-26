@@ -63,6 +63,7 @@ CREATE TABLE SystemConfig (
 	mastodon VARCHAR(256) NULL,
 	bluesky VARCHAR(256) NULL,
 	telegram VARCHAR(256) NULL,
+	contact VARCHAR(256) NULL,
 	CONSTRAINT SystemConfig_PK PRIMARY KEY (configid)
 );
 

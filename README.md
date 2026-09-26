@@ -1,8 +1,78 @@
-This is a first aplha version.
-This is not a complete README.
+# What's this project?
+With this project we are trying to develop an online voting system based on the following:
+* Discriminate partitipats by email address domain.
+* The system needs to be as anonymous as possible.
 
-Notice that this project needs PHPMailer for working. See composer files.
-Also needs HugeRTE (look language installation)
+To archieve this the email addresses are stored with a deterministic Hash function (SHA-256).
+Clearly, someone with access to the database who knew the email addresses of all potential participants could compromise anonymity. This is something we will aim to address in future releases.
+
+# Installation
+
+## Manual installation
+### Requirements
+This application needs a LAMP server:
+* Apache + PHP >=8.3 with PDO and PDO_mysql
+* MariaDB >=11.4
+* Composer
+
+MariaDB must be initialized and configured with an user and a database for the application.
+
+### Download
+   Once you have installed and configured all the requirements download this repository to your site's `DocumentRoot` and install the required
+
+### Install Composer modules
+```sh
+composer require hugerte/hugerte
+composer require phpmailer/phpmailer
+```
+
+### Create the database
+```sh
+mariadb -u user -p databasename < modelo_datos.sql
+```
+
+### Configure the application
+<sub>(_The `php ...` commands may need to be launched with `sudo` or `sudo -u www-data` 
+or `sudo -u http`, depending on your system_)</sub>
+
+Enter into `config` directory, copy or rename the file `config.php.sample` to `config.php`
+and restric permissions as it contains sensible information.
+
+Every configuration item has a description, you only need to notice:
+* If you have a working Sendmail in your system you only need to set:
+```php
+"email_method" => "Sendmail",
+"email_server" => "",
+"email_port" => 587,
+"email_user" => "",
+"email_password" => "", //Server password
+"email_from" => "no-reply@domain.com", //Sender address
+"email_encryption" => "", //ssl or tls for starttls.
+```
+* If you plan to use a fake participant for testing the server you must set
+```php
+"ml_stresstest" => true,
+```
+and create the test participant with
+```sh
+mariadb -u user -p databasename < addtestparticipant.sql
+```
+as this participant must have an id of 0.
+
+Finally add an administrator user with
+```sh
+php addusercmd.php username password
+```
+And then
+1. Launch a browser.
+2. Go to the site.
+3. Admin menu
+4. Login
+5. Configure the application.
+
+The participation request form is protected with [ALTCHA](https://altcha.org/), a
+proof of work captcha that needs no external service: the widget is served from
+`js/altcha/` and the challenges are generated and checked by `utils/altcha.php`.
 
 ## Running the application with Docker Compose
 
@@ -51,6 +121,8 @@ the database to be ready before serving requests.
 | `DB_PREFIX` | *(empty)* | Optional prefix for table names. |
 | `PROXY_PATH`, `PROXY_PORT` | *(empty)* | Only needed when the application sits behind a reverse proxy on a subdirectory or a different port. |
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
+| `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
+| `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

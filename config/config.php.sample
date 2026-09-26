@@ -34,6 +34,17 @@ const CONFIG = [
 "email_encryption" => "tls", //ssl or tls for starttls.
 
 /**
+ * Altcha captcha, used in the participation request form.
+ * It needs Web Crypto in the browser, only available on secure contexts
+ * (HTTPS or localhost): set it to false on a plain HTTP installation.
+ * altcha_hmac_key signs the challenges; leave it empty and a per session
+ * key is generated instead.
+ */
+
+"altcha_enabled" => true,
+"altcha_hmac_key" => '',
+
+/**
  * For enabling stress test bypasses
  */
 

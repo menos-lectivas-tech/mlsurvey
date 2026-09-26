@@ -1,0 +1,27 @@
+/* =====================================================================
+   mlsurvey · captcha ALTCHA
+   ---------------------------------------------------------------------
+   El widget (js/altcha/altcha.min.js) se pinta con sus propias custom
+   properties: aquí sólo se traducen a los tokens de css/theme.css para
+   que siga al modo claro/oscuro y al acento elegido.
+   ===================================================================== */
+altcha-widget {
+    display: block;
+
+    --altcha-border-width: 1px;
+    --altcha-border-radius: var(--ml-radius);
+    --altcha-color-base: var(--ml-surface);
+    --altcha-color-border: var(--ml-border-strong);
+    --altcha-color-border-focus: var(--ml-accent);
+    --altcha-color-text: var(--ml-text);
+    --altcha-color-active: var(--ml-accent);
+    --altcha-color-error-text: var(--ml-danger);
+    --altcha-color-footer-bg: var(--ml-surface-2);
+    --altcha-max-width: 320px;
+}
+
+/* En la tarjeta de participación ocupa su propia línea: el campo de
+   correo queda encima y el botón de enviar debajo. */
+.ml-participate-row > altcha-widget {
+    flex: 1 0 100%;
+}

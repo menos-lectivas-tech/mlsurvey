@@ -17,6 +17,7 @@ class Config {
     public static string $alloweddomains = "";
     public static bool $haveconfig = false;
     public static string $sitename = "";
+    public static string $contact = "";
     public static function getSystemConfig (){
         $db =dbConn ();
 
@@ -31,6 +32,7 @@ class Config {
             self::$icon = $row["icon"]== null?"":$row["icon"];
             self::$alloweddomains = $row["alloweddomains"] == null ? "":$row["alloweddomains"];
             self::$sitename = $row["sitename"] == null ? "":$row["sitename"];
+            self::$contact = $row["contact"] == null ? "":$row["contact"];
             self::$haveconfig = true;
         }
         $query->closeCursor ();

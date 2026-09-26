@@ -50,6 +50,10 @@ define('CONFIG', [
 // distingue de una sin definir: por eso se escribe 'none' a proposito.
 "email_encryption" => getenv('EMAIL_ENCRYPTION') === 'none' ? '' : (getenv('EMAIL_ENCRYPTION') ?: 'tls'),
 
+// El captcha necesita Web Crypto: sin HTTPS (o localhost) hay que apagarlo.
+"altcha_enabled" => getenv('ALTCHA_ENABLED') === 'false' ? false : true,
+"altcha_hmac_key" => getenv('ALTCHA_HMAC_KEY') ?: '',
+
 "ml_stresstest" => false,
 ]);
 PHPEOF

@@ -80,6 +80,9 @@ function showSurveyQuestions ($db, $surveyid, $readonly = false){
         if ($optional != 1){
             echo ("<p class='ml-required'>Obligatoria</p>");
         }
+	if ($multiple){
+            echo ("<p><em>Pregunta de opción multiple. Se pueden marcar varias opciones</em></p>");
+	}
         ?>
         <div class="option">
             <input type="hidden" name="multiple-<?= $questionid; ?>" value="<?= $multiple; ?>">
