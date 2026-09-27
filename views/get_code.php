@@ -145,6 +145,10 @@ class GetCode extends View {
         try {
             
             $db = dbConn ();
+            if (!$this->isActive ($db, $surveyid)){
+                echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
+                return;
+            }
             if (!$this->checkDomain ($db, $email)){
                 return;
             }
@@ -216,6 +220,16 @@ class GetCode extends View {
         }
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
+    }
+
+    private function isActive ($db, $sid){
+        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+            AND startdate < NOW() AND enddate > NOW()");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $active = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $active;
     }
 
     private function checkParticipation ($db, $participant, $sid){

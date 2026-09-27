@@ -331,8 +331,12 @@ class Participate extends View {
 
     private function getEmail ($db, $pid, $code){
         $hcode = hash ('sha256', $code);
-        $query = $db->prepare ("SELECT surveyid, participant FROM {Participation} " . 
-            "WHERE participationid = :pid AND participationkey = :pk");
+        /* El enlace caduca en una hora y solo sirve mientras la consulta está abierta. */
+        $query = $db->prepare ("SELECT p.surveyid, p.participant FROM {Participation} p " .
+            "JOIN {Surveys} s ON s.surveyid = p.surveyid " .
+            "WHERE p.participationid = :pid AND p.participationkey = :pk " .
+            "AND p.participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR) " .
+            "AND s.startdate < NOW() AND s.enddate > NOW()");
         $query->bindParam (":pid", $pid, PDO::PARAM_INT);
         $query->bindParam (":pk", $hcode, PDO::PARAM_STR);
         $query->execute ();
