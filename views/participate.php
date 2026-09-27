@@ -245,13 +245,42 @@ class Participate extends View {
                 return;
             }
             $responsesign = $this->signResponse ($db, $responsejson, $privkey, $participantid);
-            $query = $db->prepare ("INSERT INTO {Responses} (surveyid, participantid, response, " .
-                " responsesign) values (:sid, :pid, :res, :ress)");
-            $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
-            $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
-            $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
-            $query->execute ();
+            $db->beginTransaction ();
+            try {
+                if (!$this->isActive ($db, $surveyid)){
+                    $db->rollBack ();
+                    echo ("<p><strong>La consulta ya no está abierta.</strong></p>");
+                    return;
+                }
+                if ($participantid != self::TESTID){
+                    /* Bloquea a la participante hasta el final de la transacción:
+                       dos envíos simultáneos no pueden colarse ambos. */
+                    $lock = $db->prepare ("SELECT participantid FROM {Participants} " .
+                        "WHERE participantid = :pid FOR UPDATE");
+                    $lock->bindParam (":pid", $participantid, PDO::PARAM_INT);
+                    $lock->execute ();
+                    $lock->closeCursor ();
+                    if (hasParticipated ($db, $participantid, $surveyid)){
+                        $db->rollBack ();
+                        echo ("<p><strong>Ya se ha participado en la consulta desde la " .
+                            "dirección de correo indicada.</strong></p>");
+                        return;
+                    }
+                }
+                $query = $db->prepare ("INSERT INTO {Responses} (surveyid, participantid, response, " .
+                    " responsesign) values (:sid, :pid, :res, :ress)");
+                $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+                $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
+                $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
+                $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
+                $query->execute ();
+                $db->commit ();
+            }
+            catch (Exception $e){
+                if ($db->inTransaction ())
+                    $db->rollBack ();
+                throw $e;
+            }
             ?>
             <p><strong>Respuestas guardadas.</strong></p>
             <p>Gracias por participar en la consulta.</p>
@@ -312,6 +341,16 @@ class Participate extends View {
         $this->email = decrypt (base64_decode ($row['participant']), $code);
         $this->surveyid = $row['surveyid'];
         return true;
+    }
+
+    private function isActive ($db, $surveyid){
+        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid " .
+            "AND startdate < NOW() AND enddate > NOW()");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->execute ();
+        $active = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $active;
     }
 
     private function getTestSurvey ($db, $pid, $code){
