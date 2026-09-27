@@ -11,8 +11,8 @@ startSession ();
 $viewsfolder = 'views';
 $classviewfile = $viewsfolder;
 $classview = "";
-if (isset($_GET['view'])){
-	$classview = $_GET['view'];
+if (isset($_GET['view']) && is_string ($_GET['view'])){
+	$classview = trim ($_GET['view'], '/');
 }
 else {
 	if (isset($_SERVER['REDIRECT_URL']))
@@ -21,6 +21,11 @@ else {
 		$theuri = $_SERVER['REQUEST_URI'];
 	$uris = explode ('/', $theuri);
 	$classview = $uris[count($uris) -1];
+}
+// Solo nombres de vista simples: evita incluir archivos fuera de views/.
+if (!preg_match ('/^[A-Za-z0-9_]*$/', $classview)){
+	logMessage (LOGGER_ERROR, "Invalid view name {$classview}");
+	$classview = "";
 }
 if ($classview == 'logout'){
 	clearSession ();
@@ -38,7 +43,8 @@ if ($classview != 'MainView' && file_exists ($classviewfile)){
 		$classview = getClassName($classview);
 	}
 	else {
-		logMessage (LOGGER_ERROR,  "file {$classviewfile} for {$classview} does not exist");
+		if ($classview != 'MainView')
+			logMessage (LOGGER_ERROR,  "file {$classviewfile} for {$classview} does not exist");
 		$classview = "MainView";
 	}
 	
