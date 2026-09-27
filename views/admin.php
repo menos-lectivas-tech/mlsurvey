@@ -48,6 +48,7 @@ class Admin extends View {
         }?>
         <li><a href="survey_manage">Gestionar consultas</a></li>
         <li><a href='logout'>Salir</a></li>
+        </ul>
 </div>
         <?php
     }

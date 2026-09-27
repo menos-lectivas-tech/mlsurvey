@@ -126,11 +126,18 @@ class GetCode extends View {
         return $db->lastInsertId ();
     }
     private function generateCode (){
-        $email = $_REQUEST['email'];
-        $surveyid = $_SESSION['surveyid'];
-        $surveyname = $_SESSION['surveyname'];
+        /* Normalizada: el hash de la dirección identifica a la persona, y
+           Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
+        $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
+            strtolower (trim ($_REQUEST['email'])) : "";
+        $surveyid = $_SESSION['surveyid'] ?? null;
+        $surveyname = $_SESSION['surveyname'] ?? "";
         clearSessionVariables ();
-        if (is_null ($email) || $email == "") {
+        if ($surveyid === null){
+            echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
+        if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
             echo ("<p><strong>La dirección de correo es incorrecta.</strong></p>");
             return;
         }
@@ -138,6 +145,10 @@ class GetCode extends View {
         try {
             
             $db = dbConn ();
+            if (!$this->isActive ($db, $surveyid)){
+                echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
+                return;
+            }
             if (!$this->checkDomain ($db, $email)){
                 return;
             }
@@ -199,16 +210,29 @@ class GetCode extends View {
             echo ("<p><strong>El sistema no está configurado aún. No se puede participar.</strong></p>");
             return false;
         }
-        $domainstring = $query->fetch()['alloweddomains'];
+        $domainstring = $query->fetch()['alloweddomains'] ?? "";
         $query->closeCursor ();
-        $domains = explode (" ", $domainstring);
-        $emaildomain = explode ("@", $email)[1];
+        $domains = array_filter (explode (" ", strtolower (trim ($domainstring))));
+        /* Sin dominios configurados puede participar cualquiera. */
+        if (empty ($domains))
+            return true;
+        $emaildomain = substr (strrchr ($email, "@"), 1);
         foreach ($domains as $key => $domain) {
             if ($emaildomain == $domain)
                 return true;
         }
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
+    }
+
+    private function isActive ($db, $sid){
+        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+            AND startdate < NOW() AND enddate > NOW()");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $active = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $active;
     }
 
     private function checkParticipation ($db, $participant, $sid){

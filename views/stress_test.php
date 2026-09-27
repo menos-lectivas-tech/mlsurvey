@@ -136,7 +136,7 @@ class StressTest extends View {
         $this->cleanTests ();
         if (!file_exists (self::TEST_DIR))
             mkdir (self::TEST_DIR, 0700, true);
-        $testcount = $_REQUEST['testcount'];
+        $testcount = (int) $_REQUEST['testcount'];
         $surveyid = $_REQUEST["surveyid"];
         try {
             $file = fopen (self::TEST_FILE, "w");
@@ -151,7 +151,7 @@ class StressTest extends View {
                 $query->execute ();
                 $pid = $db->lastInsertId ();
                 $auth = url_base64_encode ($code);
-                $theurl = getURL () . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
+                $theurl = rtrim (getURL (), "/") . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
                 fwrite ($file, $theurl);
             }
             fclose ($file);
@@ -178,7 +178,7 @@ class StressTest extends View {
     private function insertHTML (){
         ?>
         <h2>Datos de test generados.</h2>
-        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="buttton-3">Descargar</a>
+        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="button-3">Descargar</a>
         <?php
     }
 }
