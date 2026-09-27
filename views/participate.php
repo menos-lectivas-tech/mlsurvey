@@ -56,15 +56,14 @@ class Participate extends View {
         $pid = $_REQUEST[self::PID];
         $key = $_REQUEST[self::KEY];
         if (isset (Config::PARAMS['ml_stresstest']) && Config::PARAMS['ml_stresstest']
-             && $_REQUEST["t"])
+             && !empty ($_REQUEST["t"]))
             $this->istest = true;
 
         clearSessionVariables ();
         
 
-        $code = url_base64_decode ($key);
-
         try {
+            $code = url_base64_decode ($key);
             $db = dbConn ();
             
             if (!$this->getEmail ($db, $pid, $code) && !$this->istest){
@@ -173,6 +172,10 @@ class Participate extends View {
             tokenError ();
             return;           
         }
+        if (!isset ($_SESSION['surveyid']) || !isset ($_SESSION['participantid'])){
+            $this->securityError ();
+            return;
+        }
         $surveyid = $_SESSION['surveyid'];
         $participantid = $_SESSION['participantid'];
 
@@ -181,7 +184,7 @@ class Participate extends View {
             $privkey = false;
         }
         else {
-            if (!isset ($_COOKIE[self::COOKIE_KEY])){
+            if (!isset ($_COOKIE[self::COOKIE_KEY]) || !isset ($_SESSION['privkey'])){
                 echo ("<p><strong>Error recuperando las cookies para firmar las respuestas.</strong></p>");
                 return;
             }
