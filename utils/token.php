@@ -30,10 +30,10 @@ function checkToken (){
     $token = $_SESSION['token'];
     unset ($_SESSION['token']);
 
-    if (!isset ($_REQUEST['token']))
+    if (!isset ($_REQUEST['token']) || !is_string ($_REQUEST['token']))
         return false;
 
-    if ($token != $_REQUEST['token'])
+    if (!hash_equals ($token, $_REQUEST['token']))
         return false;
     
     return true;

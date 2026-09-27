@@ -178,7 +178,7 @@ class StressTest extends View {
     private function insertHTML (){
         ?>
         <h2>Datos de test generados.</h2>
-        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="buttton-3">Descargar</a>
+        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="button-3">Descargar</a>
         <?php
     }
 }

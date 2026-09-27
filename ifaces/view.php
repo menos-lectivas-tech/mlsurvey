@@ -111,7 +111,7 @@ function showView ($view){
 			echo ('</div>');
 		}
 		else {
-			logMessage (LOGGER_DEBUG, "Loading multicols for {$name}");
+			logMessage (LOGGER_DEBUG, "Loading single column for {$name}");
 			$view->show ();
 		}
 	}
