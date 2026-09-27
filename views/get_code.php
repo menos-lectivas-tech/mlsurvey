@@ -126,11 +126,18 @@ class GetCode extends View {
         return $db->lastInsertId ();
     }
     private function generateCode (){
-        $email = $_REQUEST['email'];
-        $surveyid = $_SESSION['surveyid'];
-        $surveyname = $_SESSION['surveyname'];
+        /* Normalizada: el hash de la dirección identifica a la persona, y
+           Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
+        $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
+            strtolower (trim ($_REQUEST['email'])) : "";
+        $surveyid = $_SESSION['surveyid'] ?? null;
+        $surveyname = $_SESSION['surveyname'] ?? "";
         clearSessionVariables ();
-        if (is_null ($email) || $email == "") {
+        if ($surveyid === null){
+            echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
+        if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
             echo ("<p><strong>La dirección de correo es incorrecta.</strong></p>");
             return;
         }
