@@ -24,9 +24,10 @@ class Participate extends View {
     function doInit (){
         startSession ();
         $this->key = random_bytes (32);
-        $host   = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+        /* Sin dominio: cookie solo para este host. HTTP_HOST puede llevar el
+           puerto (localhost:8080) y el navegador rechaza ese dominio. */
         setcookie (self::COOKIE_KEY, base64_encode ($this->key), time () + 1800, //Half an hour
-            "", $host, true, true);
+            "", "", true, true);
     }
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
