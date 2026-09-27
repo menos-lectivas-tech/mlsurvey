@@ -151,7 +151,7 @@ class StressTest extends View {
                 $query->execute ();
                 $pid = $db->lastInsertId ();
                 $auth = url_base64_encode ($code);
-                $theurl = getURL () . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
+                $theurl = rtrim (getURL (), "/") . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
                 fwrite ($file, $theurl);
             }
             fclose ($file);
