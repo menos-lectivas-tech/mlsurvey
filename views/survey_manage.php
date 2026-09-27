@@ -943,11 +943,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                     $query->bindParam (":file", $filename, PDO::PARAM_STR);
                 }
                 else {
-                    $query->bindParam (":file", "", PDO::PARAM_STR);
+                    $query->bindValue (":file", "", PDO::PARAM_STR);
                 }
                 $query->execute ();
                 $sid = $dbconn->lastInsertId ();
-                $this->mvdir (session_id (), $sid);
+                if (is_string ($filename) && $filename != "")
+                    $this->mvdir (session_id (), $sid);
                 $this->insertQuestions ($dbconn, $sid, $questions);
                 $dbconn->commit ();
             }
@@ -1225,7 +1226,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                     $query->bindParam (":file", $filename, PDO::PARAM_STR);
                 }
                 else {
-                    $query->bindParam (":file", "", PDO::PARAM_STR);
+                    $query->bindValue (":file", "", PDO::PARAM_STR);
                 }
                 $query->execute ();
                 $query = $dbconn->prepare ("DELETE from {Questions} ".
@@ -1253,6 +1254,8 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     private function saveFile ($surveyid): string|bool {
         $dir = FileParams::FILE_DIR . $surveyid;
                 
+        if (!isset ($_FILES['file-input']))
+            return "";
         $fileinfo = $_FILES['file-input'];
         if (is_array ($fileinfo["error"])){
             $this->fileerror = "Solo un archivo por subida";
@@ -1311,6 +1314,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     private function mvdir ($orig, $dest){
         $src = FileParams::FILE_DIR . $orig;
         $dst = FileParams::FILE_DIR . $dest;
-        rename ($src, $dst);
+        if (file_exists ($src))
+            rename ($src, $dst);
     }
 }
