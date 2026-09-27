@@ -624,7 +624,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                         dropZone.classList.remove ("dragging");
                     }
                 });
-                <?=  $this->havefile ? "addFile ('{$this->filename}');" : ""?>
+                <?=  $this->havefile ? "addFile (" . json_encode ($this->filename, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ");" : ""?>
 
                 const fileinput = document.getElementById("file-input");
                 fileinput.addEventListener("change", function (){
@@ -636,7 +636,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 <?php
                     if ($this->havefile){
                         $downloadfile = FileParams::FILE_DIR . $this->fileid . "/" . $this->filename;
-                        echo ("window.open ('{$downloadfile}', '_self');");
+                        echo ("window.open (" . json_encode ($downloadfile, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ", '_self');");
                     }
                 ?>
             }
@@ -1056,11 +1056,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"
-            value="<?= $survey['surveyname'] ?>"></p>
+            value="<?= htmlspecialchars ($survey['surveyname']); ?>"></p>
         <p><label for="surveydesc">Descripción</label>
-        <textarea class="description" name="surveydesc" id="surveydesc">
-            <?= $survey['surveydesc']; ?>
-        </textarea>
+        <textarea class="description" name="surveydesc" id="surveydesc"><?= htmlspecialchars ($survey['surveydesc']); ?></textarea>
         </p>
         <label id="drop-zone" class="drop-zone dragidle">
         <div id="text-file">Añadir documentación en PDF. Pulsa o arrastra el archivo aquí.</div>
@@ -1112,7 +1110,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 <input type="text" id="name-q-<?= $qid; ?>" name="name-q-<?= $qid; ?>"
                 value=""></p>-->
             <p><label id="label-desc-q-<?= $qid; ?>" for="desc-q-<?= $qid; ?>">Descripción:</label>
-                <textarea class="description" name="desc-q-<?= $qid; ?>" id="desc-q-<?= $qid; ?>"><?= $question['questiondesc']; ?></textarea></p>
+                <textarea class="description" name="desc-q-<?= $qid; ?>" id="desc-q-<?= $qid; ?>"><?= htmlspecialchars ($question['questiondesc']); ?></textarea></p>
             <p><label id="label-opt-q-<?= $qid; ?>" for="opt-q-<?= $qid; ?>">Opcional:</label>
                 <input type="checkbox" name="opt-q-<?= $qid; ?>" id="opt-q-<?= $qid; ?>" 
                 <?= $opt; ?>>
@@ -1146,12 +1144,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     
                 <p id="p-opt-<?= $qid; ?>-1"><input type="text" 
                 name="opt-<?= $qid;?>-1" id="opt-<?= $qid;?>-1"
-                value="<?= $option['optiondesc']; ?>"></p>
+                value="<?= htmlspecialchars ($option['optiondesc']); ?>"></p>
     <?php
             }
             else if ($oid == 2){?>
                 <p id="p-opt-<?= $qid;?>-2"><input type="text" name="opt-<?= $qid;?>-2"
-                 id="opt-<?= $qid;?>-2" value="<?= $option['optiondesc']; ?>">
+                 id="opt-<?= $qid;?>-2" value="<?= htmlspecialchars ($option['optiondesc']); ?>">
                     
                     <button type="button" id="add-opt-<?= $qid;?>-2" class="button-3" 
                     onclick="addoption (<?= $qid;?>,2);">
@@ -1165,7 +1163,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             ?>
                 <p id="p-opt-<?= $qoid; ?>">
                 <input type="text" name="opt-<?= $qoid; ?>" id="opt-<?= $qoid; ?>"
-                    value="<?= $option['optiondesc']; ?>">
+                    value="<?= htmlspecialchars ($option['optiondesc']); ?>">
                     <button type="button" id="add-opt-<?= $qoid; ?>" class="button-3" 
                         onclick="addoption (<?= $qid; ?>,<?= $oid; ?>);">
                         <img src="img/add.svg" />

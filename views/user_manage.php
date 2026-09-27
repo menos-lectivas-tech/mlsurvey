@@ -282,7 +282,7 @@ onload='document.getElementById("user").focus();'>
         <h2>Modificar usuaria</h2>
         <form id="moduser" name="moduser" method="POST" action="user_manage" 
 onload='document.getElementById("user").focus();'>
-        <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1" value="<?= $name ?>"></p>
+        <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1" value="<?= htmlspecialchars ($name ?? ""); ?>"></p>
         <p>Nueva clave: <input type="password" id="passwd" name="passwd" placeholder="Vacío sin cambios"></p>
         <p>Confirmar nueva clave: <input type="password" id="passwd2" name="passwd2"></p>
         <p>Es admin: <input type="checkbox" id="isadmin" name="isadmin" <?= $isadmin; ?>></p>

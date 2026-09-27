@@ -212,21 +212,19 @@ class SystemManage extends View {
             </select></p>
             <p><label for="alloweddomains">Dominios permitidos:</label>
             <input type="text" id="alloweddomains" name="alloweddomains"
-                value="<?= $alloweddomains; ?>"
+                value="<?= htmlspecialchars ($alloweddomains ?? ""); ?>"
                 placeholder="Separados por espacios. Vacío indica sin restricciones."></p>
             <p><label for="sitename">Nombre del sitio:</label>
-                <input type="text" id="sitename" name="sitename" value="<?= $sitename; ?>">
+                <input type="text" id="sitename" name="sitename" value="<?= htmlspecialchars ($sitename ?? ""); ?>">
             </p>
             <p><label for="contact">Dirección de contacto:</label>
-                <input type="email" id="contact" name="contact" value="<?= $contact; ?>">
+                <input type="email" id="contact" name="contact" value="<?= htmlspecialchars ($contact ?? ""); ?>">
             </p>
             <p><label for="mainheader">Texto cabecera:</label>
-                <input type="text" id="mainheader" name="mainheader" value="<?= $mainheader; ?>">
+                <input type="text" id="mainheader" name="mainheader" value="<?= htmlspecialchars ($mainheader ?? ""); ?>">
             </p>
             <p><label for="maincontent">Texto principal:</label>
-                <textarea class="description" name="maincontent" id="maincontent">
-                    <?= $maincontent; ?>
-                </textarea>
+                <textarea class="description" name="maincontent" id="maincontent"><?= htmlspecialchars ($maincontent ?? ""); ?></textarea>
             </p>
             <div class="option" id="mailtest" style="display: none;">
                 <p><label for="sendtest">Enviar mensaje de prueba:</label>
