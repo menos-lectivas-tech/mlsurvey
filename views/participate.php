@@ -79,6 +79,7 @@ class Participate extends View {
                 $_SESSION['surveyid'] = $this->surveyid;
                 $_SESSION['participantid'] = self::TESTID;
                 $this->showSurvey ($db, $this->surveyid, self::TESTID);
+                return;
             }
             //This block should be removed in non alpha versions
             /*if ($email == "prueba@mierda.cow" && $code = "123456"){

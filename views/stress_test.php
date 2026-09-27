@@ -136,7 +136,7 @@ class StressTest extends View {
         $this->cleanTests ();
         if (!file_exists (self::TEST_DIR))
             mkdir (self::TEST_DIR, 0700, true);
-        $testcount = $_REQUEST['testcount'];
+        $testcount = (int) $_REQUEST['testcount'];
         $surveyid = $_REQUEST["surveyid"];
         try {
             $file = fopen (self::TEST_FILE, "w");
