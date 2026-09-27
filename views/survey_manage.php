@@ -1003,6 +1003,8 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
+                if (!$this->isEditable ($dbconn, $_REQUEST['surveyid']))
+                    throw new Exception ("Survey {$_REQUEST['surveyid']} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys} SET modifiedby = :uid
                     WHERE surveyid = :sid");
                 $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
@@ -1033,11 +1035,14 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $_SESSION['surveyid'] = $sid;
         $this->javascriptype = SurveyJavascript::AddJavascript;
         $dbconn = dbConn ();
-        $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid");
+        $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid
+            AND startdate > NOW()");
         $surveys->bindParam (":sid", $sid, PDO::PARAM_INT);
         $surveys->execute ();
-        if ($surveys->rowCount() == 0)
+        if ($surveys->rowCount() == 0){
+            echo ("<p><strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong></p>");
             return;
+        }
         $survey = $surveys->fetch ();
         if (!empty ($survey['surveyfile'])){
             $this->havefile = true;
@@ -1206,11 +1211,24 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             }
             $nquestion++;
         }
+        try {
+            if (!$this->isEditable (dbConn (), $sid)){
+                echo ("<strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong>");
+                return;
+            }
+        }
+        catch (Exception $e){
+            echo ("<strong>Error al modificar la consulta.</strong>");
+            logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
+            return;
+        }
         $filename = $this->saveFile ($sid);
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
+                if (!$this->isEditable ($dbconn, $sid))
+                    throw new Exception ("Survey {$sid} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys}  
                      SET surveyname = :name, startdate = :start, showpartial = :partial,
                     enddate = :end, surveydesc = :desc, surveyfile = :file, modifiedby = :uid 
@@ -1249,6 +1267,17 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             echo ("<p><strong>Error subiendo archivo: {$this->fileerror}.</strong></p>");
             $this->deldir ($sid);
         }
+    }
+
+    /* Solo se pueden modificar o eliminar las consultas que no han empezado. */
+    private function isEditable ($dbconn, $sid): bool {
+        $query = $dbconn->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+            AND startdate > NOW() FOR UPDATE");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $editable = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $editable;
     }
 
     private function saveFile ($surveyid): string|bool {
