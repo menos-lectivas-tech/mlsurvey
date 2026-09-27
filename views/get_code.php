@@ -210,10 +210,13 @@ class GetCode extends View {
             echo ("<p><strong>El sistema no está configurado aún. No se puede participar.</strong></p>");
             return false;
         }
-        $domainstring = $query->fetch()['alloweddomains'];
+        $domainstring = $query->fetch()['alloweddomains'] ?? "";
         $query->closeCursor ();
-        $domains = explode (" ", $domainstring);
-        $emaildomain = explode ("@", $email)[1];
+        $domains = array_filter (explode (" ", strtolower (trim ($domainstring))));
+        /* Sin dominios configurados puede participar cualquiera. */
+        if (empty ($domains))
+            return true;
+        $emaildomain = substr (strrchr ($email, "@"), 1);
         foreach ($domains as $key => $domain) {
             if ($emaildomain == $domain)
                 return true;
