@@ -3,6 +3,7 @@ require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'include/fileparams.php';
 require_once 'utils/fileutils.php';
+require_once 'utils/results.php';
 require_once 'include/icons.php';
 
 enum SurveyJavascript {
@@ -18,6 +19,10 @@ class SurveyManage extends View {
     private const ADDACTION = 'addaction';
     private const MODIFYACTION = 'modifaction';
     private const DELACTION = 'delaction';
+    private const GENERATERESULTS = 'Generar resultados';
+    /* Lo que haya que contar de la generación de resultados se muestra
+       dentro de la página, no antes de su cabecera. */
+    private string $resultsmessage = "";
     private bool $havefile = false;
     private string $filename = "";
     private string $fileerror = "";
@@ -68,6 +73,9 @@ class SurveyManage extends View {
                     //The warning should be previous;
                     $this->deleteSurvey ();
                     break;
+                case self::GENERATERESULTS:
+                    $this->generateResults ();
+                    break;
                 default:
                     logMessage (LOGGER_ERROR, "Unkown surveys manage action {$action}");
                     break;
@@ -96,10 +104,15 @@ class SurveyManage extends View {
         ?>
         <div class="col-md-8">
         <h2>Gestión de consultas</h2>
-        <form id="surveymanage" name="surveymanage" method="POST" 
+        <?= $this->resultsmessage; ?>
+        <form id="surveymanage" name="surveymanage" method="POST"
             action="survey_manage">
+        <!-- Los botones de cada fila escriben aquí sobre qué consulta actúan:
+             el servidor sigue leyendo $_REQUEST['surveyid']. -->
+        <input type="hidden" name="surveyid" id="selectedsurvey" value="">
         <?php
         $this->listSurveys ();
+        $this->listEndedSurveys ();
         $this->showControls ();
         echo ('</form></div>');
 
@@ -162,9 +175,6 @@ class SurveyManage extends View {
                 </tbody>
             </table>
 </div>
-<!-- Los botones de cada fila escriben aquí sobre qué consulta actúan:
-     el servidor sigue leyendo $_REQUEST['surveyid']. -->
-<input type="hidden" name="surveyid" id="selectedsurvey" value="">
             <?php
         }
         catch (Exception $e){
@@ -172,6 +182,111 @@ class SurveyManage extends View {
                 <p>Error obteniendo la lista de consultas. Contacte con soporte.</p>
             <?php
             logMessage (LOGGER_ERROR, "DB error {$e} getting surveys list");
+        }
+    }
+
+    /* Las consultas ya finalizadas no se pueden modificar ni eliminar, pero
+       sí volver a contar: de ahí que tengan tabla propia con un único botón. */
+    private function listEndedSurveys (){
+        try {
+            $dbconn = dbConn ();
+            $query = $dbconn->prepare ("SELECT s.surveyid, s.surveyname" .
+            ", DATE_FORMAT(s.enddate,'%d/%m/%Y %T') as dend" .
+            ", DATE_FORMAT(r.resultsdate,'%d/%m/%Y %T') as dresults" .
+            ", r.ispartial FROM {Surveys} s" .
+            " LEFT JOIN {Results} r ON r.surveyid = s.surveyid" .
+            " WHERE s.enddate < NOW()" .
+                " ORDER BY s.enddate DESC");
+            $query->execute ();
+            if ($query->rowCount () == 0)
+                return;
+            ?>
+            <h3>Consultas finalizadas</h3>
+            <p>De las consultas finalizadas solo es posible generar sus resultados
+               a partir de las respuestas recibidas.</p>
+<div class="card-table-container">
+            <table class="card-like-table ml-stack" id="endedsurveystable">
+                <thead><tr>
+                    <td>Consulta</td><td>Fecha fin</td><td>Resultados</td><td class="ml-row-actions">Acciones</td>
+                </tr></thead>
+                <tbody>
+                <?php
+                while ($row = $query->fetch ()){
+                    $id = $row['surveyid'];
+                    $name = $row['surveyname'];
+                    if (empty ($row['dresults']))
+                        $results = "Sin generar";
+                    else if (!empty ($row['ispartial']))
+                        $results = "Parciales ({$row['dresults']})";
+                    else
+                        $results = $row['dresults'];
+                    ?>
+                    <tr id="ended-<?= $id; ?>">
+                        <td><span class="username" id="sve-<?= $id; ?>"><?= $name ?></span></td>
+                        <td data-label="Fecha fin"><?= $row['dend'] ?></td>
+                        <td data-label="Resultados"><?= $results ?></td>
+                        <td class="ml-row-actions">
+                            <button type="submit" class="button-3"
+                                name="<?= self::MANAGEACTION ?>" value="<?= self::GENERATERESULTS ?>"
+                                id="generate-<?= $id; ?>" onclick="return pick_survey (<?= $id; ?>);"
+                                title="<?= self::GENERATERESULTS ?>"
+                                aria-label="Generar los resultados de la consulta <?= htmlspecialchars ($name); ?>">
+                                <?= self::GENERATERESULTS ?>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php
+                }
+                $query->closeCursor ();
+                ?>
+                </tbody>
+            </table>
+</div>
+            <?php
+        }
+        catch (Exception $e){
+            ?>
+                <p>Error obteniendo la lista de consultas finalizadas. Contacte con soporte.</p>
+            <?php
+            logMessage (LOGGER_ERROR, "DB error {$e} getting ended surveys list");
+        }
+    }
+
+    /* Guarda en Results el recuento definitivo de una consulta finalizada
+       contando todas sus Responses. */
+    private function generateResults (){
+        if (!isset ($_REQUEST['surveyid']))
+            return;
+        $surveyid = $_REQUEST['surveyid'];
+        try {
+            $dbconn = dbConn ();
+            $surveys = $dbconn->prepare ("SELECT surveyname FROM {Surveys} WHERE
+                surveyid = :sid AND enddate < NOW()");
+            $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+            $surveys->execute ();
+            if ($surveys->rowCount () == 0){
+                $this->resultsmessage =
+                    "<p><strong>No se encuentra la consulta finalizada seleccionada.</strong></p>";
+                $surveys->closeCursor ();
+                return;
+            }
+            $surveyname = $surveys->fetch ()['surveyname'];
+            $surveys->closeCursor ();
+
+            $results = countResponses ($dbconn, $surveyid);
+            if ($results["Total"] == 0){
+                $this->resultsmessage = "<p><strong>La consulta {$surveyname} no tiene " .
+                    "respuestas: no hay resultados que generar.</strong></p>";
+                return;
+            }
+            saveResults ($dbconn, $surveyid, $results, false);
+            $this->resultsmessage = "<p><strong>Resultados de la consulta {$surveyname} " .
+                "generados a partir de {$results["Total"]} respuestas.</strong></p>";
+        }
+        catch (Exception $e){
+            $this->resultsmessage =
+                "<p><strong>Error generando los resultados de la consulta.</strong></p>";
+            logMessage (LOGGER_ERROR, "Error {$e} generating results for survey {$surveyid}.");
         }
     }
 

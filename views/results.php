@@ -1,6 +1,7 @@
 <?php
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
+require_once 'utils/results.php';
 class Results extends View {
 
     /* Ranuras de la paleta categórica definida en css/results.css.
@@ -36,7 +37,8 @@ class Results extends View {
         $surveyid = $_REQUEST["queryid"];
         try {
             $db = dbConn ();
-            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile " . 
+            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile, showpartial, " .
+            "startdate < NOW() AND enddate > NOW() AS active " .
             "FROM {Surveys} WHERE surveyid = :sid");
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $surveys->execute ();
@@ -51,27 +53,30 @@ class Results extends View {
             $surveyfile = $survey["surveyfile"];
             $surveys->closeCursor ();
 
-            $results = $db->prepare ("SELECT results FROM {Results} WHERE surveyid = :sid");
-            $results->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $results->execute ();
-            if ($results->rowCount () == 0){
-                echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
-                return;
+            /* Mientras la consulta está abierta los parciales se cuentan en
+               caliente sobre Responses; Results solo guarda el recuento
+               definitivo que se genera al finalizar. */
+            $partial = !empty ($survey["active"]);
+            if ($partial){
+                if (empty ($survey["showpartial"])){
+                    echo ("<p><strong>La consulta {$surveyname} no muestra resultados parciales.</strong></p>");
+                    return;
+                }
+                $resultsarray = countResponses ($db, $surveyid);
             }
-            $result = $results->fetch ()['results'];
-            $results->closeCursor ();
-            $resultsarray = json_decode ($result, true);
-            if ($resultsarray == null){
-                echo ("<p><strong>Error leyendo los resultados para la consulta {$surveyname}</strong></p>");
-                logMessage (LOGGER_ERROR, "Malformed results JSON for survey {$surveyid}");
-                return;
+            else {
+                $resultsarray = loadResults ($db, $surveyid);
+                if ($resultsarray === null){
+                    echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
+                    return;
+                }
             }
             $thefile = FileParams::FILE_DIR . $surveyid . "/" . $surveyfile;
             ?>
-            <h2>Mostrando resultados para la consulta <?= $surveyname;?>.</h2>
+            <h2>Mostrando resultados <?= $partial ? "parciales " : ""; ?>para la consulta <?= $surveyname;?>.</h2>
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
             <?= empty ($surveyfile)?"":"Documentación adjunta: <a href='{$surveyfile}'";?>
-            <p><em>En esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
+            <p><em><?= $partial ? "Hasta ahora e" : "E"; ?>n esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
             <?php
             $questions = $db->prepare ("SELECT * FROM {Questions} WHERE surveyid = :sid");
             $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
@@ -106,7 +111,7 @@ class Results extends View {
                     while ($option = $options->fetch ()){
                         $optionid = $option['optionid'];
                         $optionres = $resultsarray["Responses"][$questionid][$optionid];
-                        $pctres = $optionres/$totalquestion;
+                        $pctres = $totalquestion > 0 ? $optionres/$totalquestion : 0;
                         $elid = "opt-" . $questionid . "-" . $optionid;
                         /* Las opciones empiezan en 1: se desplaza para que la
                            primera reciba la ranura inicial de la paleta. */

@@ -197,11 +197,6 @@ class Participate extends View {
         try {
             $responsearray = array (); 
             $db = dbConn ();
-            $partials = null;
-            $haspartials = false;
-            if ($haspartials = $this->hasPartials ($db, $surveyid))
-                $partials = $this->getPartial ($db, $surveyid);
-
             $questions = $db->prepare ("SELECT questionid, multiple, optional " . 
                 "FROM {Questions} WHERE surveyid = :sid ORDER BY questionid ASC");
             $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
@@ -215,8 +210,6 @@ class Participate extends View {
                         if (isset ($_REQUEST["op-" . $questionid])){
                             $selected = $_REQUEST["op-" . $questionid];
                             $responsearray[$questionid] = $selected;
-                            if($haspartials)
-                                $partials["Responses"][$questionid][$selected]++;
                         }
                         else if ($optional == 1)
                             $responsearray[$questionid] = -1;
@@ -233,9 +226,6 @@ class Participate extends View {
                         for ($i = 1; $i <= $toptions; $i++){
                             if (isset ($_REQUEST["op-" . $questionid . "-" . $i])){
                                 $responsearray[$questionid][$i] = 1;
-                            
-                                if($haspartials)
-                                    $partials["Responses"][$questionid][$i] += 1;
                             }
                         }
                         if ($optional == 0 && empty ($responsearray[$questionid])){
@@ -262,8 +252,6 @@ class Participate extends View {
             $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
             $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
             $query->execute ();
-            if ($haspartials)
-                $this->updatePartials ($db, $surveyid, $partials);
             ?>
             <p><strong>Respuestas guardadas.</strong></p>
             <p>Gracias por participar en la consulta.</p>
@@ -338,74 +326,5 @@ class Participate extends View {
         $row = $query->fetch ();
         $this->surveyid = $row['surveyid'];
         return true;
-    }
-
-    private function hasPartials ($db, $surveyid){
-        $query = $db->prepare ("SELECT showpartial FROM {Surveys}
-            WHERE surveyid = :sid LIMIT 1");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->execute ();
-        $survey = $query->fetch ();
-        $ret = !empty ($survey["showpartial"]);
-        $query->closeCursor ();
-        return $ret;
-    }
-
-    private function getPartial ($db, $surveyid){
-        $ret = null;
-        $query = $db->prepare ("SELECT results FROM {Results} 
-            WHERE surveyid = :sid");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->execute ();
-        if ($query->rowCount () == 0){
-            $ret =  $this->buildPartial ($db, $surveyid);
-        }
-        else {
-            $ret = json_decode ($query->fetch()["results"], true);
-        }
-        $query->closeCursor ();
-        return $ret;
-    }
-
-    private function buildPartial ($db, $surveyid){
-        $partial = array();
-        $partial["Total"] = 0;
-        $partial["Responses"] = array ();
-        $questions = $db->prepare ("SELECT questionid FROM {Questions} 
-            WHERE surveyid = :sid");
-        $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $questions->execute ();
-        while ($question = $questions->fetch ()){
-            $questionid = $question["questionid"];
-            $partial["Responses"][$questionid] = array ();
-            $options = $db->prepare ("SELECT optionid FROM {Options} WHERE
-                surveyid = :sid AND questionid = :qid");
-            $options->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $options->bindParam (":qid", $questionid, PDO::PARAM_INT);
-            $options->execute ();
-            while ($option = $options->fetch ()){
-                $partial["Responses"][$questionid][$option["optionid"]] = 0;
-            }
-            $options->closeCursor ();
-        }
-        $questions->closeCursor ();
-
-        $result = json_encode ($partial);
-        $query = $db->prepare ("INSERT INTO {Results} (surveyid, results, ispartial) values
-            (:sid, :res, 1)");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->bindParam (":res", $result, PDO::PARAM_STR);
-        $query->execute ();
-        return $partial;
-    }
-
-    private function updatePartials ($db, $surveyid, $partials){
-        $partials["Total"]++;
-        $res = json_encode ($partials);
-        $query = $db->prepare ("UPDATE {Results} set results = :res, ispartial = 1
-            WHERE surveyid = :sid");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->bindParam (":res", $res, PDO::PARAM_STR);
-        $query->execute ();
     }
 }
