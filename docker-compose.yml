@@ -80,9 +80,9 @@ services:
       APACHE_START_WORKERS: ${APACHE_START_WORKERS:-25}
       APACHE_MAX_SPARE_WORKERS: ${APACHE_MAX_SPARE_WORKERS:-75}
       APACHE_LISTEN_BACKLOG: ${APACHE_LISTEN_BACKLOG:-1024}
-      # Rellenar si la aplicacion esta detras de un proxy inverso.
-      PROXY_PATH: ${PROXY_PATH:-}
-      PROXY_PORT: ${PROXY_PORT:-}
+      # URL publica del sitio, tal como la ven las participantes. Los enlaces
+      # de los correos se construyen con ella, no con la cabecera Host.
+      SITE_URL: ${SITE_URL:-http://localhost:${WEB_PORT:-8080}/}
       # 0: error, 1: warn, 2: info, 3: debug. En produccion 0.
       LOG_LEVEL: ${LOG_LEVEL:-0}
       # Envio de correo (antes en la base de datos, ahora en config/config.php).
