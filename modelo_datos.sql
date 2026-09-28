@@ -74,7 +74,8 @@ CREATE TABLE Participants (
 	publickey TEXT NOT NULL,
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
-CREATE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
+/*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
+CREATE UNIQUE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
 
 CREATE TABLE Participation (
 	participationid INT UNSIGNED auto_increment NOT NULL,

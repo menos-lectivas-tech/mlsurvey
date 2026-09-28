@@ -157,48 +157,20 @@ class GetCode extends View {
             }
 
             $hashmail = hash ('sha256', $email);
-            $participants = $db->prepare ("SELECT participantid From {Participants} " .
-                "WHERE participant = :participant");
-            $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
-            $participants->execute ();
-            $participantid = -1;
-            if ($participants->rowCount () == 0){
-                $participantid = $this->insertParticipant ($db, $email, $hashmail);
-            }
-            else {
-                $participant = $participants->fetch ();
-                $participantid = $participant['participantid'];
-            }
-            $participants->closeCursor ();
-            /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
-                //Needs a time limit.
-                echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
-                return;
-            }*/
-            if (hasParticipated ($db, $participantid, $surveyid)){
-                echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
+            if (!lockParticipant ($db, $hashmail)){
+                echo ("<p><strong>Hay otra petición en curso con esta dirección de correo. " .
+                    "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
             }
-
-            /* participant va cifrado con un código aleatorio distinto en cada
-               petición, así que no sirve para buscar las anteriores: el límite
-               por hora se comprueba con esta etiqueta fija por correo y consulta. */
-            $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
-            if ($this->checkParticipation ($db, $requesttag, $surveyid)){
-                return;
+            try {
+                $reserved = $this->reserveCode ($db, $email, $hashmail, $surveyid);
             }
-
-            $code = random_bytes (32);
-            $passwd = hash ('sha256', $code);
-            $encryptedmail = base64_encode (encrypt ($email, $code));
-            $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
-                "values (:id, :sid, :pwd, :tag)");
-            $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
-            $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
-            $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
-            $query->execute ();
-            $pid = $db->lastInsertId ();
+            finally {
+                unlockParticipant ($db, $hashmail);
+            }
+            if ($reserved === null)
+                return;
+            [$pid, $code] = $reserved;
             $mailer = new MlMailer ();
             $mailer->configure ();
             $mailer->sendCode ($email, $pid, url_base64_encode ($code), $mailsurveyname);
@@ -209,6 +181,54 @@ class GetCode extends View {
             echo ("<p><strong>Error generando código para la consulta <em>{$surveyname}</em></strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} when generating code for survey");
         }
+    }
+
+    /* Busca o crea a la participante y guarda la petición de código. Se
+       llama con el bloqueo de la dirección cogido. Devuelve [pid, código],
+       o null si no procede (ya ha participado o ya pidió uno hace poco). */
+    private function reserveCode ($db, $email, $hashmail, $surveyid){
+        $participants = $db->prepare ("SELECT participantid From {Participants} " .
+            "WHERE participant = :participant ORDER BY participantid LIMIT 1");
+        $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
+        $participants->execute ();
+        $participantid = -1;
+        if ($participants->rowCount () == 0){
+            $participantid = $this->insertParticipant ($db, $email, $hashmail);
+        }
+        else {
+            $participant = $participants->fetch ();
+            $participantid = $participant['participantid'];
+        }
+        $participants->closeCursor ();
+        /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
+            //Needs a time limit.
+            echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
+            return null;
+        }*/
+        if (hasParticipated ($db, $participantid, $surveyid)){
+            echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
+            return null;
+        }
+
+        /* participant va cifrado con un código aleatorio distinto en cada
+           petición, así que no sirve para buscar las anteriores: el límite
+           por hora se comprueba con esta etiqueta fija por correo y consulta. */
+        $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
+        if ($this->checkParticipation ($db, $requesttag, $surveyid)){
+            return null;
+        }
+
+        $code = random_bytes (32);
+        $passwd = hash ('sha256', $code);
+        $encryptedmail = base64_encode (encrypt ($email, $code));
+        $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
+            "values (:id, :sid, :pwd, :tag)");
+        $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
+        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
+        $query->execute ();
+        return [$db->lastInsertId (), $code];
     }
 
     private function checkDomain ($db, $email){

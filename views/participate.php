@@ -91,7 +91,7 @@ class Participate extends View {
 
             $hashmail = hash ('sha256', $this->email);
             $participants = $db->prepare ("SELECT participantid, privatekey " .
-                "FROM {Participants} WHERE participant = :part");
+                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
             $participants->bindParam (":part", $hashmail, PDO::PARAM_STR);
             $participants->execute ();
             if ($participants->rowCount () == 0){
