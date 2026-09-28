@@ -48,25 +48,19 @@ class GetCode extends View {
             showMain ();
             return;
         }
-        $_SESSION['surveyid'] = $_REQUEST['responseid'];
-        unset($_REQUEST['responseid']);
+        $surveyid = $_REQUEST['responseid'];
+        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
+            echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
         try {
             $db = dbConn ();
-            $survey = $db->prepare ("SELECT surveyname FROM {Surveys} " .
-                "WHERE surveyid = :id");
-            $survey->bindParam (":id", $_SESSION['surveyid'], PDO::PARAM_INT);
-            $survey->execute ();
-            if ($survey->rowCount () == 0){
-                removeToken ();
+            if ($this->getSurveyName ($db, $surveyid) === null){
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
-                logMessage (LOGGER_ERROR, "Survey {$_SESSION['surveyid']} does not exist.");
+                logMessage (LOGGER_ERROR, "Survey {$surveyid} does not exist.");
                 return;
             }
-            $row = $survey->fetch ();
-            //echo ("<h2>Obteniendo código para la consulta <em>{$row['surveyname']}</em>.</h2>");
-            $_SESSION['surveyname'] = $row['surveyname'];
-            $survey->closeCursor ();
-            if (!showSurveyHeader ($db, $_SESSION['surveyid'], true)){
+            if (!showSurveyHeader ($db, $surveyid, true)){
                 removeToken ();
                 return;
             }
@@ -82,6 +76,9 @@ class GetCode extends View {
                    verlas pinchando en <em>Ver las preguntas de la consulta</em> debajo de este recuadro.</p>
                 <form id="getcode" name="getcode" method="POST" action="get_code">
                     <?= setTokenHTML (); ?>
+                    <!-- La consulta va en el propio formulario: en la sesión
+                         la pisaría otra pestaña con otra consulta abierta. -->
+                    <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                     <label for="email">Dirección de correo
                       <p><small><em>* Los dominios autorizados son:
                        <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
@@ -101,7 +98,7 @@ class GetCode extends View {
 
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
-                <?php showSurveyQuestions ($db, $_SESSION['surveyid'], true); ?>
+                <?php showSurveyQuestions ($db, $surveyid, true); ?>
             </details>
             <?php
         }
@@ -131,12 +128,8 @@ class GetCode extends View {
            Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
         $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
             strtolower (trim ($_REQUEST['email'])) : "";
-        $surveyid = $_SESSION['surveyid'] ?? null;
-        /* El nombre va tal cual en el correo y escapado en la página. */
-        $mailsurveyname = $_SESSION['surveyname'] ?? "";
-        $surveyname = h ($mailsurveyname);
-        clearParticipationSession ();
-        if ($surveyid === null){
+        $surveyid = $_REQUEST['surveyid'] ?? null;
+        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
         }
@@ -144,10 +137,17 @@ class GetCode extends View {
             echo ("<p><strong>La dirección de correo es incorrecta.</strong></p>");
             return;
         }
-        
+
+        $surveyname = "";
         try {
-            
             $db = dbConn ();
+            /* El nombre va tal cual en el correo y escapado en la página. */
+            $mailsurveyname = $this->getSurveyName ($db, $surveyid);
+            if ($mailsurveyname === null){
+                echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+                return;
+            }
+            $surveyname = h ($mailsurveyname);
             if (!$this->isActive ($db, $surveyid)){
                 echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
                 return;
@@ -251,6 +251,15 @@ class GetCode extends View {
         }
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
+    }
+
+    private function getSurveyName ($db, $sid): ?string {
+        $query = $db->prepare ("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $name = $query->fetchColumn ();
+        $query->closeCursor ();
+        return $name === false ? null : $name;
     }
 
     private function isActive ($db, $sid){
