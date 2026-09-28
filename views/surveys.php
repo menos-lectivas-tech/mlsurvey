@@ -75,7 +75,7 @@ class Surveys extends View {
                     $id = $survey['surveyid'];
                     ?>
                     <tr id="<?= "response_" . $id; ?>">
-                        <td><span class="username" id="svr-<?= $id; ?>"><?= $survey['surveyname'] . $survey["showpartial"]?></span></td>
+                        <td><span class="username" id="svr-<?= $id; ?>"><?= $survey['surveyname'] ?></span></td>
                         <td data-label="Fecha inicio"><?= $survey['dstart'] ?></td>
                         <td data-label="Fecha fin"><?= $survey['dend'] ?></td>
                         <td><input type="submit" class="button-3" onclick="return getCode (<?= $id; ?>);"

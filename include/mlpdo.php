@@ -31,10 +31,9 @@ class MLPDO extends PDO {
   public function query(string $statement, ?int $fetchmode = null, ...$fetchModeArgs)
     {
         $statement = $this->putPrefix($statement);
-        $args      = func_get_args();
 
-        if (count($args) > 1) {
-            return call_user_func_array(array($this, 'parent::query'), $args);
+        if ($fetchmode !== null) {
+            return parent::query($statement, $fetchmode, ...$fetchModeArgs);
         } else {
             return parent::query($statement);
         }

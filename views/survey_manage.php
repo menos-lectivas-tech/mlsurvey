@@ -624,7 +624,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                         dropZone.classList.remove ("dragging");
                     }
                 });
-                <?=  $this->havefile ? "addFile ('{$this->filename}');" : ""?>
+                <?=  $this->havefile ? "addFile (" . json_encode ($this->filename, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ");" : ""?>
 
                 const fileinput = document.getElementById("file-input");
                 fileinput.addEventListener("change", function (){
@@ -636,7 +636,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 <?php
                     if ($this->havefile){
                         $downloadfile = FileParams::FILE_DIR . $this->fileid . "/" . $this->filename;
-                        echo ("window.open ('{$downloadfile}', '_self');");
+                        echo ("window.open (" . json_encode ($downloadfile, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ", '_self');");
                     }
                 ?>
             }
@@ -943,11 +943,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                     $query->bindParam (":file", $filename, PDO::PARAM_STR);
                 }
                 else {
-                    $query->bindParam (":file", "", PDO::PARAM_STR);
+                    $query->bindValue (":file", "", PDO::PARAM_STR);
                 }
                 $query->execute ();
                 $sid = $dbconn->lastInsertId ();
-                $this->mvdir (session_id (), $sid);
+                if (is_string ($filename) && $filename != "")
+                    $this->mvdir (session_id (), $sid);
                 $this->insertQuestions ($dbconn, $sid, $questions);
                 $dbconn->commit ();
             }
@@ -1002,6 +1003,8 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
+                if (!$this->isEditable ($dbconn, $_REQUEST['surveyid']))
+                    throw new Exception ("Survey {$_REQUEST['surveyid']} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys} SET modifiedby = :uid
                     WHERE surveyid = :sid");
                 $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
@@ -1032,11 +1035,14 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $_SESSION['surveyid'] = $sid;
         $this->javascriptype = SurveyJavascript::AddJavascript;
         $dbconn = dbConn ();
-        $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid");
+        $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid
+            AND startdate > NOW()");
         $surveys->bindParam (":sid", $sid, PDO::PARAM_INT);
         $surveys->execute ();
-        if ($surveys->rowCount() == 0)
+        if ($surveys->rowCount() == 0){
+            echo ("<p><strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong></p>");
             return;
+        }
         $survey = $surveys->fetch ();
         if (!empty ($survey['surveyfile'])){
             $this->havefile = true;
@@ -1050,11 +1056,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"
-            value="<?= $survey['surveyname'] ?>"></p>
+            value="<?= htmlspecialchars ($survey['surveyname']); ?>"></p>
         <p><label for="surveydesc">Descripción</label>
-        <textarea class="description" name="surveydesc" id="surveydesc">
-            <?= $survey['surveydesc']; ?>
-        </textarea>
+        <textarea class="description" name="surveydesc" id="surveydesc"><?= htmlspecialchars ($survey['surveydesc']); ?></textarea>
         </p>
         <label id="drop-zone" class="drop-zone dragidle">
         <div id="text-file">Añadir documentación en PDF. Pulsa o arrastra el archivo aquí.</div>
@@ -1106,7 +1110,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 <input type="text" id="name-q-<?= $qid; ?>" name="name-q-<?= $qid; ?>"
                 value=""></p>-->
             <p><label id="label-desc-q-<?= $qid; ?>" for="desc-q-<?= $qid; ?>">Descripción:</label>
-                <textarea class="description" name="desc-q-<?= $qid; ?>" id="desc-q-<?= $qid; ?>"><?= $question['questiondesc']; ?></textarea></p>
+                <textarea class="description" name="desc-q-<?= $qid; ?>" id="desc-q-<?= $qid; ?>"><?= htmlspecialchars ($question['questiondesc']); ?></textarea></p>
             <p><label id="label-opt-q-<?= $qid; ?>" for="opt-q-<?= $qid; ?>">Opcional:</label>
                 <input type="checkbox" name="opt-q-<?= $qid; ?>" id="opt-q-<?= $qid; ?>" 
                 <?= $opt; ?>>
@@ -1140,12 +1144,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     
                 <p id="p-opt-<?= $qid; ?>-1"><input type="text" 
                 name="opt-<?= $qid;?>-1" id="opt-<?= $qid;?>-1"
-                value="<?= $option['optiondesc']; ?>"></p>
+                value="<?= htmlspecialchars ($option['optiondesc']); ?>"></p>
     <?php
             }
             else if ($oid == 2){?>
                 <p id="p-opt-<?= $qid;?>-2"><input type="text" name="opt-<?= $qid;?>-2"
-                 id="opt-<?= $qid;?>-2" value="<?= $option['optiondesc']; ?>">
+                 id="opt-<?= $qid;?>-2" value="<?= htmlspecialchars ($option['optiondesc']); ?>">
                     
                     <button type="button" id="add-opt-<?= $qid;?>-2" class="button-3" 
                     onclick="addoption (<?= $qid;?>,2);">
@@ -1159,7 +1163,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             ?>
                 <p id="p-opt-<?= $qoid; ?>">
                 <input type="text" name="opt-<?= $qoid; ?>" id="opt-<?= $qoid; ?>"
-                    value="<?= $option['optiondesc']; ?>">
+                    value="<?= htmlspecialchars ($option['optiondesc']); ?>">
                     <button type="button" id="add-opt-<?= $qoid; ?>" class="button-3" 
                         onclick="addoption (<?= $qid; ?>,<?= $oid; ?>);">
                         <img src="img/add.svg" />
@@ -1205,11 +1209,24 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             }
             $nquestion++;
         }
+        try {
+            if (!$this->isEditable (dbConn (), $sid)){
+                echo ("<strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong>");
+                return;
+            }
+        }
+        catch (Exception $e){
+            echo ("<strong>Error al modificar la consulta.</strong>");
+            logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
+            return;
+        }
         $filename = $this->saveFile ($sid);
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
+                if (!$this->isEditable ($dbconn, $sid))
+                    throw new Exception ("Survey {$sid} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys}  
                      SET surveyname = :name, startdate = :start, showpartial = :partial,
                     enddate = :end, surveydesc = :desc, surveyfile = :file, modifiedby = :uid 
@@ -1225,7 +1242,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                     $query->bindParam (":file", $filename, PDO::PARAM_STR);
                 }
                 else {
-                    $query->bindParam (":file", "", PDO::PARAM_STR);
+                    $query->bindValue (":file", "", PDO::PARAM_STR);
                 }
                 $query->execute ();
                 $query = $dbconn->prepare ("DELETE from {Questions} ".
@@ -1250,9 +1267,22 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
     }
 
+    /* Solo se pueden modificar o eliminar las consultas que no han empezado. */
+    private function isEditable ($dbconn, $sid): bool {
+        $query = $dbconn->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+            AND startdate > NOW() FOR UPDATE");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $editable = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $editable;
+    }
+
     private function saveFile ($surveyid): string|bool {
         $dir = FileParams::FILE_DIR . $surveyid;
                 
+        if (!isset ($_FILES['file-input']))
+            return "";
         $fileinfo = $_FILES['file-input'];
         if (is_array ($fileinfo["error"])){
             $this->fileerror = "Solo un archivo por subida";
@@ -1311,6 +1341,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     private function mvdir ($orig, $dest){
         $src = FileParams::FILE_DIR . $orig;
         $dst = FileParams::FILE_DIR . $dest;
-        rename ($src, $dst);
+        if (file_exists ($src))
+            rename ($src, $dst);
     }
 }
