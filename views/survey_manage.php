@@ -1054,22 +1054,24 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function deleteSurvey (){
-        if (!isset ($_REQUEST['surveyid']))
+        /* Solo dígitos: además de a la base de datos, va a la ruta de sus adjuntos. */
+        $sid = $_REQUEST['surveyid'] ?? "";
+        if (!is_string ($sid) || !ctype_digit ($sid))
             return;
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
-                if (!$this->isEditable ($dbconn, $_REQUEST['surveyid']))
-                    throw new Exception ("Survey {$_REQUEST['surveyid']} has already started");
+                if (!$this->isEditable ($dbconn, $sid))
+                    throw new Exception ("Survey {$sid} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys} SET modifiedby = :uid
                     WHERE surveyid = :sid");
-                $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
+                $query->bindParam (":sid", $sid, PDO::PARAM_INT);
                 $query->bindParam (":uid", $_SESSION["userid"], PDO::PARAM_INT);
                 $query->execute ();
                 $query = $dbconn->prepare ("DELETE FROM {Surveys} WHERE
                     surveyid = :sid");
-                $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
+                $query->bindParam (":sid", $sid, PDO::PARAM_INT);
                 $query->execute ();
                 $dbconn->commit ();
             }
@@ -1078,6 +1080,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 throw $e;
                 
             }
+            /* Los adjuntos se sirven tal cual desde files/: si se quedasen,
+               seguirían publicados sin consulta. */
+            $this->deldir ($sid);
         }
         catch (Exception $e){
             echo ('<strong>Error eliminando la consulta.</strong>');
@@ -1303,7 +1308,10 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             catch (Exception $e){
                 $dbconn->rollBack ();
                 throw $e;
-            }                
+            }
+            /* Si se ha quitado el adjunto, que deje de estar publicado. */
+            if ($filename === "")
+                $this->deldir ($sid);
         }
         catch (Exception $e){
             echo ("<strong>Error al modificar la consulta.</strong>");
