@@ -13,3 +13,13 @@ function getURL (){
         throw new Exception ("site_url is not configured: can't build links to the site.");
     return rtrim ($url, "/") . "/";
 }
+
+/*
+ * Si el navegador llega al sitio por HTTPS: la petición lo es, o lo es la
+ * URL pública (un proxy inverso puede terminar el TLS y reenviar por HTTP).
+ */
+function isHttps (): bool {
+    if (!empty ($_SERVER['HTTPS']) && strtolower ($_SERVER['HTTPS']) != 'off')
+        return true;
+    return stripos (trim (Config::PARAMS["site_url"] ?? ""), "https://") === 0;
+}

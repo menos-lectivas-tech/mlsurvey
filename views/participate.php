@@ -7,6 +7,7 @@ require_once 'utils/token.php';
 require_once 'utils/crypt.php';
 require_once 'include/fileparams.php';
 require_once 'utils/showsurvey.php';
+require_once 'utils/host.php';
 
 class Participate extends View {
     public const ACTION = "Enviar";
@@ -25,9 +26,15 @@ class Participate extends View {
         startSession ();
         $this->key = random_bytes (32);
         /* Sin dominio: cookie solo para este host. HTTP_HOST puede llevar el
-           puerto (localhost:8080) y el navegador rechaza ese dominio. */
-        setcookie (self::COOKIE_KEY, base64_encode ($this->key), time () + 1800, //Half an hour
-            "", "", true, true);
+           puerto (localhost:8080) y el navegador rechaza ese dominio.
+           Secure solo con HTTPS: servido por HTTP, el navegador descarta
+           una cookie Secure y luego no se podría firmar la respuesta. */
+        setcookie (self::COOKIE_KEY, base64_encode ($this->key), [
+            'expires' => time () + 1800, //Half an hour
+            'secure' => isHttps (),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
