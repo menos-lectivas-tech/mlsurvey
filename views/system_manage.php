@@ -3,6 +3,8 @@
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'include/mlmailer.php';
+require_once 'utils/token.php';
+require_once 'utils/html.php';
 
 class SystemManage extends View {
 
@@ -45,6 +47,11 @@ class SystemManage extends View {
         echo ('<div class="col-md-8">');
         
         if (isset($_REQUEST[self::MANAGEACTION])){
+            if (!checkToken ()){
+                tokenError ();
+                echo ('</div>');
+                return;
+            }
             if ($_REQUEST[self::MANAGEACTION] == "Modificar")
                 $this->modifySystemConfig ();
         }
@@ -103,20 +110,26 @@ class SystemManage extends View {
                 var smtpdiv = document.getElementById ("smtpdiv");
                 var sendmaildiv = document.getElementById ("sendmaildiv");
                 var mailtest = document.getElementById ("mailtest");
-                if (method == <?= MLMailer::SMTP_METHOD ?>){
-                    sendmaildiv.style.display = "none";
-                    smtpdiv.style.display = "block";
-                    mailtest.style.display = "block";
+                /* smtpdiv y sendmaildiv pueden no existir: los datos del
+                   servidor de correo ya no se editan desde aquí. */
+                function display (element, value){
+                    if (element != null)
+                        element.style.display = value;
                 }
-                else if (method == <?= MLMailer::SENDMAIL_METHOD ?>){
-                    sendmaildiv.style.display = "block";
-                    smtpdiv.style.display = "none";
-                    mailtest.style.display = "block";
+                if (method == "<?= MLMailer::SMTP_METHOD ?>"){
+                    display (sendmaildiv, "none");
+                    display (smtpdiv, "block");
+                    display (mailtest, "block");
+                }
+                else if (method == "<?= MLMailer::SENDMAIL_METHOD ?>"){
+                    display (sendmaildiv, "block");
+                    display (smtpdiv, "none");
+                    display (mailtest, "block");
                 }
                 else {
-                    sendmaildiv.style.display = "none";
-                    smtpdiv.style.display = "none";
-                    mailtest.style.display = "none";
+                    display (sendmaildiv, "none");
+                    display (smtpdiv, "none");
+                    display (mailtest, "none");
                 }
             }
 
@@ -173,6 +186,8 @@ class SystemManage extends View {
             $(document).ready(function() {
                 
                 $(".searchbox").select2();
+                /* La configuración de correo está en config/config.php. */
+                allowedFields (<?= json_encode (Config::PARAMS["email_method"] ?? ""); ?>);
                 
 
                 const sendtest = document.getElementById('sendtest');
@@ -197,6 +212,7 @@ class SystemManage extends View {
         <h2>Configuración del sistema.</h2>
         <form id="systemmanage" name="systemmanage" method="POST" 
             action="system_manage" onload='prepareTimezones ();'>
+        <?= setTokenHTML (); ?>
         <div class="question">
             <p><label for="timezone">Zona horaria:</label>
             <select id="timezone" name="timezone" class="searchbox"
@@ -212,21 +228,19 @@ class SystemManage extends View {
             </select></p>
             <p><label for="alloweddomains">Dominios permitidos:</label>
             <input type="text" id="alloweddomains" name="alloweddomains"
-                value="<?= $alloweddomains; ?>"
+                value="<?= htmlspecialchars ($alloweddomains ?? ""); ?>"
                 placeholder="Separados por espacios. Vacío indica sin restricciones."></p>
             <p><label for="sitename">Nombre del sitio:</label>
-                <input type="text" id="sitename" name="sitename" value="<?= $sitename; ?>">
+                <input type="text" id="sitename" name="sitename" value="<?= htmlspecialchars ($sitename ?? ""); ?>">
             </p>
             <p><label for="contact">Dirección de contacto:</label>
-                <input type="email" id="contact" name="contact" value="<?= $contact; ?>">
+                <input type="email" id="contact" name="contact" value="<?= htmlspecialchars ($contact ?? ""); ?>">
             </p>
             <p><label for="mainheader">Texto cabecera:</label>
-                <input type="text" id="mainheader" name="mainheader" value="<?= $mainheader; ?>">
+                <input type="text" id="mainheader" name="mainheader" value="<?= htmlspecialchars ($mainheader ?? ""); ?>">
             </p>
             <p><label for="maincontent">Texto principal:</label>
-                <textarea class="description" name="maincontent" id="maincontent">
-                    <?= $maincontent; ?>
-                </textarea>
+                <textarea class="description" name="maincontent" id="maincontent"><?= htmlspecialchars ($maincontent ?? ""); ?></textarea>
             </p>
             <div class="option" id="mailtest" style="display: none;">
                 <p><label for="sendtest">Enviar mensaje de prueba:</label>
@@ -250,13 +264,31 @@ class SystemManage extends View {
         $cid = $_SESSION['configid'];
         unset ($_SESSION['configid']);
         $dbconn = dbConn ();
+        $tzkey = $_REQUEST['timezone'] ?? "";
+        if (!is_string ($tzkey) || !ctype_digit ($tzkey) || empty ($timezones[(int) $tzkey])){
+            echo ("<p><strong>Debes indicar una zona horaria.</strong></p>");
+            return;
+        }
+        $timezone = $timezones[(int) $tzkey];
+        /* CONVERT_TZ devuelve NULL con una zona que la base de datos no
+           conoce: guardarla dejaría las fechas del sitio sin zona. */
+        $check = $dbconn->prepare ("SELECT CONVERT_TZ(NOW(), @@session.time_zone, :tz) IS NOT NULL");
+        $check->bindParam (":tz", $timezone, PDO::PARAM_STR);
+        $check->execute ();
+        $known = (bool) $check->fetchColumn ();
+        $check->closeCursor ();
+        if (!$known){
+            echo ("<p><strong>La base de datos no conoce la zona horaria " . h ($timezone) .
+                ". Elige otra.</strong></p>");
+            logMessage (LOGGER_ERROR, "Time zone {$timezone} not loaded in the database.");
+            return;
+        }
         $query = $dbconn->prepare ("UPDATE {SystemConfig} SET
             timezone = :timezone, alloweddomains = :domain, contact = :contact,
             mainheader = :mh, maincontent = :mc, sitename = :sn
             WHERE configid = :id");
         $query->bindParam (":id", $cid, PDO::PARAM_INT);
-        $query->bindParam (":timezone", $timezones[$_REQUEST['timezone']],
-            PDO::PARAM_STR);
+        $query->bindParam (":timezone", $timezone, PDO::PARAM_STR);
         $query->bindParam (":domain", $_REQUEST['alloweddomains'],
             PDO::PARAM_STR);
         $query->bindParam (":mh", $_REQUEST['mainheader'],

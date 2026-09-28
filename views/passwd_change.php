@@ -76,13 +76,18 @@ class PasswdChange extends View {
 
     private function changePassword (): bool {
         startSession ();
-        $oldpw = $_REQUEST["current"];
-        $newpw = password_hash ($_REQUEST["newpasswd"], PASSWORD_DEFAULT);
+        $oldpw = $_REQUEST["current"] ?? "";
+        $newpwplain = $_REQUEST["newpasswd"] ?? "";
         $userid = $_SESSION['userid'];
-        if (empty ($oldpw) || empty ($newpw)){
+        if (empty ($oldpw) || empty ($newpwplain)){
             echo ("<p><strong>Ninguna clave puede estar vacía</strong></p>");
             return false;
         }
+        if ($newpwplain !== ($_REQUEST["newpasswd1"] ?? "")){
+            echo ("<p><strong>La nueva clave y su confirmación no coinciden</strong></p>");
+            return false;
+        }
+        $newpw = password_hash ($newpwplain, PASSWORD_DEFAULT);
         try {
             if (validateUser ("", $oldpw, $userid) != 0){
                 echo ("<p><strong>Clave actual erronea o token de seguridad no válido.</strong></p>");

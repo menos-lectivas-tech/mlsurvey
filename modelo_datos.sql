@@ -74,7 +74,8 @@ CREATE TABLE Participants (
 	publickey TEXT NOT NULL,
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
-CREATE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
+/*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
+CREATE UNIQUE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
 
 CREATE TABLE Participation (
 	participationid INT UNSIGNED auto_increment NOT NULL,
@@ -82,9 +83,11 @@ CREATE TABLE Participation (
 	participationkey VARCHAR(256) NOT NULL,
 	participant TEXT NOT NULL,
 	participationdate DATETIME NOT NULL DEFAULT current_timestamp,
+	requesttag CHAR(64) NULL, /*sha256 of participant hash and surveyid, for the hourly limit*/
 	CONSTRAINT Participation_PK PRIMARY KEY (participationid),
 	CONSTRAINT Participation_surveys_FK FOREIGN KEY (surveyid) REFERENCES Surveys(surveyid) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
+CREATE INDEX Participation_request_IDX USING BTREE ON Participation (surveyid, requesttag, participationdate);
 
 
 CREATE TABLE StressTest (
@@ -116,15 +119,12 @@ CREATE TABLE Results (
 	CONSTRAINT Results_Surveys_FK FOREIGN KEY (surveyid) REFERENCES Surveys(surveyid) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
+CREATE TABLE Version (
+  versionid INT UNSIGNED NOT NULL PRIMARY KEY,
+  versioncode INT NOT NULL
+);
 
-CREATE TABLE Version {
-	versionid INT UNSIGNED NOT NULL,
-	versioncode INT UNSIGNED NOT NULL,
-	versionname VARCHAR(16) NOT NULL,
-	CONSTRAINT Version_PK PRIMARY KEY (versionid)
-};
-
-INSERT INTO Version values (1, 1, "1.0");
+INSERT INTO Version values (1, 2);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update

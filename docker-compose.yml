@@ -80,9 +80,9 @@ services:
       APACHE_START_WORKERS: ${APACHE_START_WORKERS:-25}
       APACHE_MAX_SPARE_WORKERS: ${APACHE_MAX_SPARE_WORKERS:-75}
       APACHE_LISTEN_BACKLOG: ${APACHE_LISTEN_BACKLOG:-1024}
-      # Rellenar si la aplicacion esta detras de un proxy inverso.
-      PROXY_PATH: ${PROXY_PATH:-}
-      PROXY_PORT: ${PROXY_PORT:-}
+      # URL publica del sitio, tal como la ven las participantes. Los enlaces
+      # de los correos se construyen con ella, no con la cabecera Host.
+      SITE_URL: ${SITE_URL:-http://localhost:${WEB_PORT:-8080}/}
       # 0: error, 1: warn, 2: info, 3: debug. En produccion 0.
       LOG_LEVEL: ${LOG_LEVEL:-0}
       # Envio de correo (antes en la base de datos, ahora en config/config.php).
@@ -96,6 +96,10 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-mlsurvey@example.test}
       # tls (STARTTLS), ssl, o none para SMTP sin cifrar (solo desarrollo).
       EMAIL_ENCRYPTION: ${EMAIL_ENCRYPTION:-none}
+      # Captcha ALTCHA del formulario de codigo (ver .env.dev): sin HTTPS
+      # ni localhost hay que ponerlo a false.
+      ALTCHA_ENABLED: ${ALTCHA_ENABLED:-true}
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}

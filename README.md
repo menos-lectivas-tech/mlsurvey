@@ -39,6 +39,8 @@ Enter into `config` directory, copy or rename the file `config.php.sample` to `c
 and restric permissions as it contains sensible information.
 
 Every configuration item has a description, you only need to notice:
+* `site_url` is mandatory: it is the public URL of the site and the participation
+  links sent by email are built from it.
 * If you have a working Sendmail in your system you only need to set:
 ```php
 "email_method" => "Sendmail",
@@ -119,7 +121,7 @@ the database to be ready before serving requests.
 | `DB_PASSWORD` | `mlsurvey` | Password for that user. |
 | `DB_ROOT_PASSWORD` | `mlsurvey-root` | MariaDB `root` password. |
 | `DB_PREFIX` | *(empty)* | Optional prefix for table names. |
-| `PROXY_PATH`, `PROXY_PORT` | *(empty)* | Only needed when the application sits behind a reverse proxy on a subdirectory or a different port. |
+| `SITE_URL` | `http://localhost:${WEB_PORT}/` | Public URL of the site (scheme, host, port and path). The participation links sent by email are built from it, never from the request's `Host` header. |
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
@@ -153,3 +155,10 @@ docker compose exec web bash   # shell inside the container
 docker compose restart web     # restart just the application
 docker compose down            # stop the containers, keeping the data
 ```
+
+# Update
+When updating the application don't forget run:
+```sh
+php updatedb.php
+```
+for updating the database tables if needed.

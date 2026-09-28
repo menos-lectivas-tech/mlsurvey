@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'utils/dbutils.php';
@@ -34,6 +35,13 @@ class UserManage extends View {
             showMain ();
             return;
         }
+        if ((isset ($_REQUEST[self::MANAGEACTION]) || isset ($_REQUEST[self::ADDACTION]) ||
+            isset ($_REQUEST[self::MODIFYACTION])) && !checkToken ()){
+            echo ('<div class="col-md-8">');
+            tokenError ();
+            echo ('</div>');
+            return;
+        }
         if (isset($_REQUEST[self::MANAGEACTION])){
             $action = $_REQUEST[self::MANAGEACTION];
             unset ($_REQUEST[self::MANAGEACTION]);
@@ -59,21 +67,36 @@ class UserManage extends View {
             unset ($_REQUEST[self::ADDACTION]);
             switch ($action) {
                 case 'Aceptar':
-                    $user = $_REQUEST['user'];
-                    $passwd = $_REQUEST['passwd'];
+                    $user = $_REQUEST['user'] ?? "";
+                    $passwd = $_REQUEST['passwd'] ?? "";
+                    if ($user == "" || $passwd == ""){
+                        echo ("<h3>El nombre de usuaria y la clave no pueden estar vacíos</h3>");
+                        break;
+                    }
+                    if ($passwd !== ($_REQUEST['passwd2'] ?? "")){
+                        echo ("<h3>Las claves no coinciden</h3>");
+                        break;
+                    }
                     try {
-                    if (isset($_REQUEST['isadmin'])){
-                        adduser ($user, $passwd, "A");
-                    }
-                    else {
-                        adduser ($user, $passwd);
-                    }
+                        if (userNameExists ($user)){
+                            echo ("<h3>Ya existe una usuaria con ese nombre</h3>");
+                            break;
+                        }
+                        if (isset($_REQUEST['isadmin'])){
+                            $res = adduser ($user, $passwd, "A");
+                        }
+                        else {
+                            $res = adduser ($user, $passwd);
+                        }
+                        if ($res == 0)
+                            echo ("<strong>Usuaria " . htmlspecialchars ($user) . " añadida con éxito</strong>");
+                        else
+                            echo ("<h3>Error al añadir la usuaria</h3>");
                     }
                     catch (Exception $e){
                         echo ("<h3>Error al añadir la usuaria</h3>");
                         logMessage (LOGGER_ERROR, "Error ading user: {$e}");
                     }
-                    echo ("<strong>Usuaria {$user} añadida con éxito</strong>");
                     break;
                 default:
                     break;
@@ -92,6 +115,7 @@ class UserManage extends View {
         <div class="col-md-8">
         <h2>Gestión de usuarias</h2>
         <form id="usermanage" name="usermanage" method="POST" action="user_manage" >
+        <?= setTokenHTML (); ?>
         <?php
         $this->listUsers ();
         $this->showControls ();
@@ -126,7 +150,7 @@ class UserManage extends View {
                     $name = $row['username'];
                     ?>
                     <tr id="<?= $id; ?>">
-                        <td><span class="username" id="us-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="us-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td class="ml-row-actions">
                             <button type="submit" class="button-3 is-ghost is-icon"
                                 name="<?= self::MANAGEACTION ?>" value="Modificar"
@@ -227,6 +251,7 @@ class UserManage extends View {
         <h2>Añadir usuaria</h2>
         <form id="adduser" name="adduser" method="POST" action="user_manage" 
 onload='document.getElementById("user").focus();'>
+        <?= setTokenHTML (); ?>
         <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1"></p>
         <p>Clave: <input type="password" id="passwd" name="passwd"></p>
         <p>Confirmar clave: <input type="password" id="passwd2" name="passwd2"></p>
@@ -241,10 +266,11 @@ onload='document.getElementById("user").focus();'>
 
     private function deleteUser (){
         $userid = $_REQUEST['userid'];
+        $username = "";
         try {
             $username = getUserName ($userid);
             rmUser ($userid);
-            echo ("<strong>Usuaria {$username} eliminada con éxito.</strong>");
+            echo ("<strong>Usuaria " . h ($username) . " eliminada con éxito.</strong>");
         }
         catch (Exception $e){
             echo ("<strong>Error al eliminar usuaria</strong>");
@@ -282,7 +308,8 @@ onload='document.getElementById("user").focus();'>
         <h2>Modificar usuaria</h2>
         <form id="moduser" name="moduser" method="POST" action="user_manage" 
 onload='document.getElementById("user").focus();'>
-        <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1" value="<?= $name ?>"></p>
+        <?= setTokenHTML (); ?>
+        <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1" value="<?= htmlspecialchars ($name ?? ""); ?>"></p>
         <p>Nueva clave: <input type="password" id="passwd" name="passwd" placeholder="Vacío sin cambios"></p>
         <p>Confirmar nueva clave: <input type="password" id="passwd2" name="passwd2"></p>
         <p>Es admin: <input type="checkbox" id="isadmin" name="isadmin" <?= $isadmin; ?>></p>
@@ -296,20 +323,32 @@ onload='document.getElementById("user").focus();'>
     }
     private function modifyUser (){
         $userid = $_REQUEST['userid'];
-        $newname = $_REQUEST['user'];
-        $newpasswd = $_REQUEST['passwd'];
+        $newname = $_REQUEST['user'] ?? "";
+        $newpasswd = $_REQUEST['passwd'] ?? "";
+        if ($newname == ""){
+            echo ('<strong>El nombre de usuaria no puede estar vacío</strong>');
+            return;
+        }
+        if ($newpasswd !== ($_REQUEST['passwd2'] ?? "")){
+            echo ('<strong>Las claves no coinciden</strong>');
+            return;
+        }
         $isadmin = "";
         if (isset ($_REQUEST['isadmin'])){
             $isadmin = "A";
         }
         try {
+            if (userNameExists ($newname, $userid)){
+                echo ('<strong>Ya existe otra usuaria con ese nombre</strong>');
+                return;
+            }
             alterUser ($userid, $newname, $isadmin, $newpasswd);
+            echo ("<strong>Usuaria " . htmlspecialchars ($newname) . " modificada con éxito</strong>");
         }
         catch (Exception $e){
             echo ('<strong>Error al intentar modificar la usuaria</strong>');
             logMessage (LOGGER_ERROR, "Error modifying user {$e}");
         }
-        echo ("<strong>Usuaria {$newname} modificada con éxito</strong>");
     }
 
     function loadStyles (){

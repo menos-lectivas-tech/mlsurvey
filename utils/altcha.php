@@ -21,8 +21,11 @@ const ALTCHA_ALGORITHM = 'SHA-256';
 const ALTCHA_MAX_NUMBER = 200000;
 /* Validez del reto, en segundos. */
 const ALTCHA_EXPIRES = 900;
-/* Variable de sesión donde se guarda el reto pendiente. */
-const ALTCHA_SESSION = 'altcha';
+/* Variable de sesión donde se guardan los retos pendientes. */
+const ALTCHA_SESSION = 'altchas';
+/* Retos pendientes que caben a la vez: uno por formulario abierto, así
+   una pestaña no invalida el reto de otra. */
+const ALTCHA_MAX_PENDING = 20;
 /* Variable de sesión con la clave HMAC, si no hay ninguna configurada. */
 const ALTCHA_SESSION_KEY = 'altchakey';
 
@@ -77,7 +80,11 @@ function altchaChallenge (){
     /* La caducidad viaja en la sal, como indica el protocolo de ALTCHA. */
     $salt = bin2hex (random_bytes (12)) . '?expires=' . (time () + ALTCHA_EXPIRES);
     $challenge = hash ('sha256', $salt . $number);
-    $_SESSION[ALTCHA_SESSION] = $challenge;
+    if (!isset ($_SESSION[ALTCHA_SESSION]) || !is_array ($_SESSION[ALTCHA_SESSION]))
+        $_SESSION[ALTCHA_SESSION] = array ();
+    $_SESSION[ALTCHA_SESSION][] = $challenge;
+    while (count ($_SESSION[ALTCHA_SESSION]) > ALTCHA_MAX_PENDING)
+        array_shift ($_SESSION[ALTCHA_SESSION]);
 
     return [
         "algorithm" => ALTCHA_ALGORITHM,
@@ -138,11 +145,9 @@ function altchaCheck (){
         return true;
 
     startSession ();
-    $challenge = isset ($_SESSION[ALTCHA_SESSION]) ? $_SESSION[ALTCHA_SESSION] : "";
-    /* Un reto, un envío: se descarta aunque la comprobación falle. */
-    unset ($_SESSION[ALTCHA_SESSION]);
-
-    if ($challenge == ""){
+    $pending = isset ($_SESSION[ALTCHA_SESSION]) && is_array ($_SESSION[ALTCHA_SESSION]) ?
+        $_SESSION[ALTCHA_SESSION] : array ();
+    if (empty ($pending)){
         logMessage (LOGGER_WARN, "Altcha: no challenge in session.");
         return false;
     }
@@ -176,8 +181,17 @@ function altchaCheck (){
         return false;
     }
 
-    /* El reto resuelto tiene que ser el que se envió en esta sesión, ... */
-    if (!hash_equals ($challenge, (string) $solution['challenge'])){
+    /* El reto resuelto tiene que ser uno de los enviados en esta sesión, ... */
+    $challenge = "";
+    foreach ($pending as $key => $candidate){
+        if (hash_equals ($candidate, (string) $solution['challenge'])){
+            $challenge = $candidate;
+            /* Un reto, un envío: se descarta aunque la comprobación falle. */
+            unset ($_SESSION[ALTCHA_SESSION][$key]);
+            break;
+        }
+    }
+    if ($challenge == ""){
         logMessage (LOGGER_WARN, "Altcha: solution for another challenge.");
         return false;
     }

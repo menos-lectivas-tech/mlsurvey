@@ -51,8 +51,8 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
     (1, 3, 2, 'No');
 
 /* 2: Actividades extraescolares del proximo curso */
-INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby) VALUES
-    (2, 'Actividades extraescolares del proximo curso', '<p>Consulta <strong>abierta</strong>: se puede solicitar codigo y participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 27 DAY), 1, 1);
+INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby, showpartial) VALUES
+    (2, 'Actividades extraescolares del proximo curso', '<p>Consulta <strong>abierta</strong>: se puede solicitar codigo y participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 27 DAY), 1, 1, true);
 INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
     (2, 1, '<p>&iquest;Que actividad te interesa mas?</p>', 0, 0, NULL);
 INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
@@ -206,6 +206,13 @@ INSERT INTO Participation (participationid, surveyid, participationkey, particip
     (6, 2, 'abe8950e69a04e27acd086d94c43c42e833229e9705a6fd256cede0bb80e174a', 'dkpJZHV4ODcwUTl6a1hnT2NPZmhmSkQ4cWNEQWpNV3U3RTF6cWR6TVJKdz0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
 INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
     (7, 2, '52a37853a33877db86653f55f24851e444207e8108dace15c7575b242d866d88', 'TkdDdWFtMTkvR2pXdmRUQTU5TEZGaC9PZVgwakV1bStUdG1Sc2NQSXBVcz0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
+/* Participaciones ya usadas en la consulta 2 (ana, bruno y carla ya han respondido). */
+INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
+    (8, 2, '3109c9550b750695cf2a68c9b574ec50f08272ec52e7aeb23963ddcb456dd1c7', 'L0Fod0taWUhuVFdrZ0VHOHlpcGp4L2FjWU1oUzFkZ21tZGlPY2FkUWw2WT0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
+INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
+    (9, 2, '8bbcf252eb14078507b91a588f166a83c485d8fb89e6575bbb0ec4ae521f9ced', 'WlloOVZ0TTV0dGJ4NlRjdm43bVJFdzVzSTc5RzJMNTZ5a1dYbFd1d0d4RT0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
+INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
+    (10, 2, '5d1347fb5f918494f3f5730381c39be19f7d115e84dcc9f907b79b9fb6c833b2', 'OEU3bWk4a0Z6RHgvRHEwT3l3QWZ1Q0FucS8zby9pQkx5eDZQVUM1bWwvZz0=', DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 /* ---------- Respuestas firmadas de la consulta 1 ---------- */
 /* Verificables con: docker compose exec web php verify_responses.php 1 */
@@ -220,6 +227,11 @@ INSERT INTO Responses (surveyid, participantid, response, responsesign, response
 INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
     (1, 5, '{"1":2,"2":{"2":1,"4":1},"3":2}', 'MEUCICPbgx0U9avVeynUlpafLOt+sCC4qyL5XwC2IwGuHlQ4AiEAsn/uEL9NKrvRs/J4P0tyM8gGkXpnAGUwrNe3Zf2kxqk=', DATE_SUB(NOW(), INTERVAL 19 DAY));
 
-/* ---------- Resultados publicados de la consulta 1 ---------- */
-INSERT INTO Results (surveyid, results, resultsdate) VALUES
-    (1, '{"Total":5,"Responses":{"1":{"1":1,"2":3,"3":1,"4":0},"2":{"1":2,"2":3,"3":1,"4":3},"3":{"1":2,"2":2}}}', DATE_SUB(NOW(), INTERVAL 9 DAY));
+/* ---------- Respuestas firmadas de la consulta 2 (abierta, con resultados parciales) ---------- */
+/* Verificables con: docker compose exec web php verify_responses.php 2 */
+INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
+    (2, 1, '{"1":1,"2":{"2":1,"3":1}}', 'MEQCIClOwJ2vX/3m9QS3RG1n/+egkF1sNsavEUr6SFrqUVTsAiAu5OEY3CWmDmkM4MkKkU4m4vpZPy8dUqwyw8E1K2vAqQ==', DATE_SUB(NOW(), INTERVAL 2 DAY));
+INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
+    (2, 2, '{"1":3,"2":[]}', 'MEUCIDdGvAr0ALQErUe2uCT3XxAYXHwWGXIQ2oOgyiGCS9geAiEA/eZZheTV2bCxK+qcQD8pHmeEchQB6oeBJ2UoUx6qtSQ=', DATE_SUB(NOW(), INTERVAL 1 DAY));
+INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
+    (2, 3, '{"1":1,"2":{"4":1}}', 'MEUCIB4TKIdjw8H1OkUw3SqyRaWq5FdFcBv5ElbV3ROzo7I3AiEA+XaR8WaoIR9/hKVc/Kr/GHVMqVYoCkcwhJyj4aukrJk=', DATE_SUB(NOW(), INTERVAL 1 DAY));

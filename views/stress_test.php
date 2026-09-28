@@ -1,7 +1,11 @@
 <?php
+
 /**
  * This class shows and manages the stress tests.
  */
+
+require_once 'utils/html.php';
+
 require_once "ifaces/view.php";
 require_once "utils/user.php";
 require_once "utils/dbutils.php";
@@ -60,6 +64,10 @@ class StressTest extends View {
         }
         
         if (isset ($_REQUEST['testaction'])){
+            if (!checkToken ()){
+                tokenError ();
+                return;
+            }
             switch ($_REQUEST['testaction']) {
                 case self::TEST_CLEAN:
                     if ($this->cleanTests ())
@@ -82,12 +90,13 @@ class StressTest extends View {
         <h1>Generar archivo de stress</h1>
         <form id="stresstest" name="stresstest" method="POST" 
             action="stress_test">
+            <?= setTokenHTML (); ?>
             <p><label for="surveys">Consulta:</label>
                     <select id="surveys" name="surveyid">
                         <?php
                         while ($survey = $surveys->fetch ()){
                             ?>
-                        <option value="<?= $survey["surveyid"] ?>"><?= $survey["surveyname"] ?></option>
+                        <option value="<?= $survey["surveyid"] ?>"><?= h ($survey["surveyname"]) ?></option>
                         <?php
                         }
                         ?>
@@ -149,7 +158,7 @@ class StressTest extends View {
         $this->cleanTests ();
         if (!file_exists (self::TEST_DIR))
             mkdir (self::TEST_DIR, 0700, true);
-        $testcount = $_REQUEST['testcount'];
+        $testcount = (int) $_REQUEST['testcount'];
         $surveyid = $_REQUEST["surveyid"];
         try {
             $file = fopen (self::TEST_FILE, "w");
@@ -164,7 +173,7 @@ class StressTest extends View {
                 $query->execute ();
                 $pid = $db->lastInsertId ();
                 $auth = url_base64_encode ($code);
-                $theurl = getURL () . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
+                $theurl = rtrim (getURL (), "/") . "/participate?t=1&pid={$pid}&auth={$auth}" . PHP_EOL;
                 fwrite ($file, $theurl);
             }
             fclose ($file);
@@ -181,7 +190,7 @@ class StressTest extends View {
     private function insertHTML (){
         ?>
         <h2>Datos de test generados.</h2>
-        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="buttton-3">Descargar</a>
+        <a href="<?= self::TEST_FILE ?>" download="testdata.txt" class="button-3">Descargar</a>
         <?php
     }
 }

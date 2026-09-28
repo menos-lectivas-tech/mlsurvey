@@ -9,11 +9,12 @@ const CONFIG = [
 "db_prefix"=>'',
 
 /**
- * Needed sometimes if behind a reverse proxy or with some location configurations.
- * No need to change if the emails are sended with the correct URL 
+ * Public URL of the site, as participants reach it (scheme, host, port and
+ * path, e.g. "https://consultas.example.org/mlsurvey/"). The participation
+ * links sent by email are built from it. It is mandatory: the Host header of
+ * the request can't be trusted for that.
  */
-"proxy_path"=>"",
-"proxy_port"=>"",
+"site_url"=>"",
 
 
 /**
@@ -49,4 +50,11 @@ const CONFIG = [
  */
 
 "ml_stresstest" => false,
+
+/**
+ * For restrict permissions on survey edition.
+ * true: only creator can edit a survey
+ * false: every user can edit a survey.
+ */
+"survey_edit_restric" => false,
 ];

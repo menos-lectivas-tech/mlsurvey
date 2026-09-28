@@ -1,7 +1,10 @@
 <?php
+
 /**
  * This class handle the page for showing ended surveys.
  */
+
+require_once 'utils/html.php';
 require_once "ifaces/view.php";
 require_once "utils/dbutils.php";
 
@@ -63,7 +66,7 @@ class EndedSurveys extends View {
                     $id = $survey['surveyid'];
                     ?>
                     <tr id="<?= "query_" . $id; ?>">
-                        <td><span class="username" id="svr-<?= $id; ?>"><?= $survey['surveyname']?></span></td>
+                        <td><span class="username" id="svr-<?= $id; ?>"><?= h ($survey['surveyname']) ?></span></td>
                         <td data-label="Fecha inicio"><?= $survey['dstart'] ?></td>
                         <td data-label="Fecha fin"><?= $survey['dend'] ?></td>
                         <td><input type="submit" class="button-3"

@@ -1,9 +1,14 @@
 <?php
+
 /**
  * This class shows the results for a survey
  */
+
+require_once 'utils/html.php';
+
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
+require_once 'utils/results.php';
 class Results extends View {
 
     /* Ranuras de la paleta categórica definida en css/results.css.
@@ -39,8 +44,11 @@ class Results extends View {
         $surveyid = $_REQUEST["queryid"];
         try {
             $db = dbConn ();
-            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile
-                FROM {Surveys} WHERE surveyid = :sid");
+
+            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile, showpartial, " .
+            "startdate < NOW() AND enddate > NOW() AS active " .
+            "FROM {Surveys} WHERE surveyid = :sid");
+
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $surveys->execute ();
             if ($surveys->rowCount () == 0){
@@ -49,35 +57,40 @@ class Results extends View {
                 return;
             }
             $survey = $surveys->fetch ();
-            $surveyname = $survey['surveyname'];
-            $surveydesc = $survey["surveydesc"];
+            $surveyname = h ($survey['surveyname']);
+            $surveydesc = sanitizeHtml ($survey["surveydesc"]);
             $surveyfile = $survey["surveyfile"];
             $surveys->closeCursor ();
 
-            $results = $db->prepare ("SELECT results, ispartial 
-                FROM {Results} WHERE surveyid = :sid");
-            $results->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $results->execute ();
-            if ($results->rowCount () == 0){
-                echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
-                return;
+
+            /* Mientras la consulta está abierta los parciales se cuentan en
+               caliente sobre Responses; Results solo guarda el recuento
+               definitivo que se genera al finalizar. */
+            $partial = !empty ($survey["active"]);
+            if ($partial){
+                if (empty ($survey["showpartial"])){
+                    echo ("<p><strong>La consulta {$surveyname} no muestra resultados parciales.</strong></p>");
+                    return;
+                }
+                $resultsarray = countResponses ($db, $surveyid);
             }
-            $row = $results->fetch ();
-            $result = $row['results'];
-            $partial = empty ($row["ispartial"]) ? " " : " parciales ";
-            $results->closeCursor ();
-            $resultsarray = json_decode ($result, true);
-            if ($resultsarray == null){
-                echo ("<p><strong>Error leyendo los resultados para la consulta {$surveyname}</strong></p>");
-                logMessage (LOGGER_ERROR, "Malformed results JSON for survey {$surveyid}");
-                return;
+            else {
+                $resultsarray = loadResults ($db, $surveyid);
+                if ($resultsarray === null){
+                    echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
+                    return;
+                }
+
             }
-            $thefile = FileParams::FILE_DIR . $surveyid . "/" . $surveyfile;
+            $thefile = h (FileParams::FILE_DIR . $surveyid . "/" . rawurlencode ($surveyfile ?? ""));
+            $surveyfilename = h ($surveyfile);
             ?>
-            <h2>Mostrando resultados<?= $partial; ?>para la consulta <?= $surveyname;?>.</h2>
+
+            <h2>Mostrando resultados <?= $partial ? "parciales " : ""; ?>para la consulta <?= $surveyname;?>.</h2>
+
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
-            <?= empty ($surveyfile)?"":"Documentación adjunta: <a href='{$surveyfile}'";?>
-            <p><em>En esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
+            <?= empty ($surveyfile)?"":"<p>Documentación adjunta: <a href='{$thefile}'>{$surveyfilename}</a></p>";?>
+            <p><em><?= $partial ? "Hasta ahora e" : "E"; ?>n esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
             <?php
             $questions = $db->prepare ("SELECT * FROM {Questions} WHERE surveyid = :sid");
             $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
@@ -89,7 +102,7 @@ class Results extends View {
                 ?>
                 <div class="question">
                     <h3>Pregunta <?= $questionid; ?></h3>
-                    <p><strong><em><?= $question["questiondesc"]; ?></em></strong></p>
+                    <div><strong><em><?= sanitizeHtml ($question["questiondesc"]); ?></em></strong></div>
                     <p>
                         <label for="<?= $mulid; ?>">Multiple</label>
                         <input disabled type="checkbox" value="Multiple" id="<?= $mulid; ?>"
@@ -101,7 +114,7 @@ class Results extends View {
                     <div class="option">
                     <?php
                     $totalquestion = 0;
-                    foreach ($resultsarray["Responses"][$questionid] as $value) {
+                    foreach ($resultsarray["Responses"][$questionid] ?? [] as $value) {
                         $totalquestion += $value;
                     }
                     $options = $db->prepare ("SELECT * FROM {Options} WHERE " . 
@@ -111,8 +124,8 @@ class Results extends View {
                     $options->execute ();
                     while ($option = $options->fetch ()){
                         $optionid = $option['optionid'];
-                        $optionres = $resultsarray["Responses"][$questionid][$optionid];
-                        $pctres = $optionres/$totalquestion;
+                        $optionres = $resultsarray["Responses"][$questionid][$optionid] ?? 0;
+                        $pctres = $totalquestion > 0 ? $optionres/$totalquestion : 0;
                         $elid = "opt-" . $questionid . "-" . $optionid;
                         /* Las opciones empiezan en 1: se desplaza para que la
                            primera reciba la ranura inicial de la paleta. */
@@ -120,10 +133,10 @@ class Results extends View {
                         $elclass = self::RESULTS_COLORS[($optionid + $slots - 1) % $slots];
                         ?>
                         <p>
-                        <label for="<?= $elid; ?>"><strong><?= $option['optiondesc'] ?></strong>: <?= 
+                        <label for="<?= $elid; ?>"><strong><?= h ($option['optiondesc']) ?></strong>: <?= 
                          $optionres?> votos</label>
                          <progress class="<?= $elclass ?>" id="<?= $elid; ?>" 
-                         value="<?= $pctres; ?>" max="1"> <?= $pctres; ?>% </progress>
+                         value="<?= $pctres; ?>" max="1"> <?= round ($pctres * 100, 1); ?>% </progress>
                         </p>
                     <?php
                     }

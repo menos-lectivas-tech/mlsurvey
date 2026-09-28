@@ -1,7 +1,11 @@
 <?php
+
 /**
  * This class shows the page for getting and sending participation URL.
  */
+
+require_once 'utils/html.php';
+
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'views/surveys.php';
@@ -62,25 +66,19 @@ class GetCode extends View {
             showMain ();
             return;
         }
-        $_SESSION['surveyid'] = $_REQUEST['responseid'];
-        unset($_REQUEST['responseid']);
+        $surveyid = $_REQUEST['responseid'];
+        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
+            echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
         try {
             $db = dbConn ();
-            $survey = $db->prepare ("SELECT surveyname FROM {Surveys} " .
-                "WHERE surveyid = :id");
-            $survey->bindParam (":id", $_SESSION['surveyid'], PDO::PARAM_INT);
-            $survey->execute ();
-            if ($survey->rowCount () == 0){
-                removeToken ();
+            if ($this->getSurveyName ($db, $surveyid) === null){
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
-                logMessage (LOGGER_ERROR, "Survey {$_SESSION['surveyid']} does not exist.");
+                logMessage (LOGGER_ERROR, "Survey {$surveyid} does not exist.");
                 return;
             }
-            $row = $survey->fetch ();
-            //echo ("<h2>Obteniendo código para la consulta <em>{$row['surveyname']}</em>.</h2>");
-            $_SESSION['surveyname'] = $row['surveyname'];
-            $survey->closeCursor ();
-            if (!showSurveyHeader ($db, $_SESSION['surveyid'], true)){
+            if (!showSurveyHeader ($db, $surveyid, true)){
                 removeToken ();
                 return;
             }
@@ -96,10 +94,13 @@ class GetCode extends View {
                    verlas pinchando en <em>Ver las preguntas de la consulta</em> debajo de este recuadro.</p>
                 <form id="getcode" name="getcode" method="POST" action="get_code">
                     <?= setTokenHTML (); ?>
+                    <!-- La consulta va en el propio formulario: en la sesión
+                         la pisaría otra pestaña con otra consulta abierta. -->
+                    <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                     <label for="email">Dirección de correo
                       <p><small><em>* Los dominios autorizados son:
-                       <?= Config::$alloweddomains == ""? "cualquiera" : str_replace (" ", ", ",
-                           Config::$alloweddomains);?>
+                       <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
+                           Config::$alloweddomains));?>
                        </em></small></p>
                     </label>
                     <div class="ml-participate-row">
@@ -115,7 +116,7 @@ class GetCode extends View {
 
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
-                <?php showSurveyQuestions ($db, $_SESSION['surveyid'], true); ?>
+                <?php showSurveyQuestions ($db, $surveyid, true); ?>
             </details>
             <?php
         }
@@ -161,66 +162,59 @@ class GetCode extends View {
      * formatted as an URL.
      */
     private function generateCode (){
-        $email = $_REQUEST['email'];
-        $surveyid = $_SESSION['surveyid'];
-        $surveyname = $_SESSION['surveyname'];
-        clearSessionVariables ();
-        if (is_null ($email) || $email == "") {
+        /* Normalizada: el hash de la dirección identifica a la persona, y
+           Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
+        $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
+            strtolower (trim ($_REQUEST['email'])) : "";
+        $surveyid = $_REQUEST['surveyid'] ?? null;
+        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
+            echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
+        if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
             echo ("<p><strong>La dirección de correo es incorrecta.</strong></p>");
             return;
         }
-        
+
+        $surveyname = "";
         try {
-            $old = true;
+
             $db = dbConn ();
+            /* El nombre va tal cual en el correo y escapado en la página. */
+            $mailsurveyname = $this->getSurveyName ($db, $surveyid);
+            if ($mailsurveyname === null){
+                echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+                return;
+            }
+            $surveyname = h ($mailsurveyname);
+            if (!$this->isActive ($db, $surveyid)){
+                echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
+                return;
+            }
             if (!$this->checkDomain ($db, $email)){
                 return;
             }
 
             $hashmail = hash ('sha256', $email);
-            $participants = $db->prepare ("SELECT participantid From {Participants} " .
-                "WHERE participant = :participant");
-            $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
-            $participants->execute ();
-            $participantid = -1;
-            if ($participants->rowCount () == 0){
-                $old = false;
-                $participantid = $this->insertParticipant ($db, $email, $hashmail);
-            }
-            else {
-                $participant = $participants->fetch ();
-                $participantid = $participant['participantid'];
-            }
-            $participants->closeCursor ();
-            /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
-                //Needs a time limit.
-                echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
-                return;
-            }*/
-            if ($old){
-                if (hasParticipated ($db, $participantid, $surveyid)){
-                    echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
-                    return;
-                }
-            }
 
-            $code = random_bytes (32);
-            
-            if ($this->checkParticipation ($db, $participant, $surveyid)){
+            if (!lockParticipant ($db, $hashmail)){
+                echo ("<p><strong>Hay otra petición en curso con esta dirección de correo. " .
+                    "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
+
             }
-            $passwd = hash ('sha256', $code);
-            $participant = base64_encode (encrypt ($email, $code));
-            $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey) " .
-                "values (:id, :sid, :pwd)");
-            $query->bindParam (":id", $participant, PDO::PARAM_STR);
-            $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
-            $query->execute ();
-            $pid = $db->lastInsertId ();
+            try {
+                $reserved = $this->reserveCode ($db, $email, $hashmail, $surveyid);
+            }
+            finally {
+                unlockParticipant ($db, $hashmail);
+            }
+            if ($reserved === null)
+                return;
+            [$pid, $code] = $reserved;
             $mailer = new MlMailer ();
             $mailer->configure ();
-            $mailer->sendCode ($email, $pid, url_base64_encode ($code), $surveyname);
+            $mailer->sendCode ($email, $pid, url_base64_encode ($code), $mailsurveyname);
             echo ("<p><strong>El código para participar en la consulta <em>{$surveyname}</em> " . 
                 "ha sido enviado a la dirección indicada.</strong></p>");
         }
@@ -230,9 +224,56 @@ class GetCode extends View {
         }
     }
 
-    /**
-     * Checks if an email address belongs to any of the allowed domains.
-     */
+
+    /* Busca o crea a la participante y guarda la petición de código. Se
+       llama con el bloqueo de la dirección cogido. Devuelve [pid, código],
+       o null si no procede (ya ha participado o ya pidió uno hace poco). */
+    private function reserveCode ($db, $email, $hashmail, $surveyid){
+        $participants = $db->prepare ("SELECT participantid From {Participants} " .
+            "WHERE participant = :participant ORDER BY participantid LIMIT 1");
+        $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
+        $participants->execute ();
+        $participantid = -1;
+        if ($participants->rowCount () == 0){
+            $participantid = $this->insertParticipant ($db, $email, $hashmail);
+        }
+        else {
+            $participant = $participants->fetch ();
+            $participantid = $participant['participantid'];
+        }
+        $participants->closeCursor ();
+        /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
+            //Needs a time limit.
+            echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
+            return null;
+        }*/
+        if (hasParticipated ($db, $participantid, $surveyid)){
+            echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
+            return null;
+        }
+
+        /* participant va cifrado con un código aleatorio distinto en cada
+           petición, así que no sirve para buscar las anteriores: el límite
+           por hora se comprueba con esta etiqueta fija por correo y consulta. */
+        $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
+        if ($this->checkParticipation ($db, $requesttag, $surveyid)){
+            return null;
+        }
+
+        $code = random_bytes (32);
+        $passwd = hash ('sha256', $code);
+        $encryptedmail = base64_encode (encrypt ($email, $code));
+        $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
+            "values (:id, :sid, :pwd, :tag)");
+        $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
+        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
+        $query->execute ();
+        return [$db->lastInsertId (), $code];
+    }
+
+
     private function checkDomain ($db, $email){
         $query = $db->prepare ("SELECT alloweddomains FROM {SystemConfig} LIMIT 1");
         $query->execute ();
@@ -240,10 +281,13 @@ class GetCode extends View {
             echo ("<p><strong>El sistema no está configurado aún. No se puede participar.</strong></p>");
             return false;
         }
-        $domainstring = $query->fetch()['alloweddomains'];
+        $domainstring = $query->fetch()['alloweddomains'] ?? "";
         $query->closeCursor ();
-        $domains = explode (" ", $domainstring);
-        $emaildomain = explode ("@", $email)[1];
+        $domains = array_filter (explode (" ", strtolower (trim ($domainstring))));
+        /* Sin dominios configurados puede participar cualquiera. */
+        if (empty ($domains))
+            return true;
+        $emaildomain = substr (strrchr ($email, "@"), 1);
         foreach ($domains as $key => $domain) {
             if ($emaildomain == $domain)
                 return true;
@@ -252,15 +296,33 @@ class GetCode extends View {
         return false;
     }
 
-    /**
-     * Checks if an email address has participated in the survey.
-     */
-    private function checkParticipation ($db, $participant, $sid){
+
+    private function getSurveyName ($db, $sid): ?string {
+        $query = $db->prepare ("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $name = $query->fetchColumn ();
+        $query->closeCursor ();
+        return $name === false ? null : $name;
+    }
+
+    private function isActive ($db, $sid){
+        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+            AND startdate < NOW() AND enddate > NOW()");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $active = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $active;
+    }
+
+    private function checkParticipation ($db, $requesttag, $sid){
+
         $ret = false;
         $query = $db->prepare ("SELECT 1 FROM {Participation} WHERE 
-            participant = :part AND surveyid = :sid
+            requesttag = :tag AND surveyid = :sid
             AND participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR)");
-        $query->bindParam (":part", $participant, PDO::PARAM_STR);
+        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
         $query->execute ();
         if ($query->rowCount () > 0){
