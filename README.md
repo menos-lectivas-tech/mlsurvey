@@ -155,3 +155,10 @@ docker compose exec web bash   # shell inside the container
 docker compose restart web     # restart just the application
 docker compose down            # stop the containers, keeping the data
 ```
+
+# Update
+When updating the application don't forget run:
+```sh
+php updatedb.php
+```
+for updating the database tables if needed.

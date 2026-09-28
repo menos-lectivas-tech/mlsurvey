@@ -119,6 +119,13 @@ CREATE TABLE Results (
 	CONSTRAINT Results_Surveys_FK FOREIGN KEY (surveyid) REFERENCES Surveys(surveyid) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
+CREATE TABLE Version (
+  versionid INT UNSIGNED NOT NULL PRIMARY KEY,
+  versioncode INT NOT NULL
+);
+
+INSERT INTO Version values (1, 2);
+
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
 BEFORE UPDATE ON Responses
