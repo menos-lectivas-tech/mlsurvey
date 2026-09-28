@@ -59,7 +59,7 @@ class Participate extends View {
              && !empty ($_REQUEST["t"]))
             $this->istest = true;
 
-        clearSessionVariables ();
+        clearParticipationSession ();
         
 
         try {
@@ -145,7 +145,7 @@ class Participate extends View {
         catch (Exception $e){
             echo ("<p><strong>Error recuperando los datos para la participación</strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} when getting data for response.");
-            clearSessionVariables ();
+            clearParticipationSession ();
             return;
         }
     }
@@ -198,7 +198,7 @@ class Participate extends View {
             }
         }
 
-        clearSessionVariables ();
+        clearParticipationSession ();
         try {
             $responsearray = array (); 
             $db = dbConn ();

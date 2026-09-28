@@ -40,7 +40,7 @@ class ResponseSurvey extends View {
                 removeToken ();
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
                 logMessage (LOGGER_ERROR, "Survey {$_SESSION['surveyid']} does not exist.");
-                clearSessionVariables ();
+                clearParticipationSession ();
                 return;
             }
             $row = $survey->fetch ();
@@ -50,7 +50,7 @@ class ResponseSurvey extends View {
         catch (Exception $e){
             echo ("<p><strong>Error al acceder a la consulta seleccionada.</strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} getting survey for response.");
-            clearSessionVariables ();
+            clearParticipationSession ();
             return;
         }
         ?>

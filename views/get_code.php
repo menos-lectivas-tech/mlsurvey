@@ -135,7 +135,7 @@ class GetCode extends View {
         /* El nombre va tal cual en el correo y escapado en la página. */
         $mailsurveyname = $_SESSION['surveyname'] ?? "";
         $surveyname = h ($mailsurveyname);
-        clearSessionVariables ();
+        clearParticipationSession ();
         if ($surveyid === null){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
