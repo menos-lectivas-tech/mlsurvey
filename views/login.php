@@ -1,4 +1,8 @@
 <?php
+/**
+ * This class shows the login form and handles the login information.
+ * It's used in the admin class.
+ */
 require_once 'ifaces/view.php';
 require_once 'utils/session.php';
 require_once 'utils/user.php';

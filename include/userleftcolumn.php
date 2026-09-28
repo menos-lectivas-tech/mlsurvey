@@ -1,3 +1,9 @@
+<?php
+/**
+ * Left column for user and admin.
+ */
+?>
+
 <div class="col-md-4">
     <link href="css/tablecard.css" rel="stylesheet" />
     <div class="card-table-container">

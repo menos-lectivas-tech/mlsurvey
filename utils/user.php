@@ -3,6 +3,15 @@ require_once 'utils/session.php';
 require_once 'utils/dbutils.php';
 require_once 'utils/token.php';
 
+/**
+ * Gets user name from user id
+ * 
+ * @param int $id User id.
+ * 
+ * @return string User name or null if not found.
+ * 
+ * @throws Exception Database exception if throwed.
+ */
 function getUserName ($id){
     try {
         $dbconn = dbConn ();
@@ -21,6 +30,13 @@ function getUserName ($id){
     return null;
 }
 
+/**
+ * Deletes user from database.
+ * 
+ * @param int $id User id
+ * 
+ * @throws Exception Database exception if throwed.
+ */
 function rmUser ($id){
     try {
         $dbconn = dbConn ();
@@ -33,6 +49,15 @@ function rmUser ($id){
     }
 }
 
+/**
+ * Adds user
+ * 
+ * @param string $user The user name.
+ * @param string $pass The password
+ * @param string $role The user role. Now empty means survey manager and non emty is admin.
+ * 
+ * @throws Exception Database exception if throwed or when user name is in use.
+ */
 function adduser ($user, $pass, $role = ''){
     $iscli = (PHP_SAPI === 'cli');
     if (!$iscli){
@@ -70,6 +95,15 @@ function adduser ($user, $pass, $role = ''){
     return 0;
 }
 
+/**
+ * Check if a user is an admin.
+ * 
+ * @param int $id The user id. If not provided, the current user.
+ * 
+ * @return bool
+ * 
+ * @throws Exception Database exception if throwed.
+ */
 function isAdmin ($id = ""){
     startSession ();
     if ($id === ""){
@@ -100,6 +134,11 @@ function isAdmin ($id = ""){
     return false;
 }
 
+/**
+ * Checks if a user is logged in.
+ * 
+ * @return bool
+ */
 function isUser (){
     startSession ();
     if (isset($_SESSION['userid']))
@@ -107,6 +146,20 @@ function isUser (){
     return false;    
 }
 
+
+/**
+ * Validates user/password combination.
+ * 
+ * 
+ * @param string $user The user name.
+ * @param string $passwd The password
+ * @param int $id The id of the user for checking. If provided, validates user name and
+ * password for the provided id.
+ * 
+ * @return bool
+ * 
+ * @throws Exception On error.
+ */
 function validateUser ($user, $passwd, $id = -1){
     startSession ();
     /*if (!isset($_SESSION['token']) || $_SESSION['token'] != $token){
@@ -163,6 +216,16 @@ function validateUser ($user, $passwd, $id = -1){
     
 }
 
+/**
+ * Changes user data.
+ * 
+ * @param int $id The user id.
+ * @param string $username The new user name.
+ * @param string $isadmin The new role.
+ * @param string $passwd If provided, the new password. Otherwise lefts password unchanged.
+ * 
+ * @throws Exception Database exception if throwed.
+ */
 function alterUser ($id, $username, $isadmin, $passwd = ""){
     try {
         if ($passwd == "")

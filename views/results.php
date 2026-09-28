@@ -1,4 +1,7 @@
 <?php
+/**
+ * This class shows the results for a survey
+ */
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
 class Results extends View {
@@ -36,8 +39,8 @@ class Results extends View {
         $surveyid = $_REQUEST["queryid"];
         try {
             $db = dbConn ();
-            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile " . 
-            "FROM {Surveys} WHERE surveyid = :sid");
+            $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile
+                FROM {Surveys} WHERE surveyid = :sid");
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $surveys->execute ();
             if ($surveys->rowCount () == 0){
@@ -51,14 +54,17 @@ class Results extends View {
             $surveyfile = $survey["surveyfile"];
             $surveys->closeCursor ();
 
-            $results = $db->prepare ("SELECT results FROM {Results} WHERE surveyid = :sid");
+            $results = $db->prepare ("SELECT results, ispartial 
+                FROM {Results} WHERE surveyid = :sid");
             $results->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $results->execute ();
             if ($results->rowCount () == 0){
                 echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
                 return;
             }
-            $result = $results->fetch ()['results'];
+            $row = $results->fetch ();
+            $result = $row['results'];
+            $partial = empty ($row["ispartial"]) ? " " : " parciales ";
             $results->closeCursor ();
             $resultsarray = json_decode ($result, true);
             if ($resultsarray == null){
@@ -68,7 +74,7 @@ class Results extends View {
             }
             $thefile = FileParams::FILE_DIR . $surveyid . "/" . $surveyfile;
             ?>
-            <h2>Mostrando resultados para la consulta <?= $surveyname;?>.</h2>
+            <h2>Mostrando resultados<?= $partial; ?>para la consulta <?= $surveyname;?>.</h2>
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
             <?= empty ($surveyfile)?"":"Documentación adjunta: <a href='{$surveyfile}'";?>
             <p><em>En esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>

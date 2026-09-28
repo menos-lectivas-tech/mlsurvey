@@ -1,4 +1,7 @@
 <?php
+/**
+ * This class shows and manages the stress tests.
+ */
 require_once "ifaces/view.php";
 require_once "utils/user.php";
 require_once "utils/dbutils.php";
@@ -14,6 +17,8 @@ class StressTest extends View {
     private const TEST_CLEAN = "Limpiar";
     private const TEST_DIR = "files/tmptest";
     private const TEST_FILE = self::TEST_DIR . "/testurls.txt";
+
+
     public function doInit (){
         if (isset (Config::PARAMS['ml_stresstest']) && Config::PARAMS['ml_stresstest']
              && isAdmin ())
@@ -40,6 +45,14 @@ class StressTest extends View {
         <?php
     }
 
+    /**
+     * If the application option is configured and the user has admin profile
+     * shows a page for selecting the survey for the tests and the number of tests.
+     * Then a file with individual URLs for testing is created and can be download.
+     * 
+     * When a test is requested the previous tests are deleted.
+     * 
+     */
     public function show  (){
         if (!$this->canstress){
             showMain ();
@@ -164,17 +177,7 @@ class StressTest extends View {
         }
     }
 
-    private function insertHTML2 (){
-        ?>
-        <script>
-            function downloadFile(){
-                window.open ("<?= self::TEST_FILE; ?>", "_self");
-            }
-        </script>
-        <h2>Datos de test generados.</h2>
-        <p><input type="button" class="button-3" onclick="downloadFile ();" value="Descargar"></p>
-        <?php
-    }
+    
     private function insertHTML (){
         ?>
         <h2>Datos de test generados.</h2>

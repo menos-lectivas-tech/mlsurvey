@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * This class shows and manages the change of the password for the current user.
+ */
 require_once 'ifaces/view.php';
 require_once 'utils/session.php';
 require_once 'utils/user.php';

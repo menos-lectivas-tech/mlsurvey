@@ -1,4 +1,7 @@
 <?php
+/**
+ * This class handle the page for showing ended surveys.
+ */
 require_once "ifaces/view.php";
 require_once "utils/dbutils.php";
 

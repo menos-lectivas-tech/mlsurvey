@@ -58,3 +58,15 @@ function dbConn (){
     }
     return $dbconn;
 }
+
+function getDBVersion (){
+    $db = dbConn ();
+    $q = $db->query ("SELECT versioncode, versionname FROM {Version}
+        WHERE versionid =  1");
+    $version = $q->fetch ();
+    $ret = [
+        "code" => $version["versioncode"],
+        "name" => $version["versionname"]
+    ];
+    return $ret;
+}

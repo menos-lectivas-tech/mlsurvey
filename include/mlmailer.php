@@ -1,4 +1,10 @@
 <?php
+/**
+ * Class for handling email server and messages.
+ * Extends PHPMailer (https://github.com/PHPMailer/PHPMailer), which is installed
+ * via Composer
+ * 
+ */
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
@@ -24,36 +30,6 @@ class MLMailer extends PHPMailer {
     ];
     private $m_from = "";
     public function configure (){
-        /*$db = dbConn ();
-        try {
-            $query = $db->prepare ("SELECT * FROM {SystemConfig} LIMIT 1");
-            $query->execute ();
-            if ($query->rowCount () == 0){
-                throw new Exception("No server settings not found. Configure them first.");
-                return;
-            }
-            $row = $query->fetch ();
-            if (is_null($row['emailmethod']) || $row['emailmethod'] == self::NO_METHOD){
-                throw new Exception("Email settings not found. Configure them first.");
-                return;
-            }
-            $method = $row['emailmethod'];
-            if ($method == self::SMTP_METHOD){
-                $this->configSMTP ($row);
-            }
-            else if ($method == self::SENDMAIL_METHOD){
-                $this->configSendmail ();
-            }
-            else {
-                throw new Exception("Unkown email method configured. Method: {$method}.");
-            }
-            $this->m_from = $row['emailfrom'];
-            $this->CharSet = self::CHARSET_UTF8;
-            $this->Encoding = self::ENCODING_BASE64;
-        }
-        catch (Exception $e){
-            throw $e;
-        }*/
         $method = Config::PARAMS["email_method"];
         $this->m_from = Config::PARAMS["email_from"];
         $this->CharSet = self::CHARSET_UTF8;
@@ -84,6 +60,14 @@ class MLMailer extends PHPMailer {
         $this->isSendmail ();
     }
 
+    /**
+     * Tests email sending with a hardcoded message. This message must be
+     * configurable in the future.
+     * 
+     * @param string $recipient Recipient email address.
+     * 
+     * @throws Exception with the error info.
+     */
     public function sendTest ($recipient){
         $this->setFrom ($this->m_from);
         $recipients = explode (",", $recipient);
@@ -99,6 +83,18 @@ class MLMailer extends PHPMailer {
         }
     }
 
+    /**
+     * Sends the message with the link for participating.
+     * Creates the link with the parameters.
+     * The message is hardcoded, but must be configurable in the future.
+     * 
+     * @param string $recipient Recipient's mail address
+     * @param string $pid Participation table id.
+     * @param string $code Base64 code for participating
+     * @param string $surveyname Survey name.
+     * 
+     * @throws Exception with the error info.
+     */
     public function sendCode ($recipient, $pid, $code, $surveyname){
         $theurl = getURL () . "/participate?pid=" . $pid . "&auth=" . $code;
         $this->setFrom ($this->m_from);
