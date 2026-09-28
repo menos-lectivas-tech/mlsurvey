@@ -82,9 +82,11 @@ CREATE TABLE Participation (
 	participationkey VARCHAR(256) NOT NULL,
 	participant TEXT NOT NULL,
 	participationdate DATETIME NOT NULL DEFAULT current_timestamp,
+	requesttag CHAR(64) NULL, /*sha256 of participant hash and surveyid, for the hourly limit*/
 	CONSTRAINT Participation_PK PRIMARY KEY (participationid),
 	CONSTRAINT Participation_surveys_FK FOREIGN KEY (surveyid) REFERENCES Surveys(surveyid) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
+CREATE INDEX Participation_request_IDX USING BTREE ON Participation (surveyid, requesttag, participationdate);
 
 
 CREATE TABLE StressTest (
