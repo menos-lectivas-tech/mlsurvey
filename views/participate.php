@@ -7,6 +7,7 @@ require_once 'utils/token.php';
 require_once 'utils/crypt.php';
 require_once 'include/fileparams.php';
 require_once 'utils/showsurvey.php';
+require_once 'utils/host.php';
 
 class Participate extends View {
     public const ACTION = "Enviar";
@@ -17,17 +18,33 @@ class Participate extends View {
     private const TESTID = 0;
 
     private const COOKIE_KEY ="lacookie";
+    /* Formularios de participación abiertos en la sesión, y campo del
+       formulario que dice cuál de ellos se envía. */
+    private const PARTICIPATIONS = "participations";
+    private const FORM_FIELD = "participation";
+    private const PARTICIPATIONS_MAX = 20;
     private $key = "";
     private string $email = "";
     private int $surveyid = -1;
 
     function doInit (){
         startSession ();
-        $this->key = random_bytes (32);
+        /* Una sola clave para todas las pestañas: si cada enlace abierto
+           generase la suya, los formularios abiertos antes ya no podrían
+           descifrar su clave de firma. */
+        $current = isset ($_COOKIE[self::COOKIE_KEY]) && is_string ($_COOKIE[self::COOKIE_KEY]) ?
+            base64_decode ($_COOKIE[self::COOKIE_KEY], true) : false;
+        $this->key = ($current !== false && strlen ($current) == 32) ? $current : random_bytes (32);
         /* Sin dominio: cookie solo para este host. HTTP_HOST puede llevar el
-           puerto (localhost:8080) y el navegador rechaza ese dominio. */
-        setcookie (self::COOKIE_KEY, base64_encode ($this->key), time () + 1800, //Half an hour
-            "", "", true, true);
+           puerto (localhost:8080) y el navegador rechaza ese dominio.
+           Secure solo con HTTPS: servido por HTTP, el navegador descarta
+           una cookie Secure y luego no se podría firmar la respuesta. */
+        setcookie (self::COOKIE_KEY, base64_encode ($this->key), [
+            'expires' => time () + 1800, //Half an hour
+            'secure' => isHttps (),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
@@ -59,8 +76,6 @@ class Participate extends View {
              && !empty ($_REQUEST["t"]))
             $this->istest = true;
 
-        clearSessionVariables ();
-        
 
         try {
             $code = url_base64_decode ($key);
@@ -75,9 +90,8 @@ class Participate extends View {
                     echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
                     return;
                 }
-                $_SESSION['surveyid'] = $this->surveyid;
-                $_SESSION['participantid'] = self::TESTID;
-                $this->showSurvey ($db, $this->surveyid, self::TESTID);
+                $formid = $this->saveParticipation ($this->surveyid, self::TESTID, null);
+                $this->showSurvey ($db, $this->surveyid, $formid);
                 return;
             }
             //This block should be removed in non alpha versions
@@ -91,7 +105,7 @@ class Participate extends View {
 
             $hashmail = hash ('sha256', $this->email);
             $participants = $db->prepare ("SELECT participantid, privatekey " .
-                "FROM {Participants} WHERE participant = :part");
+                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
             $participants->bindParam (":part", $hashmail, PDO::PARAM_STR);
             $participants->execute ();
             if ($participants->rowCount () == 0){
@@ -137,15 +151,13 @@ class Participate extends View {
                 return;
             }
             openssl_pkey_export($key, $priv);
-            $_SESSION['privkey'] = encrypt ($priv, $this->key);
-            $_SESSION['surveyid'] = $this->surveyid;
-            $_SESSION['participantid'] = $participantid;
-            $this->showSurvey ($db, $this->surveyid, $participantid);
+            $formid = $this->saveParticipation ($this->surveyid, $participantid,
+                encrypt ($priv, $this->key));
+            $this->showSurvey ($db, $this->surveyid, $formid);
         }
         catch (Exception $e){
             echo ("<p><strong>Error recuperando los datos para la participación</strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} when getting data for response.");
-            clearSessionVariables ();
             return;
         }
     }
@@ -157,8 +169,37 @@ class Participate extends View {
         <?php
     }
 
-    private function showSurvey ($db, $surveyid){
+    /* Guarda lo que necesita el envío de un formulario y devuelve su id.
+       Va en el propio formulario, no suelto en la sesión: con dos enlaces
+       abiertos a la vez, las respuestas de uno acababan en la consulta
+       del otro. */
+    private function saveParticipation ($surveyid, $participantid, $privkey): string {
+        if (!isset ($_SESSION[self::PARTICIPATIONS]) || !is_array ($_SESSION[self::PARTICIPATIONS]))
+            $_SESSION[self::PARTICIPATIONS] = array ();
+        $formid = bin2hex (random_bytes (16));
+        $_SESSION[self::PARTICIPATIONS][$formid] = [
+            'surveyid' => $surveyid,
+            'participantid' => $participantid,
+            'privkey' => $privkey,
+        ];
+        $_SESSION[self::PARTICIPATIONS] = array_slice ($_SESSION[self::PARTICIPATIONS],
+            -self::PARTICIPATIONS_MAX, null, true);
+        return $formid;
+    }
+
+    /* Los datos del formulario enviado, que dejan de valer: un envío por formulario. */
+    private function takeParticipation (): ?array {
+        $formid = $_REQUEST[self::FORM_FIELD] ?? null;
+        if (!is_string ($formid) || !isset ($_SESSION[self::PARTICIPATIONS][$formid]))
+            return null;
+        $participation = $_SESSION[self::PARTICIPATIONS][$formid];
+        unset ($_SESSION[self::PARTICIPATIONS][$formid]);
+        return $participation;
+    }
+
+    private function showSurvey ($db, $surveyid, $formid){
         echo ('<form name="participate" id="participate" action="participate" method="POST">');
+        echo ("<input type='hidden' name='" . self::FORM_FIELD . "' value='{$formid}'>");
         showTheSurvey ($db, $surveyid);
         ?>
         <p><input type="submit" class="button-3" name="<?= self::ACTION; ?>" 
@@ -172,24 +213,25 @@ class Participate extends View {
             tokenError ();
             return;           
         }
-        if (!isset ($_SESSION['surveyid']) || !isset ($_SESSION['participantid'])){
+        $participation = $this->takeParticipation ();
+        if ($participation === null){
             $this->securityError ();
             return;
         }
-        $surveyid = $_SESSION['surveyid'];
-        $participantid = $_SESSION['participantid'];
+        $surveyid = $participation['surveyid'];
+        $participantid = $participation['participantid'];
 
         
         if ($participantid == self::TESTID){
             $privkey = false;
         }
         else {
-            if (!isset ($_COOKIE[self::COOKIE_KEY]) || !isset ($_SESSION['privkey'])){
+            if (!isset ($_COOKIE[self::COOKIE_KEY]) || $participation['privkey'] === null){
                 echo ("<p><strong>Error recuperando las cookies para firmar las respuestas.</strong></p>");
                 return;
             }
             try {
-                $privkey = decrypt ($_SESSION['privkey'], base64_decode ($_COOKIE[self::COOKIE_KEY]));
+                $privkey = decrypt ($participation['privkey'], base64_decode ($_COOKIE[self::COOKIE_KEY]));
             }
             catch (Exception $e){
                 echo ("<p><strong>Error cryptográfico al firmar las respuestas.</strong></p>");
@@ -198,7 +240,6 @@ class Participate extends View {
             }
         }
 
-        clearSessionVariables ();
         try {
             $responsearray = array (); 
             $db = dbConn ();
@@ -206,42 +247,45 @@ class Participate extends View {
                 "FROM {Questions} WHERE surveyid = :sid ORDER BY questionid ASC");
             $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $questions->execute ();
-            if ($questions->rowCount () > 0){
-                while ($question = $questions->fetch ()){
-                    $questionid = $question['questionid'];
-                    $optional = $question['optional'];
-                    $multiple = $question['multiple'];
-                    if ($multiple == 0){
-                        if (isset ($_REQUEST["op-" . $questionid])){
-                            $selected = $_REQUEST["op-" . $questionid];
-                            $responsearray[$questionid] = $selected;
-                        }
-                        else if ($optional == 1)
-                            $responsearray[$questionid] = -1;
-                        else{
-                            echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
-                            $questions->closeCursor ();
+            $questionlist = $questions->fetchAll ();
+            $questions->closeCursor ();
+            foreach ($questionlist as $question){
+                $questionid = $question['questionid'];
+                $optional = $question['optional'];
+                $multiple = $question['multiple'];
+                /* Las respuestas se contrastan con las opciones que existen:
+                   lo que llega del formulario no es de fiar. */
+                $validoptions = $this->getOptionIds ($db, $surveyid, $questionid);
+                if ($multiple == 0){
+                    $selected = $_REQUEST["op-" . $questionid] ?? null;
+                    if ($selected !== null){
+                        if (!is_string ($selected) || !ctype_digit ($selected) ||
+                            !in_array ((int) $selected, $validoptions, true)){
+                            echo ("<p><strong>Error. Hay respuestas no válidas.</strong></p>");
                             return;
+                        }
+                        $responsearray[$questionid] = (int) $selected;
+                    }
+                    else if ($optional == 1)
+                        $responsearray[$questionid] = -1;
+                    else{
+                        echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
+                        return;
+                    }
+                }
+                else {
+                    $responsearray[$questionid] = array();
+                    foreach ($validoptions as $optionid){
+                        if (isset ($_REQUEST["op-" . $questionid . "-" . $optionid])){
+                            $responsearray[$questionid][$optionid] = 1;
                         }
                     }
-                    else {
-                        $toptions = $_REQUEST["topt-" . $questionid];
-                        $responsearray[$questionid] = array();
-                        $responses = 0;
-                        for ($i = 1; $i <= $toptions; $i++){
-                            if (isset ($_REQUEST["op-" . $questionid . "-" . $i])){
-                                $responsearray[$questionid][$i] = 1;
-                            }
-                        }
-                        if ($optional == 0 && empty ($responsearray[$questionid])){
-                            echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
-                            $questions->closeCursor ();
-                            return;
-                        }
+                    if ($optional == 0 && empty ($responsearray[$questionid])){
+                        echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
+                        return;
                     }
                 }
             }
-            $questions->closeCursor ();
             $responsejson = json_encode ($responsearray);
             if ($responsejson === false){
                 echo ("<p><strong>Error codificando respuestas.</strong></p>");
@@ -350,6 +394,17 @@ class Participate extends View {
         $this->email = decrypt (base64_decode ($row['participant']), $code);
         $this->surveyid = $row['surveyid'];
         return true;
+    }
+
+    private function getOptionIds ($db, $surveyid, $questionid): array {
+        $options = $db->prepare ("SELECT optionid FROM {Options} " .
+            "WHERE surveyid = :sid AND questionid = :qid");
+        $options->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $options->bindParam (":qid", $questionid, PDO::PARAM_INT);
+        $options->execute ();
+        $ids = array_map ('intval', $options->fetchAll (PDO::FETCH_COLUMN));
+        $options->closeCursor ();
+        return $ids;
     }
 
     private function isActive ($db, $surveyid){

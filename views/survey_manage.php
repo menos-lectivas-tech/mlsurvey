@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'include/fileparams.php';
@@ -58,6 +59,13 @@ class SurveyManage extends View {
             showMain ();
             return;
         }
+        if ((isset ($_REQUEST[self::MANAGEACTION]) || isset ($_REQUEST[self::ADDACTION]) ||
+            isset ($_REQUEST[self::MODIFYACTION])) && !checkToken ()){
+            echo ('<div class="col-md-8">');
+            tokenError ();
+            echo ('</div>');
+            return;
+        }
         if (isset($_REQUEST[self::MANAGEACTION])){
             $action = $_REQUEST[self::MANAGEACTION];
             unset ($_REQUEST[self::MANAGEACTION]);
@@ -110,6 +118,7 @@ class SurveyManage extends View {
         <!-- Los botones de cada fila escriben aquí sobre qué consulta actúan:
              el servidor sigue leyendo $_REQUEST['surveyid']. -->
         <input type="hidden" name="surveyid" id="selectedsurvey" value="">
+        <?= setTokenHTML (); ?>
         <?php
         $this->listSurveys ();
         $this->listEndedSurveys ();
@@ -124,8 +133,9 @@ class SurveyManage extends View {
             $query = $dbconn->prepare ("SELECT surveyid, surveyname" .
             ", DATE_FORMAT(enddate,'%d/%m/%Y %T') as dend" . 
             ", DATE_FORMAT(startdate,'%d/%m/%Y %T') as dstart FROM {Surveys}" .
-            " WHERE startdate > NOW()" .
+            " WHERE startdate > NOW()" . $this->ownerFilter ("createdby") .
                 " ORDER BY startdate DESC");
+            $this->bindOwner ($query);
             $query->execute ();
             $this->surveyscount = $query->rowCount ();
             if ($this->surveyscount == 0){
@@ -150,7 +160,7 @@ class SurveyManage extends View {
                     $name = $row['surveyname'];
                     ?>
                     <tr id="<?= $id; ?>">
-                        <td><span class="username" id="sv-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="sv-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td data-label="Fecha inicio"><?= $row['dstart'] ?></td>
                         <td data-label="Fecha fin"><?= $row['dend'] ?></td>
                         <td class="ml-row-actions">
@@ -195,8 +205,9 @@ class SurveyManage extends View {
             ", DATE_FORMAT(r.resultsdate,'%d/%m/%Y %T') as dresults" .
             ", r.ispartial FROM {Surveys} s" .
             " LEFT JOIN {Results} r ON r.surveyid = s.surveyid" .
-            " WHERE s.enddate < NOW()" .
+            " WHERE s.enddate < NOW()" . $this->ownerFilter ("s.createdby") .
                 " ORDER BY s.enddate DESC");
+            $this->bindOwner ($query);
             $query->execute ();
             if ($query->rowCount () == 0)
                 return;
@@ -222,7 +233,7 @@ class SurveyManage extends View {
                         $results = $row['dresults'];
                     ?>
                     <tr id="ended-<?= $id; ?>">
-                        <td><span class="username" id="sve-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="sve-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td data-label="Fecha fin"><?= $row['dend'] ?></td>
                         <td data-label="Resultados"><?= $results ?></td>
                         <td class="ml-row-actions">
@@ -261,8 +272,9 @@ class SurveyManage extends View {
         try {
             $dbconn = dbConn ();
             $surveys = $dbconn->prepare ("SELECT surveyname FROM {Surveys} WHERE
-                surveyid = :sid AND enddate < NOW()");
+                surveyid = :sid AND enddate < NOW()" . $this->ownerFilter ("createdby"));
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+            $this->bindOwner ($surveys);
             $surveys->execute ();
             if ($surveys->rowCount () == 0){
                 $this->resultsmessage =
@@ -270,7 +282,7 @@ class SurveyManage extends View {
                 $surveys->closeCursor ();
                 return;
             }
-            $surveyname = $surveys->fetch ()['surveyname'];
+            $surveyname = h ($surveys->fetch ()['surveyname']);
             $surveys->closeCursor ();
 
             $results = countResponses ($dbconn, $surveyid);
@@ -393,6 +405,7 @@ class SurveyManage extends View {
     <h2>Añadir consulta</h2>
         <form id="addsurvey" name="addsurvey" method="POST" action="survey_manage" 
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
+        <?= setTokenHTML (); ?>
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"></p>
         <p><label for="surveydesc">Descripción</label>
@@ -896,31 +909,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function addSurvey (){
-        $surveyname = $_REQUEST['survey'];
-        $startstring = $_REQUEST['startdate'];
-        $endstring = $_REQUEST['enddate'];
-        $surveydesc = $_REQUEST['surveydesc'];
-        $showpartial = isset ($_REQUEST["showpartial"]);
-        $nquestion = 1;
-        $noption = 1;
-        $questions = array();
-        while (isset($_REQUEST['desc-q-' . $nquestion])){
-            $questions[$nquestion] = array();
-            //$questions[$nquestion]['name'] = $_REQUEST['name-q-' . $nquestion];
-            $questions[$nquestion]['desc'] = $_REQUEST['desc-q-' . $nquestion];
-            $questions[$nquestion]['optional'] = isset(
-                $_REQUEST['opt-q-' . $nquestion]);
-            $questions[$nquestion]['multiple'] = isset(
-                $_REQUEST['mul-q-' . $nquestion]);
-            $noption = 1;
-            $questions[$nquestion]['options'] = array();
-            while (isset($_REQUEST['opt-' . $nquestion . '-' .$noption])){
-                $questions[$nquestion]['options'][$noption] = 
-                    $_REQUEST['opt-' . $nquestion . '-' .$noption];
-                $noption++;
-            }
-            $nquestion++;
+        $form = $this->readSurveyForm ();
+        if (is_string ($form)){
+            echo ("<p><strong>" . h ($form) . "</strong></p>");
+            return;
         }
+        [$surveyname, $surveydesc, $showpartial, $startstring, $endstring, $questions] = $form;
         
         
         $filename = $this->saveFile (session_id ());
@@ -969,6 +963,69 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
 
     }
 
+    /* Lee y valida el formulario de alta o modificación. El navegador ya
+       lo comprueba, pero la petición puede llegar sin pasar por él. Devuelve
+       los datos listos para guardar o un mensaje de error. */
+    private function readSurveyForm (): array|string {
+        $text = fn ($key) => is_string ($_REQUEST[$key] ?? null) ? trim ($_REQUEST[$key]) : "";
+        /* Las descripciones son HTML del editor: vacía si no tiene texto. */
+        $hastext = fn ($html) => preg_replace ('/[\s\x{00A0}]+/u', '',
+            html_entity_decode (strip_tags ($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) !== "";
+
+        $surveyname = $text ('survey');
+        if ($surveyname === "")
+            return "El nombre de la consulta no puede estar vacío.";
+        $surveydesc = $text ('surveydesc');
+        if (!$hastext ($surveydesc))
+            return "La descripción de la consulta no puede estar vacía.";
+
+        $start = $this->parseDate ($text ('startdate'));
+        $end = $this->parseDate ($text ('enddate'));
+        if ($start === null || $end === null)
+            return "Las fechas de inicio y fin no son válidas.";
+        if ($start <= new DateTime ())
+            return "La fecha de inicio debe ser posterior a ahora.";
+        if ($end <= $start)
+            return "La fecha de fin debe ser posterior a la de inicio.";
+
+        $questions = array();
+        for ($nquestion = 1; isset ($_REQUEST['desc-q-' . $nquestion]); $nquestion++){
+            $desc = $text ('desc-q-' . $nquestion);
+            if (!$hastext ($desc))
+                return "La descripción de la pregunta {$nquestion} no puede estar vacía.";
+            $options = array();
+            for ($noption = 1; isset ($_REQUEST['opt-' . $nquestion . '-' . $noption]); $noption++){
+                $option = $text ('opt-' . $nquestion . '-' . $noption);
+                if ($option === "")
+                    return "La opción {$noption} de la pregunta {$nquestion} no puede estar vacía.";
+                $options[$noption] = $option;
+            }
+            if (count ($options) < 2)
+                return "La pregunta {$nquestion} necesita al menos dos opciones.";
+            $questions[$nquestion] = [
+                'desc' => $desc,
+                'optional' => isset ($_REQUEST['opt-q-' . $nquestion]),
+                'multiple' => isset ($_REQUEST['mul-q-' . $nquestion]),
+                'options' => $options,
+            ];
+        }
+        if (empty ($questions))
+            return "La consulta necesita al menos una pregunta.";
+
+        return [$surveyname, $surveydesc, isset ($_REQUEST["showpartial"]),
+            $start->format ('Y-m-d H:i:s'), $end->format ('Y-m-d H:i:s'), $questions];
+    }
+
+    /* Fechas de un campo datetime-local, con o sin segundos. */
+    private function parseDate (string $value): ?DateTime {
+        foreach (['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d H:i', 'Y-m-d H:i:s'] as $format){
+            $date = DateTime::createFromFormat ('!' . $format, $value);
+            if ($date !== false && $date->format ($format) === $value)
+                return $date;
+        }
+        return null;
+    }
+
     private function insertQuestions ($dbconn, $sid, $questions){
         foreach ($questions as $qid => $question) {
             $query = $dbconn->prepare ("INSERT into {Questions} " .
@@ -997,22 +1054,24 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function deleteSurvey (){
-        if (!isset ($_REQUEST['surveyid']))
+        /* Solo dígitos: además de a la base de datos, va a la ruta de sus adjuntos. */
+        $sid = $_REQUEST['surveyid'] ?? "";
+        if (!is_string ($sid) || !ctype_digit ($sid))
             return;
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
             try {
-                if (!$this->isEditable ($dbconn, $_REQUEST['surveyid']))
-                    throw new Exception ("Survey {$_REQUEST['surveyid']} has already started");
+                if (!$this->isEditable ($dbconn, $sid))
+                    throw new Exception ("Survey {$sid} has already started");
                 $query = $dbconn->prepare ("UPDATE {Surveys} SET modifiedby = :uid
                     WHERE surveyid = :sid");
-                $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
+                $query->bindParam (":sid", $sid, PDO::PARAM_INT);
                 $query->bindParam (":uid", $_SESSION["userid"], PDO::PARAM_INT);
                 $query->execute ();
                 $query = $dbconn->prepare ("DELETE FROM {Surveys} WHERE
                     surveyid = :sid");
-                $query->bindParam (":sid", $_REQUEST['surveyid'], PDO::PARAM_INT);
+                $query->bindParam (":sid", $sid, PDO::PARAM_INT);
                 $query->execute ();
                 $dbconn->commit ();
             }
@@ -1021,6 +1080,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
                 throw $e;
                 
             }
+            /* Los adjuntos se sirven tal cual desde files/: si se quedasen,
+               seguirían publicados sin consulta. */
+            $this->deldir ($sid);
         }
         catch (Exception $e){
             echo ('<strong>Error eliminando la consulta.</strong>');
@@ -1032,12 +1094,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         if (!isset ($_REQUEST['surveyid']))
             return;
         $sid = $_REQUEST['surveyid'];
-        $_SESSION['surveyid'] = $sid;
         $this->javascriptype = SurveyJavascript::AddJavascript;
         $dbconn = dbConn ();
         $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid
-            AND startdate > NOW()");
+            AND startdate > NOW()" . $this->ownerFilter ("createdby"));
         $surveys->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $this->bindOwner ($surveys);
         $surveys->execute ();
         if ($surveys->rowCount() == 0){
             echo ("<p><strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong></p>");
@@ -1054,6 +1116,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     <h2>Modificar consulta</h2>
         <form id="modsurvey" name="modsurvey" method="POST" action="survey_manage" 
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
+        <?= setTokenHTML (); ?>
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"
             value="<?= htmlspecialchars ($survey['surveyname']); ?>"></p>
@@ -1087,6 +1150,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
          ?>
         <p><input class="button-3" type="submit" onclick="return validate_add ();" 
             name="<?= self::MODIFYACTION ?>" id="ok" value="Aceptar">
+        <!-- La consulta que se modifica va en el propio formulario: en la
+             sesión la pisaría otra pestaña con otra consulta abierta. -->
+        <input type="hidden" name="surveyid" value="<?= (int) $sid; ?>">
         <input class="button-3" type="submit" name="<?= self::MODIFYACTION ?>" 
             id="cancel" value="Cancelar">
         </p>
@@ -1180,35 +1246,15 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function modifySurvey(){
-        if (!isset ($_SESSION['surveyid']))
+        $sid = $_REQUEST['surveyid'] ?? "";
+        if (!is_string ($sid) || !ctype_digit ($sid))
             return;
-        $sid = $_SESSION['surveyid'];
-        unset ($_SESSION['surveyid']);        
-        $surveyname = $_REQUEST['survey'];
-        $startstring = $_REQUEST['startdate'];
-        $endstring = $_REQUEST['enddate'];
-        $surveydesc = $_REQUEST['surveydesc'];
-        $showpartial = isset ($_REQUEST["showpartial"]);
-        $nquestion = 1;
-        $noption = 1;
-        $questions = array();
-        while (isset($_REQUEST['desc-q-' . $nquestion])){
-            $questions[$nquestion] = array();
-            //$questions[$nquestion]['name'] = $_REQUEST['name-q-' . $nquestion];
-            $questions[$nquestion]['desc'] = $_REQUEST['desc-q-' . $nquestion];
-            $questions[$nquestion]['optional'] = isset(
-                $_REQUEST['opt-q-' . $nquestion]);
-            $questions[$nquestion]['multiple'] = isset(
-                $_REQUEST['mul-q-' . $nquestion]);
-            $noption = 1;
-            $questions[$nquestion]['options'] = array();
-            while (isset($_REQUEST['opt-' . $nquestion . '-' .$noption])){
-                $questions[$nquestion]['options'][$noption] = 
-                    $_REQUEST['opt-' . $nquestion . '-' .$noption];
-                $noption++;
-            }
-            $nquestion++;
+        $form = $this->readSurveyForm ();
+        if (is_string ($form)){
+            echo ("<p><strong>" . h ($form) . "</strong></p>");
+            return;
         }
+        [$surveyname, $surveydesc, $showpartial, $startstring, $endstring, $questions] = $form;
         try {
             if (!$this->isEditable (dbConn (), $sid)){
                 echo ("<strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong>");
@@ -1220,7 +1266,14 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
             return;
         }
-        $filename = $this->saveFile ($sid);
+        $filename = $this->saveFile ($sid, $this->currentFile ($sid));
+        /* Con un adjunto no válido no se guarda nada: ni se pierde el que
+           ya tenía la consulta ni los cambios quedan a medias. */
+        if ($filename === false){
+            echo ("<p><strong>Error subiendo archivo: " . h ($this->fileerror) .
+                ". No se ha modificado la consulta.</strong></p>");
+            return;
+        }
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
@@ -1255,30 +1308,44 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             catch (Exception $e){
                 $dbconn->rollBack ();
                 throw $e;
-            }                
+            }
+            /* Si se ha quitado el adjunto, que deje de estar publicado. */
+            if ($filename === "")
+                $this->deldir ($sid);
         }
         catch (Exception $e){
             echo ("<strong>Error al modificar la consulta.</strong>");
             logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
         }
-        if ($filename === false){
-            echo ("<p><strong>Error subiendo archivo: {$this->fileerror}.</strong></p>");
-            $this->deldir ($sid);
-        }
     }
 
-    /* Solo se pueden modificar o eliminar las consultas que no han empezado. */
+    /* Las administradoras gestionan todas las consultas; el resto de
+       usuarias, solo las que han creado ellas. */
+    private function ownerFilter (string $column): string {
+        return isAdmin () ? "" : " AND {$column} = :owner";
+    }
+
+    private function bindOwner ($query){
+        if (!isAdmin ())
+            $query->bindValue (":owner", $_SESSION['userid'], PDO::PARAM_INT);
+    }
+
+    /* Solo se pueden modificar o eliminar las consultas que no han empezado
+       y que la usuaria puede gestionar. */
     private function isEditable ($dbconn, $sid): bool {
         $query = $dbconn->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
-            AND startdate > NOW() FOR UPDATE");
+            AND startdate > NOW()" . $this->ownerFilter ("createdby") . " FOR UPDATE");
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $this->bindOwner ($query);
         $query->execute ();
         $editable = $query->rowCount () > 0;
         $query->closeCursor ();
         return $editable;
     }
 
-    private function saveFile ($surveyid): string|bool {
+    /* $current es el adjunto que ya tiene la consulta: es lo que se
+       conserva cuando el formulario indica que no ha cambiado. */
+    private function saveFile ($surveyid, string $current = ""): string|bool {
         $dir = FileParams::FILE_DIR . $surveyid;
                 
         if (!isset ($_FILES['file-input']))
@@ -1301,7 +1368,15 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $tmp_name = $fileinfo["tmp_name"];
         $res = $this->isPDF ($tmp_name);
         if ($res == 2){
-            return $name;
+            return $current;
+        }
+        /* Solo PDF, también por la extensión: el servidor web decide el
+           tipo del archivo por ella, y un .html que empiece por %PDF-
+           se serviría como una página del sitio. */
+        $name = preg_replace ('/[\x00-\x1f\x7f]/', '', $name);
+        if (!preg_match ('/^[^.].*\.pdf$/i', $name)){
+            $this->fileerror = "El archivo debe tener extensión .pdf";
+            return false;
         }
         else if ($res != 0){
             $this->fileerror = "No es un PDF válido";
@@ -1313,6 +1388,15 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         mkdir ($dir, 0700, true);
         move_uploaded_file($tmp_name, $newname);
         return $name;
+    }
+
+    private function currentFile ($sid): string {
+        $query = dbConn ()->prepare ("SELECT surveyfile FROM {Surveys} WHERE surveyid = :sid");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $file = $query->fetchColumn ();
+        $query->closeCursor ();
+        return is_string ($file) ? $file : "";
     }
 
     private function isPDF ($filename): int{

@@ -147,6 +147,9 @@ function validateUser ($user, $passwd, $id = -1){
             //if ($pass_crypt == crypt($passwd, $pass_crypt)) {
             if (password_verify ($passwd, $pass_crypt)){
                 if ($id == -1){
+                    /* Id de sesión nuevo al entrar: uno fijado de antemano
+                       por un tercero no debe quedar autenticado. */
+                    session_regenerate_id (true);
                     $_SESSION['userid'] = $row['userid'];
                     if ($row['role'] != '')
                         $_SESSION['admin'] = true;
@@ -163,7 +166,22 @@ function validateUser ($user, $passwd, $id = -1){
     
 }
 
+/* Si ya hay otra usuaria (distinta de $exceptid) con ese nombre. */
+function userNameExists ($username, $exceptid = -1): bool {
+    $dbconn = dbConn ();
+    $query = $dbconn->prepare ("SELECT 1 FROM {Users} WHERE username = :usu AND userid <> :id");
+    $query->bindParam (':usu', $username, PDO::PARAM_STR);
+    $query->bindParam (':id', $exceptid, PDO::PARAM_INT);
+    $query->execute ();
+    $exists = $query->rowCount () > 0;
+    $query->closeCursor ();
+    return $exists;
+}
+
 function alterUser ($id, $username, $isadmin, $passwd = ""){
+    /* El nombre identifica a la usuaria al entrar: no puede repetirse. */
+    if (userNameExists ($username, $id))
+        throw new Exception ("Ya existe un usuario con ese nombre");
     try {
         if ($passwd == "")
             $pass_crypt = "";
@@ -191,4 +209,29 @@ function alterUser ($id, $username, $isadmin, $passwd = ""){
         throw $e;
         return 1;
     }
+}
+/*
+ * Revalida la usuaria de la sesión contra la base de datos en cada
+ * petición: si la han eliminado pierde la sesión y, si le han cambiado el
+ * rol, el cambio se aplica ya, no cuando vuelva a entrar.
+ */
+function refreshUserSession (){
+    startSession ();
+    if (!isset ($_SESSION['userid']))
+        return;
+    $dbconn = dbConn ();
+    $query = $dbconn->prepare ("SELECT role FROM {Users} WHERE userid = :id");
+    $query->bindParam (':id', $_SESSION['userid'], PDO::PARAM_INT);
+    $query->execute ();
+    $row = $query->fetch ();
+    $query->closeCursor ();
+    if ($row === false){
+        logMessage (LOGGER_INFO, "User {$_SESSION['userid']} no longer exists, closing session");
+        unset ($_SESSION['userid'], $_SESSION['admin']);
+        return;
+    }
+    if (!empty ($row['role']))
+        $_SESSION['admin'] = true;
+    else
+        unset ($_SESSION['admin']);
 }

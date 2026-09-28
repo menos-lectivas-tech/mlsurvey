@@ -1,13 +1,19 @@
 <?php
+/* La página se genera entera antes de enviarse: las vistas procesan los
+   formularios en show(), ya con HTML escrito, y aun así tienen que poder
+   tocar cabeceras (cookies, id de sesión al iniciar sesión...). */
+ob_start ();
 include_once 'utils/classname.php';
 include_once 'utils/session.php';
 include_once 'utils/logger.php';
 include_once 'ifaces/view.php';
 include_once 'utils/user.php';
+require_once 'utils/html.php';
 require_once "include/config.php";
 
 Config::getSystemConfig ();
 startSession ();
+refreshUserSession ();
 $viewsfolder = 'views';
 $classviewfile = $viewsfolder;
 $classview = "";
@@ -56,7 +62,7 @@ if ($classview != 'MainView' && file_exists ($classviewfile)){
 <head>
 <meta charset="utf-8">
 <?php include 'include/themehead.php';?>
-<title><?= Config::$sitename != ""?Config::$sitename : "mlsurvey · Consultas"?></title>
+<title><?= Config::$sitename != ""? h (Config::$sitename) : "mlsurvey · Consultas"?></title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="Plataforma de consultas y votaciones." />
 <meta name="color-scheme" content="light dark" />
@@ -96,7 +102,7 @@ $view->addHead ();
                     <a class="navbar-brand" href="index.php">
                         <span class="ml-brand-mark" aria-hidden="true">ml</span>
                         <span>
-							<?= Config::$mainheader != ""?Config::$mainheader:"mlsurvey"?>
+							<?= Config::$mainheader != ""? h (Config::$mainheader) : "mlsurvey"?>
 						</span>
                     </a>
                 </div>
@@ -154,7 +160,7 @@ $view->addHead ();
 			<div class="widget">
 				<!-- Personalizar con los datos reales de contacto. -->
 				<h5 class="widgetheading">Contacto</h5>
-				<address><?= empty (Config::$contact)?"No definido":Config::$contact; ?></address>
+				<address><?= empty (Config::$contact)?"No definido": h (Config::$contact); ?></address>
 			</div>
 		</div>
 	</div>

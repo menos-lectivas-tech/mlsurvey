@@ -3,6 +3,8 @@
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'include/mlmailer.php';
+require_once 'utils/token.php';
+require_once 'utils/html.php';
 
 class SystemManage extends View {
 
@@ -45,6 +47,11 @@ class SystemManage extends View {
         echo ('<div class="col-md-8">');
         
         if (isset($_REQUEST[self::MANAGEACTION])){
+            if (!checkToken ()){
+                tokenError ();
+                echo ('</div>');
+                return;
+            }
             if ($_REQUEST[self::MANAGEACTION] == "Modificar")
                 $this->modifySystemConfig ();
         }
@@ -205,6 +212,7 @@ class SystemManage extends View {
         <h2>Configuración del sistema.</h2>
         <form id="systemmanage" name="systemmanage" method="POST" 
             action="system_manage" onload='prepareTimezones ();'>
+        <?= setTokenHTML (); ?>
         <div class="question">
             <p><label for="timezone">Zona horaria:</label>
             <select id="timezone" name="timezone" class="searchbox"
@@ -256,13 +264,31 @@ class SystemManage extends View {
         $cid = $_SESSION['configid'];
         unset ($_SESSION['configid']);
         $dbconn = dbConn ();
+        $tzkey = $_REQUEST['timezone'] ?? "";
+        if (!is_string ($tzkey) || !ctype_digit ($tzkey) || empty ($timezones[(int) $tzkey])){
+            echo ("<p><strong>Debes indicar una zona horaria.</strong></p>");
+            return;
+        }
+        $timezone = $timezones[(int) $tzkey];
+        /* CONVERT_TZ devuelve NULL con una zona que la base de datos no
+           conoce: guardarla dejaría las fechas del sitio sin zona. */
+        $check = $dbconn->prepare ("SELECT CONVERT_TZ(NOW(), @@session.time_zone, :tz) IS NOT NULL");
+        $check->bindParam (":tz", $timezone, PDO::PARAM_STR);
+        $check->execute ();
+        $known = (bool) $check->fetchColumn ();
+        $check->closeCursor ();
+        if (!$known){
+            echo ("<p><strong>La base de datos no conoce la zona horaria " . h ($timezone) .
+                ". Elige otra.</strong></p>");
+            logMessage (LOGGER_ERROR, "Time zone {$timezone} not loaded in the database.");
+            return;
+        }
         $query = $dbconn->prepare ("UPDATE {SystemConfig} SET
             timezone = :timezone, alloweddomains = :domain, contact = :contact,
             mainheader = :mh, maincontent = :mc, sitename = :sn
             WHERE configid = :id");
         $query->bindParam (":id", $cid, PDO::PARAM_INT);
-        $query->bindParam (":timezone", $timezones[$_REQUEST['timezone']],
-            PDO::PARAM_STR);
+        $query->bindParam (":timezone", $timezone, PDO::PARAM_STR);
         $query->bindParam (":domain", $_REQUEST['alloweddomains'],
             PDO::PARAM_STR);
         $query->bindParam (":mh", $_REQUEST['mainheader'],

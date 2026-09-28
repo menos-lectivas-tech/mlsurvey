@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'views/surveys.php';
@@ -39,17 +40,17 @@ class ResponseSurvey extends View {
                 removeToken ();
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
                 logMessage (LOGGER_ERROR, "Survey {$_SESSION['surveyid']} does not exist.");
-                clearSessionVariables ();
+                clearParticipationSession ();
                 return;
             }
             $row = $survey->fetch ();
-            echo ("<h2>Participar en la consulta <em>{$row['surveyname']}</em>.</h2>");
+            echo ("<h2>Participar en la consulta <em>" . h ($row['surveyname']) . "</em>.</h2>");
             $survey->closeCursor ();
         }
         catch (Exception $e){
             echo ("<p><strong>Error al acceder a la consulta seleccionada.</strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} getting survey for response.");
-            clearSessionVariables ();
+            clearParticipationSession ();
             return;
         }
         ?>

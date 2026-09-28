@@ -34,8 +34,8 @@ define('CONFIG', [
 
 "db_prefix"=>getenv('DB_PREFIX') ?: '',
 
-"proxy_path"=>getenv('PROXY_PATH') ?: '',
-"proxy_port"=>getenv('PROXY_PORT') ?: '',
+// URL publica del sitio: con ella se construyen los enlaces de los correos.
+"site_url"=>getenv('SITE_URL') ?: '',
 
 "log_level"=>(int) (getenv('LOG_LEVEL') !== false ? getenv('LOG_LEVEL') : 0),
 

@@ -67,7 +67,7 @@ onload='document.getElementById("user").focus();'>
     public function validate (){
         startSession ();
         
-        if (!isset($_SESSION['token'])){
+        if (!hasToken ()){
             $this->show ();
             return 1;
         }
