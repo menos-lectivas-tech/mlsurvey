@@ -1262,6 +1262,13 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             return;
         }
         $filename = $this->saveFile ($sid, $this->currentFile ($sid));
+        /* Con un adjunto no válido no se guarda nada: ni se pierde el que
+           ya tenía la consulta ni los cambios quedan a medias. */
+        if ($filename === false){
+            echo ("<p><strong>Error subiendo archivo: " . h ($this->fileerror) .
+                ". No se ha modificado la consulta.</strong></p>");
+            return;
+        }
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
@@ -1301,10 +1308,6 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         catch (Exception $e){
             echo ("<strong>Error al modificar la consulta.</strong>");
             logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
-        }
-        if ($filename === false){
-            echo ("<p><strong>Error subiendo archivo: {$this->fileerror}.</strong></p>");
-            $this->deldir ($sid);
         }
     }
 
