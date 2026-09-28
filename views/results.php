@@ -75,7 +75,7 @@ class Results extends View {
             ?>
             <h2>Mostrando resultados <?= $partial ? "parciales " : ""; ?>para la consulta <?= $surveyname;?>.</h2>
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
-            <?= empty ($surveyfile)?"":"Documentación adjunta: <a href='{$surveyfile}'";?>
+            <?= empty ($surveyfile)?"":"<p>Documentación adjunta: <a href='{$thefile}'>{$surveyfile}</a></p>";?>
             <p><em><?= $partial ? "Hasta ahora e" : "E"; ?>n esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
             <?php
             $questions = $db->prepare ("SELECT * FROM {Questions} WHERE surveyid = :sid");
@@ -100,7 +100,7 @@ class Results extends View {
                     <div class="option">
                     <?php
                     $totalquestion = 0;
-                    foreach ($resultsarray["Responses"][$questionid] as $value) {
+                    foreach ($resultsarray["Responses"][$questionid] ?? [] as $value) {
                         $totalquestion += $value;
                     }
                     $options = $db->prepare ("SELECT * FROM {Options} WHERE " . 
@@ -110,7 +110,7 @@ class Results extends View {
                     $options->execute ();
                     while ($option = $options->fetch ()){
                         $optionid = $option['optionid'];
-                        $optionres = $resultsarray["Responses"][$questionid][$optionid];
+                        $optionres = $resultsarray["Responses"][$questionid][$optionid] ?? 0;
                         $pctres = $totalquestion > 0 ? $optionres/$totalquestion : 0;
                         $elid = "opt-" . $questionid . "-" . $optionid;
                         /* Las opciones empiezan en 1: se desplaza para que la
@@ -122,7 +122,7 @@ class Results extends View {
                         <label for="<?= $elid; ?>"><strong><?= $option['optiondesc'] ?></strong>: <?= 
                          $optionres?> votos</label>
                          <progress class="<?= $elclass ?>" id="<?= $elid; ?>" 
-                         value="<?= $pctres; ?>" max="1"> <?= $pctres; ?>% </progress>
+                         value="<?= $pctres; ?>" max="1"> <?= round ($pctres * 100, 1); ?>% </progress>
                         </p>
                     <?php
                     }

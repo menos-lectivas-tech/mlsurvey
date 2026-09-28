@@ -103,20 +103,26 @@ class SystemManage extends View {
                 var smtpdiv = document.getElementById ("smtpdiv");
                 var sendmaildiv = document.getElementById ("sendmaildiv");
                 var mailtest = document.getElementById ("mailtest");
-                if (method == <?= MLMailer::SMTP_METHOD ?>){
-                    sendmaildiv.style.display = "none";
-                    smtpdiv.style.display = "block";
-                    mailtest.style.display = "block";
+                /* smtpdiv y sendmaildiv pueden no existir: los datos del
+                   servidor de correo ya no se editan desde aquí. */
+                function display (element, value){
+                    if (element != null)
+                        element.style.display = value;
                 }
-                else if (method == <?= MLMailer::SENDMAIL_METHOD ?>){
-                    sendmaildiv.style.display = "block";
-                    smtpdiv.style.display = "none";
-                    mailtest.style.display = "block";
+                if (method == "<?= MLMailer::SMTP_METHOD ?>"){
+                    display (sendmaildiv, "none");
+                    display (smtpdiv, "block");
+                    display (mailtest, "block");
+                }
+                else if (method == "<?= MLMailer::SENDMAIL_METHOD ?>"){
+                    display (sendmaildiv, "block");
+                    display (smtpdiv, "none");
+                    display (mailtest, "block");
                 }
                 else {
-                    sendmaildiv.style.display = "none";
-                    smtpdiv.style.display = "none";
-                    mailtest.style.display = "none";
+                    display (sendmaildiv, "none");
+                    display (smtpdiv, "none");
+                    display (mailtest, "none");
                 }
             }
 
@@ -173,6 +179,8 @@ class SystemManage extends View {
             $(document).ready(function() {
                 
                 $(".searchbox").select2();
+                /* La configuración de correo está en config/config.php. */
+                allowedFields (<?= json_encode (Config::PARAMS["email_method"] ?? ""); ?>);
                 
 
                 const sendtest = document.getElementById('sendtest');
@@ -212,21 +220,19 @@ class SystemManage extends View {
             </select></p>
             <p><label for="alloweddomains">Dominios permitidos:</label>
             <input type="text" id="alloweddomains" name="alloweddomains"
-                value="<?= $alloweddomains; ?>"
+                value="<?= htmlspecialchars ($alloweddomains ?? ""); ?>"
                 placeholder="Separados por espacios. Vacío indica sin restricciones."></p>
             <p><label for="sitename">Nombre del sitio:</label>
-                <input type="text" id="sitename" name="sitename" value="<?= $sitename; ?>">
+                <input type="text" id="sitename" name="sitename" value="<?= htmlspecialchars ($sitename ?? ""); ?>">
             </p>
             <p><label for="contact">Dirección de contacto:</label>
-                <input type="email" id="contact" name="contact" value="<?= $contact; ?>">
+                <input type="email" id="contact" name="contact" value="<?= htmlspecialchars ($contact ?? ""); ?>">
             </p>
             <p><label for="mainheader">Texto cabecera:</label>
-                <input type="text" id="mainheader" name="mainheader" value="<?= $mainheader; ?>">
+                <input type="text" id="mainheader" name="mainheader" value="<?= htmlspecialchars ($mainheader ?? ""); ?>">
             </p>
             <p><label for="maincontent">Texto principal:</label>
-                <textarea class="description" name="maincontent" id="maincontent">
-                    <?= $maincontent; ?>
-                </textarea>
+                <textarea class="description" name="maincontent" id="maincontent"><?= htmlspecialchars ($maincontent ?? ""); ?></textarea>
             </p>
             <div class="option" id="mailtest" style="display: none;">
                 <p><label for="sendtest">Enviar mensaje de prueba:</label>

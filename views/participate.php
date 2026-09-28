@@ -24,9 +24,10 @@ class Participate extends View {
     function doInit (){
         startSession ();
         $this->key = random_bytes (32);
-        $host   = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+        /* Sin dominio: cookie solo para este host. HTTP_HOST puede llevar el
+           puerto (localhost:8080) y el navegador rechaza ese dominio. */
         setcookie (self::COOKIE_KEY, base64_encode ($this->key), time () + 1800, //Half an hour
-            "", $host, true, true);
+            "", "", true, true);
     }
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
@@ -55,15 +56,14 @@ class Participate extends View {
         $pid = $_REQUEST[self::PID];
         $key = $_REQUEST[self::KEY];
         if (isset (Config::PARAMS['ml_stresstest']) && Config::PARAMS['ml_stresstest']
-             && $_REQUEST["t"])
+             && !empty ($_REQUEST["t"]))
             $this->istest = true;
 
         clearSessionVariables ();
         
 
-        $code = url_base64_decode ($key);
-
         try {
+            $code = url_base64_decode ($key);
             $db = dbConn ();
             
             if (!$this->getEmail ($db, $pid, $code) && !$this->istest){
@@ -78,6 +78,7 @@ class Participate extends View {
                 $_SESSION['surveyid'] = $this->surveyid;
                 $_SESSION['participantid'] = self::TESTID;
                 $this->showSurvey ($db, $this->surveyid, self::TESTID);
+                return;
             }
             //This block should be removed in non alpha versions
             /*if ($email == "prueba@mierda.cow" && $code = "123456"){
@@ -171,6 +172,10 @@ class Participate extends View {
             tokenError ();
             return;           
         }
+        if (!isset ($_SESSION['surveyid']) || !isset ($_SESSION['participantid'])){
+            $this->securityError ();
+            return;
+        }
         $surveyid = $_SESSION['surveyid'];
         $participantid = $_SESSION['participantid'];
 
@@ -179,7 +184,7 @@ class Participate extends View {
             $privkey = false;
         }
         else {
-            if (!isset ($_COOKIE[self::COOKIE_KEY])){
+            if (!isset ($_COOKIE[self::COOKIE_KEY]) || !isset ($_SESSION['privkey'])){
                 echo ("<p><strong>Error recuperando las cookies para firmar las respuestas.</strong></p>");
                 return;
             }
@@ -245,13 +250,42 @@ class Participate extends View {
                 return;
             }
             $responsesign = $this->signResponse ($db, $responsejson, $privkey, $participantid);
-            $query = $db->prepare ("INSERT INTO {Responses} (surveyid, participantid, response, " .
-                " responsesign) values (:sid, :pid, :res, :ress)");
-            $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
-            $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
-            $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
-            $query->execute ();
+            $db->beginTransaction ();
+            try {
+                if (!$this->isActive ($db, $surveyid)){
+                    $db->rollBack ();
+                    echo ("<p><strong>La consulta ya no está abierta.</strong></p>");
+                    return;
+                }
+                if ($participantid != self::TESTID){
+                    /* Bloquea a la participante hasta el final de la transacción:
+                       dos envíos simultáneos no pueden colarse ambos. */
+                    $lock = $db->prepare ("SELECT participantid FROM {Participants} " .
+                        "WHERE participantid = :pid FOR UPDATE");
+                    $lock->bindParam (":pid", $participantid, PDO::PARAM_INT);
+                    $lock->execute ();
+                    $lock->closeCursor ();
+                    if (hasParticipated ($db, $participantid, $surveyid)){
+                        $db->rollBack ();
+                        echo ("<p><strong>Ya se ha participado en la consulta desde la " .
+                            "dirección de correo indicada.</strong></p>");
+                        return;
+                    }
+                }
+                $query = $db->prepare ("INSERT INTO {Responses} (surveyid, participantid, response, " .
+                    " responsesign) values (:sid, :pid, :res, :ress)");
+                $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+                $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
+                $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
+                $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
+                $query->execute ();
+                $db->commit ();
+            }
+            catch (Exception $e){
+                if ($db->inTransaction ())
+                    $db->rollBack ();
+                throw $e;
+            }
             ?>
             <p><strong>Respuestas guardadas.</strong></p>
             <p>Gracias por participar en la consulta.</p>
@@ -301,8 +335,12 @@ class Participate extends View {
 
     private function getEmail ($db, $pid, $code){
         $hcode = hash ('sha256', $code);
-        $query = $db->prepare ("SELECT surveyid, participant FROM {Participation} " . 
-            "WHERE participationid = :pid AND participationkey = :pk");
+        /* El enlace caduca en una hora y solo sirve mientras la consulta está abierta. */
+        $query = $db->prepare ("SELECT p.surveyid, p.participant FROM {Participation} p " .
+            "JOIN {Surveys} s ON s.surveyid = p.surveyid " .
+            "WHERE p.participationid = :pid AND p.participationkey = :pk " .
+            "AND p.participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR) " .
+            "AND s.startdate < NOW() AND s.enddate > NOW()");
         $query->bindParam (":pid", $pid, PDO::PARAM_INT);
         $query->bindParam (":pk", $hcode, PDO::PARAM_STR);
         $query->execute ();
@@ -312,6 +350,16 @@ class Participate extends View {
         $this->email = decrypt (base64_decode ($row['participant']), $code);
         $this->surveyid = $row['surveyid'];
         return true;
+    }
+
+    private function isActive ($db, $surveyid){
+        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid " .
+            "AND startdate < NOW() AND enddate > NOW()");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->execute ();
+        $active = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $active;
     }
 
     private function getTestSurvey ($db, $pid, $code){

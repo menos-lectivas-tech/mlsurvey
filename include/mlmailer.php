@@ -100,7 +100,7 @@ class MLMailer extends PHPMailer {
     }
 
     public function sendCode ($recipient, $pid, $code, $surveyname){
-        $theurl = getURL () . "/participate?pid=" . $pid . "&auth=" . $code;
+        $theurl = rtrim (getURL (), "/") . "/participate?pid=" . $pid . "&auth=" . $code;
         $this->setFrom ($this->m_from);
         $this->addAddress ($recipient);
         $this->Subject = "Dirección para opinar en la consulta {$surveyname}";
