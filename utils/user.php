@@ -195,3 +195,28 @@ function alterUser ($id, $username, $isadmin, $passwd = ""){
         return 1;
     }
 }
+/*
+ * Revalida la usuaria de la sesión contra la base de datos en cada
+ * petición: si la han eliminado pierde la sesión y, si le han cambiado el
+ * rol, el cambio se aplica ya, no cuando vuelva a entrar.
+ */
+function refreshUserSession (){
+    startSession ();
+    if (!isset ($_SESSION['userid']))
+        return;
+    $dbconn = dbConn ();
+    $query = $dbconn->prepare ("SELECT role FROM {Users} WHERE userid = :id");
+    $query->bindParam (':id', $_SESSION['userid'], PDO::PARAM_INT);
+    $query->execute ();
+    $row = $query->fetch ();
+    $query->closeCursor ();
+    if ($row === false){
+        logMessage (LOGGER_INFO, "User {$_SESSION['userid']} no longer exists, closing session");
+        unset ($_SESSION['userid'], $_SESSION['admin']);
+        return;
+    }
+    if (!empty ($row['role']))
+        $_SESSION['admin'] = true;
+    else
+        unset ($_SESSION['admin']);
+}

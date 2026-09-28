@@ -13,6 +13,7 @@ require_once "include/config.php";
 
 Config::getSystemConfig ();
 startSession ();
+refreshUserSession ();
 $viewsfolder = 'views';
 $classviewfile = $viewsfolder;
 $classview = "";
