@@ -166,7 +166,22 @@ function validateUser ($user, $passwd, $id = -1){
     
 }
 
+/* Si ya hay otra usuaria (distinta de $exceptid) con ese nombre. */
+function userNameExists ($username, $exceptid = -1): bool {
+    $dbconn = dbConn ();
+    $query = $dbconn->prepare ("SELECT 1 FROM {Users} WHERE username = :usu AND userid <> :id");
+    $query->bindParam (':usu', $username, PDO::PARAM_STR);
+    $query->bindParam (':id', $exceptid, PDO::PARAM_INT);
+    $query->execute ();
+    $exists = $query->rowCount () > 0;
+    $query->closeCursor ();
+    return $exists;
+}
+
 function alterUser ($id, $username, $isadmin, $passwd = ""){
+    /* El nombre identifica a la usuaria al entrar: no puede repetirse. */
+    if (userNameExists ($username, $id))
+        throw new Exception ("Ya existe un usuario con ese nombre");
     try {
         if ($passwd == "")
             $pass_crypt = "";

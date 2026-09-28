@@ -78,6 +78,10 @@ class UserManage extends View {
                         break;
                     }
                     try {
+                        if (userNameExists ($user)){
+                            echo ("<h3>Ya existe una usuaria con ese nombre</h3>");
+                            break;
+                        }
                         if (isset($_REQUEST['isadmin'])){
                             $res = adduser ($user, $passwd, "A");
                         }
@@ -334,6 +338,10 @@ onload='document.getElementById("user").focus();'>
             $isadmin = "A";
         }
         try {
+            if (userNameExists ($newname, $userid)){
+                echo ('<strong>Ya existe otra usuaria con ese nombre</strong>');
+                return;
+            }
             alterUser ($userid, $newname, $isadmin, $newpasswd);
             echo ("<strong>Usuaria " . htmlspecialchars ($newname) . " modificada con éxito</strong>");
         }
