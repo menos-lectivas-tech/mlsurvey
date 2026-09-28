@@ -147,6 +147,9 @@ function validateUser ($user, $passwd, $id = -1){
             //if ($pass_crypt == crypt($passwd, $pass_crypt)) {
             if (password_verify ($passwd, $pass_crypt)){
                 if ($id == -1){
+                    /* Id de sesión nuevo al entrar: uno fijado de antemano
+                       por un tercero no debe quedar autenticado. */
+                    session_regenerate_id (true);
                     $_SESSION['userid'] = $row['userid'];
                     if ($row['role'] != '')
                         $_SESSION['admin'] = true;

@@ -1,4 +1,8 @@
 <?php
+/* La página se genera entera antes de enviarse: las vistas procesan los
+   formularios en show(), ya con HTML escrito, y aun así tienen que poder
+   tocar cabeceras (cookies, id de sesión al iniciar sesión...). */
+ob_start ();
 include_once 'utils/classname.php';
 include_once 'utils/session.php';
 include_once 'utils/logger.php';
