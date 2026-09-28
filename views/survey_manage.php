@@ -1045,7 +1045,6 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         if (!isset ($_REQUEST['surveyid']))
             return;
         $sid = $_REQUEST['surveyid'];
-        $_SESSION['surveyid'] = $sid;
         $this->javascriptype = SurveyJavascript::AddJavascript;
         $dbconn = dbConn ();
         $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid
@@ -1102,6 +1101,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
          ?>
         <p><input class="button-3" type="submit" onclick="return validate_add ();" 
             name="<?= self::MODIFYACTION ?>" id="ok" value="Aceptar">
+        <!-- La consulta que se modifica va en el propio formulario: en la
+             sesión la pisaría otra pestaña con otra consulta abierta. -->
+        <input type="hidden" name="surveyid" value="<?= (int) $sid; ?>">
         <input class="button-3" type="submit" name="<?= self::MODIFYACTION ?>" 
             id="cancel" value="Cancelar">
         </p>
@@ -1195,10 +1197,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function modifySurvey(){
-        if (!isset ($_SESSION['surveyid']))
+        $sid = $_REQUEST['surveyid'] ?? "";
+        if (!is_string ($sid) || !ctype_digit ($sid))
             return;
-        $sid = $_SESSION['surveyid'];
-        unset ($_SESSION['surveyid']);        
         $surveyname = $_REQUEST['survey'];
         $startstring = $_REQUEST['startdate'];
         $endstring = $_REQUEST['enddate'];
