@@ -909,31 +909,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function addSurvey (){
-        $surveyname = $_REQUEST['survey'];
-        $startstring = $_REQUEST['startdate'];
-        $endstring = $_REQUEST['enddate'];
-        $surveydesc = $_REQUEST['surveydesc'];
-        $showpartial = isset ($_REQUEST["showpartial"]);
-        $nquestion = 1;
-        $noption = 1;
-        $questions = array();
-        while (isset($_REQUEST['desc-q-' . $nquestion])){
-            $questions[$nquestion] = array();
-            //$questions[$nquestion]['name'] = $_REQUEST['name-q-' . $nquestion];
-            $questions[$nquestion]['desc'] = $_REQUEST['desc-q-' . $nquestion];
-            $questions[$nquestion]['optional'] = isset(
-                $_REQUEST['opt-q-' . $nquestion]);
-            $questions[$nquestion]['multiple'] = isset(
-                $_REQUEST['mul-q-' . $nquestion]);
-            $noption = 1;
-            $questions[$nquestion]['options'] = array();
-            while (isset($_REQUEST['opt-' . $nquestion . '-' .$noption])){
-                $questions[$nquestion]['options'][$noption] = 
-                    $_REQUEST['opt-' . $nquestion . '-' .$noption];
-                $noption++;
-            }
-            $nquestion++;
+        $form = $this->readSurveyForm ();
+        if (is_string ($form)){
+            echo ("<p><strong>" . h ($form) . "</strong></p>");
+            return;
         }
+        [$surveyname, $surveydesc, $showpartial, $startstring, $endstring, $questions] = $form;
         
         
         $filename = $this->saveFile (session_id ());
@@ -980,6 +961,69 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             $this->deldir (session_id ());
         }
 
+    }
+
+    /* Lee y valida el formulario de alta o modificación. El navegador ya
+       lo comprueba, pero la petición puede llegar sin pasar por él. Devuelve
+       los datos listos para guardar o un mensaje de error. */
+    private function readSurveyForm (): array|string {
+        $text = fn ($key) => is_string ($_REQUEST[$key] ?? null) ? trim ($_REQUEST[$key]) : "";
+        /* Las descripciones son HTML del editor: vacía si no tiene texto. */
+        $hastext = fn ($html) => preg_replace ('/[\s\x{00A0}]+/u', '',
+            html_entity_decode (strip_tags ($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) !== "";
+
+        $surveyname = $text ('survey');
+        if ($surveyname === "")
+            return "El nombre de la consulta no puede estar vacío.";
+        $surveydesc = $text ('surveydesc');
+        if (!$hastext ($surveydesc))
+            return "La descripción de la consulta no puede estar vacía.";
+
+        $start = $this->parseDate ($text ('startdate'));
+        $end = $this->parseDate ($text ('enddate'));
+        if ($start === null || $end === null)
+            return "Las fechas de inicio y fin no son válidas.";
+        if ($start <= new DateTime ())
+            return "La fecha de inicio debe ser posterior a ahora.";
+        if ($end <= $start)
+            return "La fecha de fin debe ser posterior a la de inicio.";
+
+        $questions = array();
+        for ($nquestion = 1; isset ($_REQUEST['desc-q-' . $nquestion]); $nquestion++){
+            $desc = $text ('desc-q-' . $nquestion);
+            if (!$hastext ($desc))
+                return "La descripción de la pregunta {$nquestion} no puede estar vacía.";
+            $options = array();
+            for ($noption = 1; isset ($_REQUEST['opt-' . $nquestion . '-' . $noption]); $noption++){
+                $option = $text ('opt-' . $nquestion . '-' . $noption);
+                if ($option === "")
+                    return "La opción {$noption} de la pregunta {$nquestion} no puede estar vacía.";
+                $options[$noption] = $option;
+            }
+            if (count ($options) < 2)
+                return "La pregunta {$nquestion} necesita al menos dos opciones.";
+            $questions[$nquestion] = [
+                'desc' => $desc,
+                'optional' => isset ($_REQUEST['opt-q-' . $nquestion]),
+                'multiple' => isset ($_REQUEST['mul-q-' . $nquestion]),
+                'options' => $options,
+            ];
+        }
+        if (empty ($questions))
+            return "La consulta necesita al menos una pregunta.";
+
+        return [$surveyname, $surveydesc, isset ($_REQUEST["showpartial"]),
+            $start->format ('Y-m-d H:i:s'), $end->format ('Y-m-d H:i:s'), $questions];
+    }
+
+    /* Fechas de un campo datetime-local, con o sin segundos. */
+    private function parseDate (string $value): ?DateTime {
+        foreach (['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d H:i', 'Y-m-d H:i:s'] as $format){
+            $date = DateTime::createFromFormat ('!' . $format, $value);
+            if ($date !== false && $date->format ($format) === $value)
+                return $date;
+        }
+        return null;
     }
 
     private function insertQuestions ($dbconn, $sid, $questions){
@@ -1200,31 +1244,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $sid = $_REQUEST['surveyid'] ?? "";
         if (!is_string ($sid) || !ctype_digit ($sid))
             return;
-        $surveyname = $_REQUEST['survey'];
-        $startstring = $_REQUEST['startdate'];
-        $endstring = $_REQUEST['enddate'];
-        $surveydesc = $_REQUEST['surveydesc'];
-        $showpartial = isset ($_REQUEST["showpartial"]);
-        $nquestion = 1;
-        $noption = 1;
-        $questions = array();
-        while (isset($_REQUEST['desc-q-' . $nquestion])){
-            $questions[$nquestion] = array();
-            //$questions[$nquestion]['name'] = $_REQUEST['name-q-' . $nquestion];
-            $questions[$nquestion]['desc'] = $_REQUEST['desc-q-' . $nquestion];
-            $questions[$nquestion]['optional'] = isset(
-                $_REQUEST['opt-q-' . $nquestion]);
-            $questions[$nquestion]['multiple'] = isset(
-                $_REQUEST['mul-q-' . $nquestion]);
-            $noption = 1;
-            $questions[$nquestion]['options'] = array();
-            while (isset($_REQUEST['opt-' . $nquestion . '-' .$noption])){
-                $questions[$nquestion]['options'][$noption] = 
-                    $_REQUEST['opt-' . $nquestion . '-' .$noption];
-                $noption++;
-            }
-            $nquestion++;
+        $form = $this->readSurveyForm ();
+        if (is_string ($form)){
+            echo ("<p><strong>" . h ($form) . "</strong></p>");
+            return;
         }
+        [$surveyname, $surveydesc, $showpartial, $startstring, $endstring, $questions] = $form;
         try {
             if (!$this->isEditable (dbConn (), $sid)){
                 echo ("<strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong>");
