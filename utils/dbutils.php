@@ -1,6 +1,7 @@
 <?php
 require_once 'include/mlpdo.php';
 require_once 'include/config.php';
+require_once 'utils/logger.php';
 
 /**
  * Devuelve la conexion a la base de datos.
@@ -49,12 +50,20 @@ function dbConn (){
     // asi que tambien hay que devolverla a SYSTEM cuando no hay ninguna configurada.
     if ($appliedtz !== Config::$timezone){
         $appliedtz = Config::$timezone;
-        if (!empty ($appliedtz))
-            // Las propiedades estaticas no se interpolan en una cadena: hay que
-            // concatenar. Ademas el valor viene de la base de datos, asi que se escapa.
-            $dbconn->exec ("SET time_zone = " . $dbconn->quote ($appliedtz));
-        else
+        try {
+            if (!empty ($appliedtz))
+                // Las propiedades estaticas no se interpolan en una cadena: hay que
+                // concatenar. Ademas el valor viene de la base de datos, asi que se escapa.
+                $dbconn->exec ("SET time_zone = " . $dbconn->quote ($appliedtz));
+            else
+                $dbconn->exec ("SET time_zone = SYSTEM");
+        }
+        catch (PDOException $e){
+            // Una zona que MariaDB no conoce no puede dejar todo el sitio sin
+            // base de datos (ni siquiera se podria entrar a corregirla).
+            logMessage (LOGGER_ERROR, "Unknown time zone {$appliedtz} in the database, using SYSTEM: {$e->getMessage ()}");
             $dbconn->exec ("SET time_zone = SYSTEM");
+        }
     }
     return $dbconn;
 }
