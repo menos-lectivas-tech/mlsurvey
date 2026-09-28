@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once "ifaces/view.php";
 require_once "utils/user.php";
 require_once "utils/dbutils.php";
@@ -79,7 +80,7 @@ class StressTest extends View {
                         <?php
                         while ($survey = $surveys->fetch ()){
                             ?>
-                        <option value="<?= $survey["surveyid"] ?>"><?= $survey["surveyname"] ?></option>
+                        <option value="<?= $survey["surveyid"] ?>"><?= h ($survey["surveyname"]) ?></option>
                         <?php
                         }
                         ?>

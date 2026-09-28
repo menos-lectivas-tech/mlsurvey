@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
 require_once 'utils/results.php';
@@ -48,8 +49,8 @@ class Results extends View {
                 return;
             }
             $survey = $surveys->fetch ();
-            $surveyname = $survey['surveyname'];
-            $surveydesc = $survey["surveydesc"];
+            $surveyname = h ($survey['surveyname']);
+            $surveydesc = sanitizeHtml ($survey["surveydesc"]);
             $surveyfile = $survey["surveyfile"];
             $surveys->closeCursor ();
 
@@ -71,11 +72,12 @@ class Results extends View {
                     return;
                 }
             }
-            $thefile = FileParams::FILE_DIR . $surveyid . "/" . $surveyfile;
+            $thefile = h (FileParams::FILE_DIR . $surveyid . "/" . rawurlencode ($surveyfile ?? ""));
+            $surveyfilename = h ($surveyfile);
             ?>
             <h2>Mostrando resultados <?= $partial ? "parciales " : ""; ?>para la consulta <?= $surveyname;?>.</h2>
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
-            <?= empty ($surveyfile)?"":"<p>Documentación adjunta: <a href='{$thefile}'>{$surveyfile}</a></p>";?>
+            <?= empty ($surveyfile)?"":"<p>Documentación adjunta: <a href='{$thefile}'>{$surveyfilename}</a></p>";?>
             <p><em><?= $partial ? "Hasta ahora e" : "E"; ?>n esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
             <?php
             $questions = $db->prepare ("SELECT * FROM {Questions} WHERE surveyid = :sid");
@@ -88,7 +90,7 @@ class Results extends View {
                 ?>
                 <div class="question">
                     <h3>Pregunta <?= $questionid; ?></h3>
-                    <p><strong><em><?= $question["questiondesc"]; ?></em></strong></p>
+                    <div><strong><em><?= sanitizeHtml ($question["questiondesc"]); ?></em></strong></div>
                     <p>
                         <label for="<?= $mulid; ?>">Multiple</label>
                         <input disabled type="checkbox" value="Multiple" id="<?= $mulid; ?>"
@@ -119,7 +121,7 @@ class Results extends View {
                         $elclass = self::RESULTS_COLORS[($optionid + $slots - 1) % $slots];
                         ?>
                         <p>
-                        <label for="<?= $elid; ?>"><strong><?= $option['optiondesc'] ?></strong>: <?= 
+                        <label for="<?= $elid; ?>"><strong><?= h ($option['optiondesc']) ?></strong>: <?= 
                          $optionres?> votos</label>
                          <progress class="<?= $elclass ?>" id="<?= $elid; ?>" 
                          value="<?= $pctres; ?>" max="1"> <?= round ($pctres * 100, 1); ?>% </progress>

@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'views/surveys.php';
@@ -83,8 +84,8 @@ class GetCode extends View {
                     <?= setTokenHTML (); ?>
                     <label for="email">Dirección de correo
                       <p><small><em>* Los dominios autorizados son:
-                       <?= Config::$alloweddomains == ""? "cualquiera" : str_replace (" ", ", ",
-                           Config::$alloweddomains);?>
+                       <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
+                           Config::$alloweddomains));?>
                        </em></small></p>
                     </label>
                     <div class="ml-participate-row">
@@ -131,7 +132,7 @@ class GetCode extends View {
         $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
             strtolower (trim ($_REQUEST['email'])) : "";
         $surveyid = $_SESSION['surveyid'] ?? null;
-        $surveyname = $_SESSION['surveyname'] ?? "";
+        $surveyname = h ($_SESSION['surveyname'] ?? "");
         clearSessionVariables ();
         if ($surveyid === null){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");

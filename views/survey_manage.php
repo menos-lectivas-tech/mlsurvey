@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'include/fileparams.php';
@@ -159,7 +160,7 @@ class SurveyManage extends View {
                     $name = $row['surveyname'];
                     ?>
                     <tr id="<?= $id; ?>">
-                        <td><span class="username" id="sv-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="sv-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td data-label="Fecha inicio"><?= $row['dstart'] ?></td>
                         <td data-label="Fecha fin"><?= $row['dend'] ?></td>
                         <td class="ml-row-actions">
@@ -232,7 +233,7 @@ class SurveyManage extends View {
                         $results = $row['dresults'];
                     ?>
                     <tr id="ended-<?= $id; ?>">
-                        <td><span class="username" id="sve-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="sve-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td data-label="Fecha fin"><?= $row['dend'] ?></td>
                         <td data-label="Resultados"><?= $results ?></td>
                         <td class="ml-row-actions">
@@ -281,7 +282,7 @@ class SurveyManage extends View {
                 $surveys->closeCursor ();
                 return;
             }
-            $surveyname = $surveys->fetch ()['surveyname'];
+            $surveyname = h ($surveys->fetch ()['surveyname']);
             $surveys->closeCursor ();
 
             $results = countResponses ($dbconn, $surveyid);
@@ -1234,7 +1235,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
             logMessage (LOGGER_ERROR, "Error {$e} when modifying survey");
             return;
         }
-        $filename = $this->saveFile ($sid);
+        $filename = $this->saveFile ($sid, $this->currentFile ($sid));
         try {
             $dbconn = dbConn ();
             $dbconn->beginTransaction ();
@@ -1305,7 +1306,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         return $editable;
     }
 
-    private function saveFile ($surveyid): string|bool {
+    /* $current es el adjunto que ya tiene la consulta: es lo que se
+       conserva cuando el formulario indica que no ha cambiado. */
+    private function saveFile ($surveyid, string $current = ""): string|bool {
         $dir = FileParams::FILE_DIR . $surveyid;
                 
         if (!isset ($_FILES['file-input']))
@@ -1328,7 +1331,15 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $tmp_name = $fileinfo["tmp_name"];
         $res = $this->isPDF ($tmp_name);
         if ($res == 2){
-            return $name;
+            return $current;
+        }
+        /* Solo PDF, también por la extensión: el servidor web decide el
+           tipo del archivo por ella, y un .html que empiece por %PDF-
+           se serviría como una página del sitio. */
+        $name = preg_replace ('/[\x00-\x1f\x7f]/', '', $name);
+        if (!preg_match ('/^[^.].*\.pdf$/i', $name)){
+            $this->fileerror = "El archivo debe tener extensión .pdf";
+            return false;
         }
         else if ($res != 0){
             $this->fileerror = "No es un PDF válido";
@@ -1340,6 +1351,15 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         mkdir ($dir, 0700, true);
         move_uploaded_file($tmp_name, $newname);
         return $name;
+    }
+
+    private function currentFile ($sid): string {
+        $query = dbConn ()->prepare ("SELECT surveyfile FROM {Surveys} WHERE surveyid = :sid");
+        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $query->execute ();
+        $file = $query->fetchColumn ();
+        $query->closeCursor ();
+        return is_string ($file) ? $file : "";
     }
 
     private function isPDF ($filename): int{

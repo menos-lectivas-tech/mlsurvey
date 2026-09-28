@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 /**
  * This is the base class for all Views. Defines some default methods and an
  * the abstract method 'show' so every View must define its own.
@@ -124,7 +125,7 @@ class MainView extends View {
     function show (){
 
     if (Config::$maincontent != "")
-        echo (Config::$maincontent);
+        echo (sanitizeHtml (Config::$maincontent));
      
     else
         echo ("<h1>Este es el contenido de main</h1>\n");

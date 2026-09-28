@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'utils/dbutils.php';
@@ -145,7 +146,7 @@ class UserManage extends View {
                     $name = $row['username'];
                     ?>
                     <tr id="<?= $id; ?>">
-                        <td><span class="username" id="us-<?= $id; ?>"><?= $name ?></span></td>
+                        <td><span class="username" id="us-<?= $id; ?>"><?= h ($name) ?></span></td>
                         <td class="ml-row-actions">
                             <button type="submit" class="button-3 is-ghost is-icon"
                                 name="<?= self::MANAGEACTION ?>" value="Modificar"
@@ -265,7 +266,7 @@ onload='document.getElementById("user").focus();'>
         try {
             $username = getUserName ($userid);
             rmUser ($userid);
-            echo ("<strong>Usuaria {$username} eliminada con éxito.</strong>");
+            echo ("<strong>Usuaria " . h ($username) . " eliminada con éxito.</strong>");
         }
         catch (Exception $e){
             echo ("<strong>Error al eliminar usuaria</strong>");

@@ -1,4 +1,5 @@
 <?php
+require_once 'utils/html.php';
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
 
@@ -22,19 +23,19 @@ function showSurveyHeader ($db, $surveyid, $readonly = false){
     }
     $survey = $query->fetch ();
     if ($readonly){
-        echo ("<h2>Consulta <em>{$survey['surveyname']}</em></h2>");
+        echo ("<h2>Consulta <em>" . h ($survey['surveyname']) . "</em></h2>");
     }
     else {
-        echo ("<h2>Participando en la consulta <em>{$survey['surveyname']}</em></h2>");
+        echo ("<h2>Participando en la consulta <em>" . h ($survey['surveyname']) . "</em></h2>");
     }
     ?>
-    <div><?= $survey["surveydesc"]; ?></div>
+    <div><?= sanitizeHtml ($survey["surveydesc"]); ?></div>
     <?php
     if (!empty ($survey["surveyfile"])){
-        $filelink = FileParams::FILE_DIR . $surveyid . "/" . $survey['surveyfile'];
+        $filelink = FileParams::FILE_DIR . $surveyid . "/" . rawurlencode ($survey['surveyfile']);
     ?>
         <div><label for="filelink">Documentación adjunta:</label>
-        <a href="<?= $filelink; ?>"><?= $survey["surveyfile"]; ?></a>
+        <a href="<?= h ($filelink); ?>"><?= h ($survey["surveyfile"]); ?></a>
         </div>
     <?php
     }
@@ -62,7 +63,7 @@ function showSurveyQuestions ($db, $surveyid, $readonly = false){
 
     <div class="question">
         <h3>Pregunta <?= $question['questionid'] ?></h3>
-        <div><?= $question['questiondesc'] ?></div>
+        <div><?= sanitizeHtml ($question['questiondesc']) ?></div>
         <?php
         $multiple = $question['multiple'];
         $optional = $question['optional'];
@@ -91,7 +92,7 @@ function showSurveyQuestions ($db, $surveyid, $readonly = false){
             <?php
             while ($option = $options->fetch ()){
                 $optionid = $option['optionid'];
-                $optiondesc = $option['optiondesc'];
+                $optiondesc = h ($option['optiondesc']);
                 if ($multiple){
                     $cname = "op-" . $questionid . "-" . $optionid;
                     echo ("<p><input type='checkbox' id='{$cname}' name='{$cname}' " .
