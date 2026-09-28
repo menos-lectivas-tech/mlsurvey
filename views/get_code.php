@@ -177,18 +177,23 @@ class GetCode extends View {
                 return;
             }
 
-            $code = random_bytes (32);
-            
-            if ($this->checkParticipation ($db, $participant, $surveyid)){
+            /* participant va cifrado con un código aleatorio distinto en cada
+               petición, así que no sirve para buscar las anteriores: el límite
+               por hora se comprueba con esta etiqueta fija por correo y consulta. */
+            $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
+            if ($this->checkParticipation ($db, $requesttag, $surveyid)){
                 return;
             }
+
+            $code = random_bytes (32);
             $passwd = hash ('sha256', $code);
-            $participant = base64_encode (encrypt ($email, $code));
-            $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey) " .
-                "values (:id, :sid, :pwd)");
-            $query->bindParam (":id", $participant, PDO::PARAM_STR);
+            $encryptedmail = base64_encode (encrypt ($email, $code));
+            $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
+                "values (:id, :sid, :pwd, :tag)");
+            $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
             $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
+            $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
             $query->execute ();
             $pid = $db->lastInsertId ();
             $mailer = new MlMailer ();
@@ -235,12 +240,12 @@ class GetCode extends View {
         return $active;
     }
 
-    private function checkParticipation ($db, $participant, $sid){
+    private function checkParticipation ($db, $requesttag, $sid){
         $ret = false;
         $query = $db->prepare ("SELECT 1 FROM {Participation} WHERE 
-            participant = :part AND surveyid = :sid
+            requesttag = :tag AND surveyid = :sid
             AND participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR)");
-        $query->bindParam (":part", $participant, PDO::PARAM_STR);
+        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
         $query->execute ();
         if ($query->rowCount () > 0){
