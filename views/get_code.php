@@ -132,7 +132,9 @@ class GetCode extends View {
         $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
             strtolower (trim ($_REQUEST['email'])) : "";
         $surveyid = $_SESSION['surveyid'] ?? null;
-        $surveyname = h ($_SESSION['surveyname'] ?? "");
+        /* El nombre va tal cual en el correo y escapado en la página. */
+        $mailsurveyname = $_SESSION['surveyname'] ?? "";
+        $surveyname = h ($mailsurveyname);
         clearSessionVariables ();
         if ($surveyid === null){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
@@ -199,7 +201,7 @@ class GetCode extends View {
             $pid = $db->lastInsertId ();
             $mailer = new MlMailer ();
             $mailer->configure ();
-            $mailer->sendCode ($email, $pid, url_base64_encode ($code), $surveyname);
+            $mailer->sendCode ($email, $pid, url_base64_encode ($code), $mailsurveyname);
             echo ("<p><strong>El código para participar en la consulta <em>{$surveyname}</em> " . 
                 "ha sido enviado a la dirección indicada.</strong></p>");
         }
