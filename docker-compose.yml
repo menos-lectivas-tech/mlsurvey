@@ -96,6 +96,10 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-mlsurvey@example.test}
       # tls (STARTTLS), ssl, o none para SMTP sin cifrar (solo desarrollo).
       EMAIL_ENCRYPTION: ${EMAIL_ENCRYPTION:-none}
+      # Captcha ALTCHA del formulario de codigo (ver .env.dev): sin HTTPS
+      # ni localhost hay que ponerlo a false.
+      ALTCHA_ENABLED: ${ALTCHA_ENABLED:-true}
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
