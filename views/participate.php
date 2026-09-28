@@ -206,42 +206,45 @@ class Participate extends View {
                 "FROM {Questions} WHERE surveyid = :sid ORDER BY questionid ASC");
             $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $questions->execute ();
-            if ($questions->rowCount () > 0){
-                while ($question = $questions->fetch ()){
-                    $questionid = $question['questionid'];
-                    $optional = $question['optional'];
-                    $multiple = $question['multiple'];
-                    if ($multiple == 0){
-                        if (isset ($_REQUEST["op-" . $questionid])){
-                            $selected = $_REQUEST["op-" . $questionid];
-                            $responsearray[$questionid] = $selected;
-                        }
-                        else if ($optional == 1)
-                            $responsearray[$questionid] = -1;
-                        else{
-                            echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
-                            $questions->closeCursor ();
+            $questionlist = $questions->fetchAll ();
+            $questions->closeCursor ();
+            foreach ($questionlist as $question){
+                $questionid = $question['questionid'];
+                $optional = $question['optional'];
+                $multiple = $question['multiple'];
+                /* Las respuestas se contrastan con las opciones que existen:
+                   lo que llega del formulario no es de fiar. */
+                $validoptions = $this->getOptionIds ($db, $surveyid, $questionid);
+                if ($multiple == 0){
+                    $selected = $_REQUEST["op-" . $questionid] ?? null;
+                    if ($selected !== null){
+                        if (!is_string ($selected) || !ctype_digit ($selected) ||
+                            !in_array ((int) $selected, $validoptions, true)){
+                            echo ("<p><strong>Error. Hay respuestas no válidas.</strong></p>");
                             return;
+                        }
+                        $responsearray[$questionid] = (int) $selected;
+                    }
+                    else if ($optional == 1)
+                        $responsearray[$questionid] = -1;
+                    else{
+                        echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
+                        return;
+                    }
+                }
+                else {
+                    $responsearray[$questionid] = array();
+                    foreach ($validoptions as $optionid){
+                        if (isset ($_REQUEST["op-" . $questionid . "-" . $optionid])){
+                            $responsearray[$questionid][$optionid] = 1;
                         }
                     }
-                    else {
-                        $toptions = $_REQUEST["topt-" . $questionid];
-                        $responsearray[$questionid] = array();
-                        $responses = 0;
-                        for ($i = 1; $i <= $toptions; $i++){
-                            if (isset ($_REQUEST["op-" . $questionid . "-" . $i])){
-                                $responsearray[$questionid][$i] = 1;
-                            }
-                        }
-                        if ($optional == 0 && empty ($responsearray[$questionid])){
-                            echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
-                            $questions->closeCursor ();
-                            return;
-                        }
+                    if ($optional == 0 && empty ($responsearray[$questionid])){
+                        echo ("<p><strong>Error. Hay preguntas obligatioras no respondidas.</strong></p>");
+                        return;
                     }
                 }
             }
-            $questions->closeCursor ();
             $responsejson = json_encode ($responsearray);
             if ($responsejson === false){
                 echo ("<p><strong>Error codificando respuestas.</strong></p>");
@@ -350,6 +353,17 @@ class Participate extends View {
         $this->email = decrypt (base64_decode ($row['participant']), $code);
         $this->surveyid = $row['surveyid'];
         return true;
+    }
+
+    private function getOptionIds ($db, $surveyid, $questionid): array {
+        $options = $db->prepare ("SELECT optionid FROM {Options} " .
+            "WHERE surveyid = :sid AND questionid = :qid");
+        $options->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $options->bindParam (":qid", $questionid, PDO::PARAM_INT);
+        $options->execute ();
+        $ids = array_map ('intval', $options->fetchAll (PDO::FETCH_COLUMN));
+        $options->closeCursor ();
+        return $ids;
     }
 
     private function isActive ($db, $surveyid){

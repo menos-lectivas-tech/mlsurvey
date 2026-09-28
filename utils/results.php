@@ -30,25 +30,46 @@ function emptyResults ($db, $surveyid){
 
 /* Suma una respuesta, con el formato en que se guarda en Responses, al
    recuento. Las preguntas múltiples guardan un array de opciones marcadas;
-   las simples, la opción elegida o -1 si se dejó en blanco. */
-function addResponse (array &$results, array $response){
+   las simples, la opción elegida o -1 si se dejó en blanco. $multiple dice
+   de qué tipo es cada pregunta: una respuesta que no encaje con su tipo
+   (un array en una pregunta simple, por ejemplo) no se cuenta. */
+function addResponse (array &$results, array $response, array $multiple){
     $results["Total"]++;
     foreach ($response as $questionid => $answer){
-        if (is_array ($answer)){
+        if (!isset ($multiple[$questionid]))
+            continue;
+        if ($multiple[$questionid]){
+            if (!is_array ($answer))
+                continue;
             foreach ($answer as $optionid => $selected){
                 if (!empty ($selected) &&
                     isset ($results["Responses"][$questionid][$optionid]))
                     $results["Responses"][$questionid][$optionid]++;
             }
         }
-        else if (isset ($results["Responses"][$questionid][$answer]))
+        else if (is_scalar ($answer) &&
+            isset ($results["Responses"][$questionid][$answer]))
             $results["Responses"][$questionid][$answer]++;
     }
+}
+
+/* Tipo de cada pregunta de la consulta: questionid => true si es múltiple. */
+function questionTypes ($db, $surveyid){
+    $types = array ();
+    $questions = $db->prepare ("SELECT questionid, multiple FROM {Questions}
+        WHERE surveyid = :sid");
+    $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+    $questions->execute ();
+    while ($question = $questions->fetch ())
+        $types[$question["questionid"]] = !empty ($question["multiple"]);
+    $questions->closeCursor ();
+    return $types;
 }
 
 /* Cuenta todas las Responses guardadas de la consulta. */
 function countResponses ($db, $surveyid){
     $results = emptyResults ($db, $surveyid);
+    $multiple = questionTypes ($db, $surveyid);
     $responses = $db->prepare ("SELECT responseid, response FROM {Responses}
         WHERE surveyid = :sid");
     $responses->bindParam (":sid", $surveyid, PDO::PARAM_INT);
@@ -60,7 +81,7 @@ function countResponses ($db, $surveyid){
                 "in survey {$surveyid}");
             continue;
         }
-        addResponse ($results, $responsearray);
+        addResponse ($results, $responsearray, $multiple);
     }
     $responses->closeCursor ();
     return $results;
