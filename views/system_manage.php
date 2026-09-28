@@ -3,6 +3,7 @@
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'include/mlmailer.php';
+require_once 'utils/token.php';
 
 class SystemManage extends View {
 
@@ -45,6 +46,11 @@ class SystemManage extends View {
         echo ('<div class="col-md-8">');
         
         if (isset($_REQUEST[self::MANAGEACTION])){
+            if (!checkToken ()){
+                tokenError ();
+                echo ('</div>');
+                return;
+            }
             if ($_REQUEST[self::MANAGEACTION] == "Modificar")
                 $this->modifySystemConfig ();
         }
@@ -205,6 +211,7 @@ class SystemManage extends View {
         <h2>Configuración del sistema.</h2>
         <form id="systemmanage" name="systemmanage" method="POST" 
             action="system_manage" onload='prepareTimezones ();'>
+        <?= setTokenHTML (); ?>
         <div class="question">
             <p><label for="timezone">Zona horaria:</label>
             <select id="timezone" name="timezone" class="searchbox"

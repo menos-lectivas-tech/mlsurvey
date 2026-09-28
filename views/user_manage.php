@@ -34,6 +34,13 @@ class UserManage extends View {
             showMain ();
             return;
         }
+        if ((isset ($_REQUEST[self::MANAGEACTION]) || isset ($_REQUEST[self::ADDACTION]) ||
+            isset ($_REQUEST[self::MODIFYACTION])) && !checkToken ()){
+            echo ('<div class="col-md-8">');
+            tokenError ();
+            echo ('</div>');
+            return;
+        }
         if (isset($_REQUEST[self::MANAGEACTION])){
             $action = $_REQUEST[self::MANAGEACTION];
             unset ($_REQUEST[self::MANAGEACTION]);
@@ -103,6 +110,7 @@ class UserManage extends View {
         <div class="col-md-8">
         <h2>Gestión de usuarias</h2>
         <form id="usermanage" name="usermanage" method="POST" action="user_manage" >
+        <?= setTokenHTML (); ?>
         <?php
         $this->listUsers ();
         $this->showControls ();
@@ -238,6 +246,7 @@ class UserManage extends View {
         <h2>Añadir usuaria</h2>
         <form id="adduser" name="adduser" method="POST" action="user_manage" 
 onload='document.getElementById("user").focus();'>
+        <?= setTokenHTML (); ?>
         <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1"></p>
         <p>Clave: <input type="password" id="passwd" name="passwd"></p>
         <p>Confirmar clave: <input type="password" id="passwd2" name="passwd2"></p>
@@ -294,6 +303,7 @@ onload='document.getElementById("user").focus();'>
         <h2>Modificar usuaria</h2>
         <form id="moduser" name="moduser" method="POST" action="user_manage" 
 onload='document.getElementById("user").focus();'>
+        <?= setTokenHTML (); ?>
         <p>Usuaria: <input type="text" id="user" name="user" tabindex="-1" value="<?= htmlspecialchars ($name ?? ""); ?>"></p>
         <p>Nueva clave: <input type="password" id="passwd" name="passwd" placeholder="Vacío sin cambios"></p>
         <p>Confirmar nueva clave: <input type="password" id="passwd2" name="passwd2"></p>

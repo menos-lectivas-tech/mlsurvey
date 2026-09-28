@@ -58,6 +58,13 @@ class SurveyManage extends View {
             showMain ();
             return;
         }
+        if ((isset ($_REQUEST[self::MANAGEACTION]) || isset ($_REQUEST[self::ADDACTION]) ||
+            isset ($_REQUEST[self::MODIFYACTION])) && !checkToken ()){
+            echo ('<div class="col-md-8">');
+            tokenError ();
+            echo ('</div>');
+            return;
+        }
         if (isset($_REQUEST[self::MANAGEACTION])){
             $action = $_REQUEST[self::MANAGEACTION];
             unset ($_REQUEST[self::MANAGEACTION]);
@@ -110,6 +117,7 @@ class SurveyManage extends View {
         <!-- Los botones de cada fila escriben aquí sobre qué consulta actúan:
              el servidor sigue leyendo $_REQUEST['surveyid']. -->
         <input type="hidden" name="surveyid" id="selectedsurvey" value="">
+        <?= setTokenHTML (); ?>
         <?php
         $this->listSurveys ();
         $this->listEndedSurveys ();
@@ -124,8 +132,9 @@ class SurveyManage extends View {
             $query = $dbconn->prepare ("SELECT surveyid, surveyname" .
             ", DATE_FORMAT(enddate,'%d/%m/%Y %T') as dend" . 
             ", DATE_FORMAT(startdate,'%d/%m/%Y %T') as dstart FROM {Surveys}" .
-            " WHERE startdate > NOW()" .
+            " WHERE startdate > NOW()" . $this->ownerFilter ("createdby") .
                 " ORDER BY startdate DESC");
+            $this->bindOwner ($query);
             $query->execute ();
             $this->surveyscount = $query->rowCount ();
             if ($this->surveyscount == 0){
@@ -195,8 +204,9 @@ class SurveyManage extends View {
             ", DATE_FORMAT(r.resultsdate,'%d/%m/%Y %T') as dresults" .
             ", r.ispartial FROM {Surveys} s" .
             " LEFT JOIN {Results} r ON r.surveyid = s.surveyid" .
-            " WHERE s.enddate < NOW()" .
+            " WHERE s.enddate < NOW()" . $this->ownerFilter ("s.createdby") .
                 " ORDER BY s.enddate DESC");
+            $this->bindOwner ($query);
             $query->execute ();
             if ($query->rowCount () == 0)
                 return;
@@ -261,8 +271,9 @@ class SurveyManage extends View {
         try {
             $dbconn = dbConn ();
             $surveys = $dbconn->prepare ("SELECT surveyname FROM {Surveys} WHERE
-                surveyid = :sid AND enddate < NOW()");
+                surveyid = :sid AND enddate < NOW()" . $this->ownerFilter ("createdby"));
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+            $this->bindOwner ($surveys);
             $surveys->execute ();
             if ($surveys->rowCount () == 0){
                 $this->resultsmessage =
@@ -393,6 +404,7 @@ class SurveyManage extends View {
     <h2>Añadir consulta</h2>
         <form id="addsurvey" name="addsurvey" method="POST" action="survey_manage" 
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
+        <?= setTokenHTML (); ?>
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"></p>
         <p><label for="surveydesc">Descripción</label>
@@ -1036,8 +1048,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $this->javascriptype = SurveyJavascript::AddJavascript;
         $dbconn = dbConn ();
         $surveys = $dbconn->prepare ("SELECT * from {Surveys} where surveyid = :sid
-            AND startdate > NOW()");
+            AND startdate > NOW()" . $this->ownerFilter ("createdby"));
         $surveys->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $this->bindOwner ($surveys);
         $surveys->execute ();
         if ($surveys->rowCount() == 0){
             echo ("<p><strong>Solo es posible modificar las consultas que aún no hayan comenzado.</strong></p>");
@@ -1054,6 +1067,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     <h2>Modificar consulta</h2>
         <form id="modsurvey" name="modsurvey" method="POST" action="survey_manage" 
 onload='document.getElementById("survey").focus();' enctype="multipart/form-data">
+        <?= setTokenHTML (); ?>
         <p><label for="survey">Consulta:</label>
             <input type="text" id="survey" name="survey" tabindex="-1"
             value="<?= htmlspecialchars ($survey['surveyname']); ?>"></p>
@@ -1267,11 +1281,24 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
     }
 
-    /* Solo se pueden modificar o eliminar las consultas que no han empezado. */
+    /* Las administradoras gestionan todas las consultas; el resto de
+       usuarias, solo las que han creado ellas. */
+    private function ownerFilter (string $column): string {
+        return isAdmin () ? "" : " AND {$column} = :owner";
+    }
+
+    private function bindOwner ($query){
+        if (!isAdmin ())
+            $query->bindValue (":owner", $_SESSION['userid'], PDO::PARAM_INT);
+    }
+
+    /* Solo se pueden modificar o eliminar las consultas que no han empezado
+       y que la usuaria puede gestionar. */
     private function isEditable ($dbconn, $sid): bool {
         $query = $dbconn->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
-            AND startdate > NOW() FOR UPDATE");
+            AND startdate > NOW()" . $this->ownerFilter ("createdby") . " FOR UPDATE");
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
+        $this->bindOwner ($query);
         $query->execute ();
         $editable = $query->rowCount () > 0;
         $query->closeCursor ();

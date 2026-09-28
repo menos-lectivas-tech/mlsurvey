@@ -47,6 +47,10 @@ class StressTest extends View {
         }
         
         if (isset ($_REQUEST['testaction'])){
+            if (!checkToken ()){
+                tokenError ();
+                return;
+            }
             switch ($_REQUEST['testaction']) {
                 case self::TEST_CLEAN:
                     if ($this->cleanTests ())
@@ -69,6 +73,7 @@ class StressTest extends View {
         <h1>Generar archivo de stress</h1>
         <form id="stresstest" name="stresstest" method="POST" 
             action="stress_test">
+            <?= setTokenHTML (); ?>
             <p><label for="surveys">Consulta:</label>
                     <select id="surveys" name="surveyid">
                         <?php
