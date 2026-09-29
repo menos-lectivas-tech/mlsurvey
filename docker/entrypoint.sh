@@ -55,7 +55,8 @@ define('CONFIG', [
 "altcha_hmac_key" => getenv('ALTCHA_HMAC_KEY') ?: '',
 
 "ml_stresstest" => false,
-"survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'false' ? false: true,
+// Por defecto sin restringir, como en config.php.sample.
+"survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',
 ]);
 PHPEOF
     chown www-data:www-data "$CONFIG_FILE"

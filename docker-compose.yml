@@ -103,10 +103,16 @@ services:
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      # true: cada usuaria solo gestiona las consultas que ha creado
+      # (las administradoras, todas).
+      SURVEY_EDIT_RESTRIC: ${SURVEY_EDIT_RESTRIC:-false}
     volumes:
       - uploads:/var/www/html/files
       # Para desarrollo, descomenta para editar el codigo sin reconstruir la imagen:
       - ./:/var/www/html
+      # Sin esto, el montaje anterior tapa el vendor/ que instala composer
+      # en la imagen (PHPMailer, HugeRTE) con el vendor/ local, vacio.
+      - /var/www/html/vendor
 
 volumes:
   db_data:
