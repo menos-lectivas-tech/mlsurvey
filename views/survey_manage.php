@@ -1419,7 +1419,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     }
 
     private function bindOwner ($query){
-        if (!Config::PARAMS["survey_edit_restric"] && !isAdmin ())
+        if (Config::PARAMS["survey_edit_restric"] && !isAdmin ())
             $query->bindValue (":owner", $_SESSION['userid'], PDO::PARAM_INT);
     }
 
@@ -1439,7 +1439,6 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     /* $current es el adjunto que ya tiene la consulta: es lo que se
        conserva cuando el formulario indica que no ha cambiado. */
     private function saveFile ($surveyid, string $current = ""): string|bool {
->>>>>>> master
         $dir = FileParams::FILE_DIR . $surveyid;
                 
         if (!isset ($_FILES['file-input']))
