@@ -97,7 +97,7 @@ function isView ($viewobject){
 /**
  * This method shows the content of a View class extender.
  * 
- * @param $view The View object.
+ * @param View $view The View object.
  */
 function showView ($view){
     if (isView ($view)){

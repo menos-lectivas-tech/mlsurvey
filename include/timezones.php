@@ -1,4 +1,7 @@
 <?php
+/**
+ * Time zones list
+ */
 $timezones = [
 "",
 "Africa/Abidjan",

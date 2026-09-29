@@ -50,4 +50,11 @@ const CONFIG = [
  */
 
 "ml_stresstest" => false,
+
+/**
+ * For restrict permissions on survey edition.
+ * true: only creator can edit a survey
+ * false: every user can edit a survey.
+ */
+"survey_edit_restric" => false,
 ];

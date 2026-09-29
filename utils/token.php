@@ -1,11 +1,22 @@
 <?php
+/**
+ * Functions for handle the security token used in some pages to prevent dumb robots attacks
+ */
 require_once 'utils/session.php';
 require_once 'utils/logger.php';
+
+
+/**
+ * Creates a session token.
+ * 
+ * @return string The token hex coded.
+ */
 
 /* Tokens pendientes que se guardan por sesión. Cada formulario lleva el
    suyo y cada uno sirve para un único envío, pero caben varios a la vez:
    así una pestaña no invalida el formulario abierto en otra. */
 const TOKEN_MAX = 20;
+
 
 function setToken (){
     startSession ();
@@ -18,12 +29,18 @@ function setToken (){
     return $token;
 }
 
+/**
+ * Inserts token into HTML 
+ */
 function setTokenHTML (){
     $token = setToken ();
     return "<input type='hidden' name='token' value='{$token}'>";
 }
 
+
+
 /* Descarta el último token generado, el del formulario que no se llegó a mostrar. */
+
 function removeToken (){
     if (!empty ($_SESSION['tokens']))
         array_pop ($_SESSION['tokens']);
@@ -34,6 +51,10 @@ function hasToken (){
     return !empty ($_SESSION['tokens']);
 }
 
+
+/**
+ * Check if session token equals request token.
+ */
 function checkToken (){
     startSession ();
     if (empty ($_SESSION['tokens']))
@@ -51,6 +72,9 @@ function checkToken (){
     return false;
 }
 
+/**
+ * Inserts HTML token error text and logs it.
+ */
 function tokenError (){
     ?>
     <strong>

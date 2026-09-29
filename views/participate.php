@@ -1,7 +1,10 @@
 <?php
+/**
+ * This class handle the whole participation proccess.
+ */
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
-require_once 'views/response_survey.php';
+//require_once 'views/response_survey.php';
 require_once 'utils/participation.php';
 require_once 'utils/token.php';
 require_once 'utils/crypt.php';
@@ -27,6 +30,10 @@ class Participate extends View {
     private string $email = "";
     private int $surveyid = -1;
 
+    /**
+     * Sends a cookie with a 256bit random key used to encrypt the private key for
+     * signing the responses on submit.
+     */
     function doInit (){
         startSession ();
         /* Una sola clave para todas las pestañas: si cada enlace abierto
@@ -57,6 +64,14 @@ class Participate extends View {
         <?php
     }
 
+    /**
+     * Depending on the request parameters, this method takes different actions.
+     * - If they don't meet the requirements, the method shows the main page.
+     * - If the are from an own submit then the responses are stored.
+     * - If the request matches a valid record of the Patcicipation table (or the StressTest),
+     * shows the responses form. Otherwise shows an error.
+     * 
+     */
     public function show (){
         startSession ();
         if (isset ($_REQUEST[self::ACTION])){
@@ -72,6 +87,10 @@ class Participate extends View {
 
         $pid = $_REQUEST[self::PID];
         $key = $_REQUEST[self::KEY];
+
+        /**
+         * Are we in a stress test?
+         */
         if (isset (Config::PARAMS['ml_stresstest']) && Config::PARAMS['ml_stresstest']
              && !empty ($_REQUEST["t"]))
             $this->istest = true;
@@ -81,6 +100,9 @@ class Participate extends View {
             $code = url_base64_decode ($key);
             $db = dbConn ();
             
+            /*
+            Gets the email address from the Participation table using the key in the request
+            */
             if (!$this->getEmail ($db, $pid, $code) && !$this->istest){
                 echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
                 return;
@@ -94,18 +116,18 @@ class Participate extends View {
                 $this->showSurvey ($db, $this->surveyid, $formid);
                 return;
             }
-            //This block should be removed in non alpha versions
-            /*if ($email == "prueba@mierda.cow" && $code = "123456"){
-                $_SESSION['privkey'] = "no";
-                $_SESSION['surveyid'] = $surveyid;
-                $_SESSION['participantid'] = self::TESTID;
-                $this->showSurvey ($db, $surveyid);
-                return;
-            }*/
+            
 
+            /*
+            Gets the private key for singing the responses, then it's encrypting
+            using the random key in the cookie. If the key can't be obtined using the
+            email address the security is compromised
+            */
             $hashmail = hash ('sha256', $this->email);
+
             $participants = $db->prepare ("SELECT participantid, privatekey " .
                 "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
+
             $participants->bindParam (":part", $hashmail, PDO::PARAM_STR);
             $participants->execute ();
             if ($participants->rowCount () == 0){
@@ -124,24 +146,7 @@ class Participate extends View {
                 <?php
                 return;
             }
-            /*$codes = $db->prepare ("SELECT passwd FROM {Participation} WHERE " .
-                "participantid = :pid AND surveyid = :sid");
-            $codes->bindParam (":pid", $participantid, PDO::PARAM_INT);
-            $codes->bindParam (":sid", $this->surveyid, PDO::PARAM_INT);
-            $codes->execute ();
-            if ($codes->rowCount () == 0){
-                ?>
-                <p><strong>La dirección de correo indicada no ha solicitado código para
-                    participar</strong></p>
-                <?php
-                return;
-            }
-            $codecrypted = ($codes->fetch())['passwd'];
-            $codes->closeCursor ();
-            if (!password_verify ($code, $codecrypted)){
-                $this->securityError ();
-                return;
-            }*/
+            
             $key = openssl_pkey_get_private ($privatekeycryp, $this->email);
             if ($key === false){
                 ?>
@@ -151,9 +156,11 @@ class Participate extends View {
                 return;
             }
             openssl_pkey_export($key, $priv);
+
             $formid = $this->saveParticipation ($this->surveyid, $participantid,
                 encrypt ($priv, $this->key));
             $this->showSurvey ($db, $this->surveyid, $formid);
+
         }
         catch (Exception $e){
             echo ("<p><strong>Error recuperando los datos para la participación</strong></p>");
@@ -168,6 +175,7 @@ class Participate extends View {
             correctos</strong></p>
         <?php
     }
+
 
     /* Guarda lo que necesita el envío de un formulario y devuelve su id.
        Va en el propio formulario, no suelto en la sesión: con dos enlaces
@@ -198,6 +206,7 @@ class Participate extends View {
     }
 
     private function showSurvey ($db, $surveyid, $formid){
+
         echo ('<form name="participate" id="participate" action="participate" method="POST">');
         echo ("<input type='hidden' name='" . self::FORM_FIELD . "' value='{$formid}'>");
         showTheSurvey ($db, $surveyid);
@@ -208,6 +217,23 @@ class Participate extends View {
         <?php
     }
 
+    /**
+     * Insert the responses in a JSON string:
+     * - If the question is a single choice one, stores the selected option number or -1 
+     *   if no choice (optional question).
+     * - If the question is a multiple choice, stores an array with the selected options or empty
+     *   if not answered.
+     * 
+     * Example:
+     * {1:2,2:{1:1,3:2},3:-1,4:{}}
+     * - Question 1 is single choice, and the selected option is 2.
+     * - Question 2 is multiple choice, and the selected options are 1 and 3.
+     * - Question 3 is single and optional, and no option has been selected.
+     * - Question 4 is multiple and optional, and no options have been selected.
+     * 
+     * This JSON string is signed with the participant's private key so it can be
+     * validated with its public key.
+     */
     private function insertResponse (){
         if (!checkToken ()){
             tokenError ();
@@ -342,6 +368,18 @@ class Participate extends View {
         }
     }
 
+    /**
+     * Signs the response with the participants private key.
+     * 
+     * @param PDO $db PDO database object
+     * @param string $response The response in JSON string.
+     * @param string $key The participants private key
+     * @param int $participantid
+     * 
+     * @return string The response signature.
+     * 
+     * @throws Exception An exception with the error.
+     */
     private function signResponse ($db, $response, #[\SensitiveParameter] $key, $participantid){
         if ($key === false){
             return "no sign";
@@ -377,6 +415,16 @@ class Participate extends View {
         return base64_encode ($sign);
     }
 
+    /**
+     * Decrypts the participant email address stored in the Participation table and
+     * stores it in $email private variable.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $pid The participation id.
+     * @param string $code The key for decrypting the email address.
+     * 
+     * @return bool
+     */
     private function getEmail ($db, $pid, $code){
         $hcode = hash ('sha256', $code);
         /* El enlace caduca en una hora y solo sirve mientras la consulta está abierta. */
@@ -395,6 +443,7 @@ class Participate extends View {
         $this->surveyid = $row['surveyid'];
         return true;
     }
+
 
     private function getOptionIds ($db, $surveyid, $questionid): array {
         $options = $db->prepare ("SELECT optionid FROM {Options} " .
@@ -417,6 +466,15 @@ class Participate extends View {
         return $active;
     }
 
+    /**
+     * When on a stress test checks if the request is valid.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $pid The participation id.
+     * @param string $code The key for validating the request.
+     * 
+     * @return bool
+     */
     private function getTestSurvey ($db, $pid, $code){
         $hcode = hash ('sha256', $code);
         $query = $db->prepare ("SELECT surveyid FROM {StressTest} " . 
@@ -430,4 +488,107 @@ class Participate extends View {
         $this->surveyid = $row['surveyid'];
         return true;
     }
+
+
+    /**
+     * Checks if survey has "show partial results" option selected.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $surveyid The survey id.
+     * 
+     * @return bool
+     */
+    private function hasPartials ($db, $surveyid){
+        $query = $db->prepare ("SELECT showpartial FROM {Surveys}
+            WHERE surveyid = :sid LIMIT 1");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->execute ();
+        $survey = $query->fetch ();
+        $ret = !empty ($survey["showpartial"]);
+        $query->closeCursor ();
+        return $ret;
+    }
+
+    /**
+     * Returns the current partial result when configured.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $surveyid The survey id.
+     * 
+     * @return string JSON with partial result.
+     * 
+     */
+    private function getPartial ($db, $surveyid){
+        $ret = null;
+        $query = $db->prepare ("SELECT results FROM {Results} 
+            WHERE surveyid = :sid");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->execute ();
+        if ($query->rowCount () == 0){
+            $ret =  $this->buildPartial ($db, $surveyid);
+        }
+        else {
+            $ret = json_decode ($query->fetch()["results"], true);
+        }
+        $query->closeCursor ();
+        return $ret;
+    }
+
+    /**
+     * Creates the partial result record when configured and no record is found.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $surveyid The survey id.
+     * 
+     */
+    private function buildPartial ($db, $surveyid){
+        $partial = array();
+        $partial["Total"] = 0;
+        $partial["Responses"] = array ();
+        $questions = $db->prepare ("SELECT questionid FROM {Questions} 
+            WHERE surveyid = :sid");
+        $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $questions->execute ();
+        while ($question = $questions->fetch ()){
+            $questionid = $question["questionid"];
+            $partial["Responses"][$questionid] = array ();
+            $options = $db->prepare ("SELECT optionid FROM {Options} WHERE
+                surveyid = :sid AND questionid = :qid");
+            $options->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+            $options->bindParam (":qid", $questionid, PDO::PARAM_INT);
+            $options->execute ();
+            while ($option = $options->fetch ()){
+                $partial["Responses"][$questionid][$option["optionid"]] = 0;
+            }
+            $options->closeCursor ();
+        }
+        $questions->closeCursor ();
+
+        $result = json_encode ($partial);
+        $query = $db->prepare ("INSERT INTO {Results} (surveyid, results, ispartial) values
+            (:sid, :res, 1)");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam (":res", $result, PDO::PARAM_STR);
+        $query->execute ();
+        return $partial;
+    }
+
+    /**
+     * Updates current partial result when configured.
+     * 
+     * @param PDO $db PDO database object.
+     * @param int $surveyid The survey id.
+     * @param string $partials JSON with partial result.
+     * 
+     */
+    private function updatePartials ($db, $surveyid, $partials){
+        $partials["Total"]++;
+        $res = json_encode ($partials);
+        $query = $db->prepare ("UPDATE {Results} set results = :res, ispartial = 1
+            WHERE surveyid = :sid");
+        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam (":res", $res, PDO::PARAM_STR);
+        $query->execute ();
+    }
+
 }

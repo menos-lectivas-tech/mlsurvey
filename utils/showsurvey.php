@@ -1,9 +1,22 @@
 <?php
+/**
+ * As the survey is showed in multiple pages, this methods helps.
+ */
+
 require_once 'utils/html.php';
+
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
 
 
+/**
+ * Called for showing the survey.
+ * 
+ * @param PDO $db PDO database object.
+ * @param int $surveyid The id of the survey in Surveys table.
+ * @param bool $readonly Shows the survey with all inputs disabled.
+ * 
+ */
 function showTheSurvey ($db, $surveyid, $readonly = false){
     if (!showSurveyHeader ($db, $surveyid, $readonly))
         return;
@@ -11,6 +24,15 @@ function showTheSurvey ($db, $surveyid, $readonly = false){
     showSurveyQuestions ($db, $surveyid, $readonly);
 }
 
+
+/**
+ * Called for showing the survey header information.
+ * 
+ * @param PDO $db PDO database object.
+ * @param int $surveyid The id of the survey in Surveys table.
+ * @param bool $readonly Shows the survey with all inputs disabled.
+ * 
+ */
 function showSurveyHeader ($db, $surveyid, $readonly = false){
     $query = $db->prepare ("SELECT surveyname, surveydesc, surveyfile FROM {Surveys} where surveyid = :sid");
     $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
@@ -43,6 +65,14 @@ function showSurveyHeader ($db, $surveyid, $readonly = false){
     return true;
 }
 
+/**
+ * Called for showing the questions.
+ * 
+ * @param PDO $db PDO database object.
+ * @param int $surveyid The id of the survey in Surveys table.
+ * @param bool $readonly Shows the survey with all inputs disabled.
+ * 
+ */
 function showSurveyQuestions ($db, $surveyid, $readonly = false){
     $setdisabled = "";
     if ($readonly){

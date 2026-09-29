@@ -1,5 +1,11 @@
 <?php
+
+/**
+ * This class shows the page for getting and sending participation URL.
+ */
+
 require_once 'utils/html.php';
+
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
 require_once 'views/surveys.php';
@@ -26,10 +32,22 @@ class GetCode extends View {
         <?php
     }
 
+    /**
+     * For avoiding bots this page includes a CAPTCHA.
+     * Thanks to ALTCHA: https://altcha.org/
+     * We're using the simplest implementation of ALTCHA  with the ALTCHA widget.
+     */
     public function addHead (){
         echo (altchaScriptHTML ());
     }
 
+    /**
+     * Depending on the request parameters the class takes different actions:
+     * - If it's not a submit and the request does't have survey information the class shows
+     * the main page.
+     * - If it's a submit from Surveys class with survey info, the form for asking email addres.
+     * - If it's an own submit, sends the email and shows the result (success or failure).
+     */
     public function show (){
         if (isset ($_REQUEST[self::ACTION])){
             if (!checkToken ()){
@@ -109,6 +127,11 @@ class GetCode extends View {
         }
     }
 
+    /**
+     * If the email address is not in Parciciants table the method generates a ECDSA key pair,
+     * encrypts private key using the email address and stores the hased email address and the
+     * key pair in Participants table.
+     */
     private function insertParticipant ($db, $email, $hashmail){
         $keypair = generateKeyPair ();
 
@@ -123,6 +146,21 @@ class GetCode extends View {
         $query->execute ();
         return $db->lastInsertId ();
     }
+
+    /**
+     * In first place, this method gets the email address from the requests and
+     * calls insertParticipant if the address isn't in Participants table and is in the configured
+     * allowed domains.
+     * 
+     * If the address was already in the Participants table ckecks if this email address
+     * has participated in the survey. If it has, shows a message and ends.
+     * 
+     * If the email address hasn't participated in the survey, the method 
+     * generates a random 256bit key, encrypts the email address with this key 
+     * (as it is needed later) and stores the key (hashed), the encrypted email and the
+     * survey ID in the Participation table. Then it sends this information to the email address
+     * formatted as an URL.
+     */
     private function generateCode (){
         /* Normalizada: el hash de la dirección identifica a la persona, y
            Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
@@ -140,6 +178,7 @@ class GetCode extends View {
 
         $surveyname = "";
         try {
+
             $db = dbConn ();
             /* El nombre va tal cual en el correo y escapado en la página. */
             $mailsurveyname = $this->getSurveyName ($db, $surveyid);
@@ -157,10 +196,12 @@ class GetCode extends View {
             }
 
             $hashmail = hash ('sha256', $email);
+
             if (!lockParticipant ($db, $hashmail)){
                 echo ("<p><strong>Hay otra petición en curso con esta dirección de correo. " .
                     "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
+
             }
             try {
                 $reserved = $this->reserveCode ($db, $email, $hashmail, $surveyid);
@@ -182,6 +223,7 @@ class GetCode extends View {
             logMessage (LOGGER_ERROR, "Error {$e} when generating code for survey");
         }
     }
+
 
     /* Busca o crea a la participante y guarda la petición de código. Se
        llama con el bloqueo de la dirección cogido. Devuelve [pid, código],
@@ -231,6 +273,7 @@ class GetCode extends View {
         return [$db->lastInsertId (), $code];
     }
 
+
     private function checkDomain ($db, $email){
         $query = $db->prepare ("SELECT alloweddomains FROM {SystemConfig} LIMIT 1");
         $query->execute ();
@@ -253,6 +296,7 @@ class GetCode extends View {
         return false;
     }
 
+
     private function getSurveyName ($db, $sid): ?string {
         $query = $db->prepare ("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
@@ -273,6 +317,7 @@ class GetCode extends View {
     }
 
     private function checkParticipation ($db, $requesttag, $sid){
+
         $ret = false;
         $query = $db->prepare ("SELECT 1 FROM {Participation} WHERE 
             requesttag = :tag AND surveyid = :sid

@@ -1,6 +1,5 @@
 <?php
 require_once 'include/config.php';
-
 /*
  * URL pública del sitio, con la barra final. Sale siempre de la
  * configuración (site_url), nunca de la petición: la cabecera Host la

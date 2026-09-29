@@ -1,5 +1,11 @@
 <?php
+
+/**
+ * This is the class that's used to create, modify and delete surveys.
+ */
+
 require_once 'utils/html.php';
+
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'include/fileparams.php';
@@ -54,6 +60,13 @@ class SurveyManage extends View {
         include 'include/userleftcolumn.php';
     }
 
+    /**
+     * Depending on the request data:
+     * - Shows a list of surveys.
+     * - Shows a form for creating a survey.
+     * - Shows the modification form.
+     * - Deletes the survey.
+     */
     function show (){
         if (!isUser ()){
             showMain ();
@@ -127,6 +140,9 @@ class SurveyManage extends View {
 
     }
 
+    /**
+     * List not started surveys for modification or deletion.
+     */
     private function listSurveys (){
         try {
             $dbconn = dbConn ();
@@ -194,6 +210,7 @@ class SurveyManage extends View {
             logMessage (LOGGER_ERROR, "DB error {$e} getting surveys list");
         }
     }
+
 
     /* Las consultas ya finalizadas no se pueden modificar ni eliminar, pero
        sí volver a contar: de ahí que tengan tabla propia con un único botón. */
@@ -302,6 +319,7 @@ class SurveyManage extends View {
         }
     }
 
+
     private function showControls (){
        ?>
        <script type="text/javascript">
@@ -348,7 +366,7 @@ class SurveyManage extends View {
         <link href="css/button3.css" rel="stylesheet" />
         <link href="css/questions.css" rel="stylesheet" />
         <style>
-            /* Zona de arrastre del PDF adjunto. */
+            /* Estilos para la zona de arrastre del PDF adjunto. */
             .drop-zone {
                 display: block;
                 width: 100%;
@@ -397,7 +415,9 @@ class SurveyManage extends View {
         <?php
     }
 
-    
+    /**
+     * Shows the add a new survey form.
+     */
     private function showAddSurvey (){
         $this->javascriptype = SurveyJavascript::AddJavascript;
     ?>
@@ -455,7 +475,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         ?>
         <script type="text/javascript">
             var questions = 0;
-                
+
         function validate_question (id){
             var e = hugerte.get("desc-q-" + id);
             if (e.getContent () == ""){
@@ -548,6 +568,17 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $this->insertFileCode ();
     }
 
+    /**
+     * Inserts the javascript code for handling the file drop zone.
+     * The functions are:
+     * - showFile: shows the selected filename.
+     * - getDroppedFiles: handles the drop action validating the file.
+     * - delfile: removes the file selected for uploading.
+     * - addFile: adds a file for uploading. When editing a survey 
+     *   this function is user for inserting a fake file.
+     * 
+     * In the ready section of the javascript everything gets initialized.
+     */
     private function insertFileCode (){
         ?>
         <script type="text/javascript">
@@ -656,6 +687,19 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         </script>
         <?php
     }
+
+    /**
+     * This function inserts the javascript code for inserting/removing questions to the
+     * form.
+     * The functions are:
+     * 
+     * - retagquestion: changes the id of a question.
+     * - addquestion: inserts a question after the questionid
+     * - delquestion: removes the question id.
+     * 
+     * All this functions takes into account that when a question is inserted/deleted 
+     * the subsequent ones must be retagged
+     */
     private function insertQuestionsCode (){
         ?>
         <script type="text/javascript">
@@ -792,6 +836,18 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         <?php
     }
 
+    /**
+     * This function inserts the javascript code for inserting/removing options to the
+     * questions.
+     * The functions are:
+     * 
+     * - retagoption: changes the id of an option in the questionid.
+     * - addoption: inserts an option after the optionid in the questionid.
+     * - deloption: removes the option optid from the questionid.
+     * 
+     * All this functions takes into account that when a question is inserted/deleted 
+     * the subsequent ones must be retagged
+     */
     private function insertOptionsCode (){
         ?>
         <script type="text/javascript">
@@ -874,6 +930,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         <?php
     }
 
+    /**
+     * Shows the question's part of the form.
+     */
     private function addQuestionsTable (){
         ?>
 
@@ -908,6 +967,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
     
     }
 
+    /**
+     * Called when a new survey has been submitted.
+     */
     private function addSurvey (){
         $form = $this->readSurveyForm ();
         if (is_string ($form)){
@@ -962,6 +1024,11 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
 
     }
+
+
+    /**
+     * Insert the questions for the submitted survey. It's using for insert/update survey.
+     */
 
     /* Lee y valida el formulario de alta o modificación. El navegador ya
        lo comprueba, pero la petición puede llegar sin pasar por él. Devuelve
@@ -1025,6 +1092,7 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
         return null;
     }
+
 
     private function insertQuestions ($dbconn, $sid, $questions){
         foreach ($questions as $qid => $question) {
@@ -1090,6 +1158,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
     }
 
+    /**
+     * Shows the survey's edition form for an existing one.
+     */
     private function showModifySurvey (){
         if (!isset ($_REQUEST['surveyid']))
             return;
@@ -1161,6 +1232,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         <?php
     }
 
+    /**
+     * Shows the question for modifying a survey.
+     */
     private function getQuestionsTable ($dbconn, $sid){
         $questions = $dbconn->prepare ("Select * from {Questions} where surveyid = :sid");
         $questions->bindParam (":sid", $sid);
@@ -1197,6 +1271,10 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $questions->closeCursor ();
 
     }
+
+    /**
+     * Show the options for modifying a survey.
+     */
     private function getOptionsTable ($dbconn, $sid, $qid){
         $options = $dbconn->prepare ("SELECT * from {Options} " .
             "where surveyid = :sid and questionid = :qid");
@@ -1245,6 +1323,12 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         $options->closeCursor ();
     }
 
+    /**
+     * Modifies an survey on edition submited.
+     * 
+     * This function updates the Survey record, but deletes old questions and options
+     * and inserts the new ones.
+     */
     private function modifySurvey(){
         $sid = $_REQUEST['surveyid'] ?? "";
         if (!is_string ($sid) || !ctype_digit ($sid))
@@ -1319,14 +1403,23 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         }
     }
 
+
+
+
     /* Las administradoras gestionan todas las consultas; el resto de
-       usuarias, solo las que han creado ellas. */
+       usuarias, solo las que han creado ellas.
+       Configurable en config.php
+    */
+
     private function ownerFilter (string $column): string {
-        return isAdmin () ? "" : " AND {$column} = :owner";
+        if (Config::PARAMS["survey_edit_restric"])
+            return isAdmin () ? "" : " AND {$column} = :owner";
+
+        return "";
     }
 
     private function bindOwner ($query){
-        if (!isAdmin ())
+        if (Config::PARAMS["survey_edit_restric"] && !isAdmin ())
             $query->bindValue (":owner", $_SESSION['userid'], PDO::PARAM_INT);
     }
 
@@ -1390,6 +1483,9 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         return $name;
     }
 
+
+
+
     private function currentFile ($sid): string {
         $query = dbConn ()->prepare ("SELECT surveyfile FROM {Surveys} WHERE surveyid = :sid");
         $query->bindParam (":sid", $sid, PDO::PARAM_INT);
@@ -1399,6 +1495,17 @@ onload='document.getElementById("survey").focus();' enctype="multipart/form-data
         return is_string ($file) ? $file : "";
     }
 
+
+    /**
+     * Check PDF magic numbers.
+     * 
+     * @param string $filename
+     * 
+     * @return int 
+     *  - 0 is PDF.
+     *  - 1 is not PDF.
+     *  - 2 fake file for no update.
+     */
     private function isPDF ($filename): int{
         $pdfheader = "%PDF-";
         if(!$handle = fopen($filename, 'r'))

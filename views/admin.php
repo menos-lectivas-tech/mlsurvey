@@ -1,4 +1,9 @@
 <?php
+/**
+ * This class handle the administraton page.
+ * Depending on the user profile it shows different options.
+ * If no user is loged in, it shows the login page.
+ */
 require_once 'ifaces/view.php';
 require_once 'utils/user.php';
 require_once 'views/login.php';

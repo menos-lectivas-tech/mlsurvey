@@ -1,5 +1,11 @@
 <?php
+
+/**
+ * This class shows the results for a survey
+ */
+
 require_once 'utils/html.php';
+
 require_once 'utils/dbutils.php';
 require_once 'include/fileparams.php';
 require_once 'utils/results.php';
@@ -38,9 +44,11 @@ class Results extends View {
         $surveyid = $_REQUEST["queryid"];
         try {
             $db = dbConn ();
+
             $surveys = $db->prepare ("SELECT surveyname, surveydesc, surveyfile, showpartial, " .
             "startdate < NOW() AND enddate > NOW() AS active " .
             "FROM {Surveys} WHERE surveyid = :sid");
+
             $surveys->bindParam (":sid", $surveyid, PDO::PARAM_INT);
             $surveys->execute ();
             if ($surveys->rowCount () == 0){
@@ -53,6 +61,7 @@ class Results extends View {
             $surveydesc = sanitizeHtml ($survey["surveydesc"]);
             $surveyfile = $survey["surveyfile"];
             $surveys->closeCursor ();
+
 
             /* Mientras la consulta está abierta los parciales se cuentan en
                caliente sobre Responses; Results solo guarda el recuento
@@ -71,11 +80,14 @@ class Results extends View {
                     echo ("<p><strong>Aún no hay resultados para  la consulta {$surveyname}.</strong></p>");
                     return;
                 }
+
             }
             $thefile = h (FileParams::FILE_DIR . $surveyid . "/" . rawurlencode ($surveyfile ?? ""));
             $surveyfilename = h ($surveyfile);
             ?>
+
             <h2>Mostrando resultados <?= $partial ? "parciales " : ""; ?>para la consulta <?= $surveyname;?>.</h2>
+
             <?= empty ($surveydesc)?"": "<div>{$surveydesc}</div>";?>
             <?= empty ($surveyfile)?"":"<p>Documentación adjunta: <a href='{$thefile}'>{$surveyfilename}</a></p>";?>
             <p><em><?= $partial ? "Hasta ahora e" : "E"; ?>n esta consulta han participado <?= $resultsarray["Total"]; ?> personas.</em></p>
