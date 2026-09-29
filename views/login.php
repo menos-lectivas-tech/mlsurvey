@@ -49,11 +49,9 @@ onload='document.getElementById("user").focus();'>
 
     private function onSuccess (){
         startSession ();
-        if (!isset($_SESSION['onsuccess'])){
-            throw new Exception("No hay clase a la que entrar");
-            return 1;
-        }
-        $class = $_SESSION['onsuccess'];
+        /* Sin destino (se ha entrado por /login directamente, o ya había
+           sesión) se va a la administración. */
+        $class = $_SESSION['onsuccess'] ?? 'admin';
         unset ($_SESSION['onsuccess']);
         include_once 'views/' . $class . '.php';
         $class = getClassName($class);
@@ -108,8 +106,8 @@ onload='document.getElementById("user").focus();'>
         }
         catch (Exception $e){
             ?>
-            <h2>Error tras validarse:</h2>
-            <p><?= $e; ?></p>
+            <h2>Error tras validarse.</h2>
+            <p>Contacte con la administración del sitio.</p>
             <?php
             logMessage (LOGGER_ERROR, "Error onsuccess: {$e}");
             return 1;
