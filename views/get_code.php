@@ -73,9 +73,16 @@ class GetCode extends View {
         }
         try {
             $db = dbConn ();
-            if ($this->getSurveyName ($db, $surveyid) === null){
+            $surveyname = $this->getSurveyName ($db, $surveyid);
+            if ($surveyname === null){
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
                 logMessage (LOGGER_ERROR, "Survey {$surveyid} does not exist.");
+                return;
+            }
+            /* Sin formulario si no se puede participar: el envío se rechazaría igualmente. */
+            if (!$this->isActive ($db, $surveyid)){
+                echo ("<p><strong>La consulta <em>" . h ($surveyname) .
+                    "</em> no está abierta.</strong></p>");
                 return;
             }
             if (!showSurveyHeader ($db, $surveyid, true)){
