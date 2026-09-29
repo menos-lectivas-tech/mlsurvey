@@ -27,14 +27,6 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-function getDBVersion (): int {
-  $db = dbConn ();
-  
-  $query = $db->query ("SELECT versioncode FROM {Version} WHERE versionid = 1");
-  $ver = $query->fetch ()["versioncode"];
-  $query->closeCursor ();
-  return $ver;
-}
 $maxversion = 2;
 
 try {
@@ -44,11 +36,11 @@ try {
     echo ("Version table does not exist. Creating\n");
   }
   
+  $db = dbConn ();
   $version = getDBVersion ();
   if ($version < 2){
-    $db = dbConn ();
     $db->exec ("ALTER TABLE {Participation} ADD COLUMN (requesttag CHAR(64) NULL)");
-    $db->exec ("CREATE INDEX Participation_request_IDX USING BTREE ON Participation 
+    $db->exec ("CREATE INDEX Participation_request_IDX USING BTREE ON {Participation}
       (surveyid, requesttag, participationdate)");
   }
   
