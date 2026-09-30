@@ -50,11 +50,6 @@ class Surveys extends View {
         ?>
         <form id="responsesurvey" name="responsesurvey" method="POST" action="get_code">
         <script type="text/javascript">
-        function getCode (surveyid){
-            const survey = document.getElementById ("responseid");
-            survey.value = surveyid;
-            return true;
-        }
         function showPartial (surveyid){
             const survey = document.getElementById ("queryid");
             survey.value = surveyid;
@@ -63,7 +58,6 @@ class Surveys extends View {
             return true;
         }
         </script>
-        <input type="hidden" id="responseid" name="responseid">
         <input type="hidden" name="queryid" id="queryid">
         <div class="card-table-container">
             <table class="card-like-table ml-stack" id="surveystable">
@@ -79,8 +73,7 @@ class Surveys extends View {
                         <td><span class="username" id="svr-<?= $id; ?>"><?= h ($survey['surveyname']) ?></span></td>
                         <td data-label="Fecha inicio"><?= $survey['dstart'] ?></td>
                         <td data-label="Fecha fin"><?= $survey['dend'] ?></td>
-                        <td><input type="submit" class="button-3" onclick="return getCode (<?= $id; ?>);"
-                            value="Ver y participar" name="<?= self::SURVEY_RESPONSE; ?>"></td>
+                        <td><a class="button-3" href="get_code?responseid=<?= $id; ?>">Ver y participar</a></td>
                         <td><?php if (!empty ($survey["showpartial"])){ ?>
                             <input type="submit" class="button-3" onclick="return showPartial (<?= $id; ?>);"
                             value="Ver" name="<?= self::SURVEY_PARTIALS; ?>">

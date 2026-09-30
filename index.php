@@ -10,6 +10,7 @@ include_once 'ifaces/view.php';
 include_once 'utils/user.php';
 require_once 'utils/html.php';
 require_once "include/config.php";
+include_once 'include/menuarray.php';
 
 Config::getSystemConfig ();
 startSession ();
@@ -93,26 +94,32 @@ $view->addHead ();
         <div class="navbar navbar-default navbar-static-top">
             <div class="container">
                 <div class="navbar-header">
+                    <?php if ($view->showNavigation ()): ?>
                     <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </button>
+                    <?php endif; ?>
                     <!-- Sustituir .ml-brand-mark por <img src="img/logo.svg" alt=""> cuando haya logotipo. -->
+                    <?php if ($view->showNavigation ()): ?>
                     <a class="navbar-brand" href="index.php">
+                    <?php else: ?>
+                    <span class="navbar-brand ml-brand-static">
+                    <?php endif; ?>
                         <span class="ml-brand-mark" aria-hidden="true">ml</span>
                         <span>
 							<?= Config::$mainheader != ""? h (Config::$mainheader) : "mlsurvey"?>
 						</span>
-                    </a>
+                    <?= $view->showNavigation () ? "</a>" : "</span>" ?>
                 </div>
+                <?php if ($view->showNavigation ()): ?>
                 <div class="navbar-collapse collapse ">
                     <ul class="nav navbar-nav">
 <!--                        <li class="active"><a href="">Inicio</a></li> 
 						<li><a href="admin">Administración</a></li>
 						<li><a href="surveys">Consultas</a></li>-->
 						<?php
-						include_once 'include/menuarray.php';
 						foreach ($menuarray as $key => $menuitem) {
 							//var_dump($menuitem);
 							$entry = "<li ";
@@ -125,6 +132,7 @@ $view->addHead ();
 						?>
                     </ul>
                 </div>
+                <?php endif; ?>
                 <?php include 'include/themeswitcher.php'; ?>
             </div>
         </div>

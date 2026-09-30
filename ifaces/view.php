@@ -64,6 +64,15 @@ abstract class View
     }
 
     /**
+     * This method tells index.php whether to show the top navigation menu.
+     * 
+     * @return "true to show the menu. Default is true"
+     */
+    public function showNavigation (){
+        return true;
+    }
+
+    /**
      * This method is called by index.php before any HTML code has been generated.
      */
     public function doInit (){
