@@ -23,6 +23,11 @@ class GetCode extends View {
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
     }
+
+    /* Sin menú: el usuario se centra en solicitar el voto / votar. */
+    function showNavigation (){
+        return false;
+    }
     
     public function loadStyles (){
         ?>
@@ -62,11 +67,13 @@ class GetCode extends View {
             return;
         }
         
-        if (!isset ($_REQUEST[Surveys::SURVEY_RESPONSE]) || !isset($_REQUEST['responseid'])){
+        /* La página de una consulta se carga con GET (get_code?responseid=N)
+           para que se pueda enlazar y recargar sin reenviar el formulario. */
+        if (!isset ($_GET['responseid'])){
             showMain ();
             return;
         }
-        $surveyid = $_REQUEST['responseid'];
+        $surveyid = $_GET['responseid'];
         if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
