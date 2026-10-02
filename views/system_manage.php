@@ -360,7 +360,6 @@ class SystemManage extends View
             PDO::PARAM_STR
         );
         $file = $this->saveFile();
-    var_dump($file);
         if ($file === null) {
             echo ("<p><strong>Error subiendo icono {$this->fileerror}</strong></p>");
             logMessage(LOGGER_ERROR, "{$this->fileerror} uploading icon");

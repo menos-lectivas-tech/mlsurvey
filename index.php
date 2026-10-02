@@ -101,13 +101,13 @@ $view->doInit();
 						<!-- Sustituir .ml-brand-mark por <img src="img/logo.svg" alt=""> cuando haya logotipo. -->
 						<a class="navbar-brand" href="index.php">
 							<?php
-							if (empty(Config::$icon)) { ?>
-								<span class="ml-brand-mark" aria-hidden="true">ml</span>
-							<?php
-							} else {
+							if (!empty(Config::$icon)) {
 								$iconfile = FileParams::ICON_DIR . Config::$icon;
 							?>
 								<img src="<?= $iconfile; ?>" alt="">
+							<?php
+							} else if (!empty (Config::PARAMS["use_default_icon"])){?>
+								<span class="ml-brand-mark" aria-hidden="true">ml</span>
 							<?php } ?>
 							<span>
 								<?= Config::$mainheader != "" ? h(Config::$mainheader) : "mlsurvey" ?>
@@ -119,19 +119,19 @@ $view->doInit();
 							<!--                        <li class="active"><a href="">Inicio</a></li> 
 						<li><a href="admin">Administración</a></li>
 						<li><a href="surveys">Consultas</a></li>-->
-							<?php
-							include_once 'include/menuarray.php';
-							foreach ($menuarray as $key => $menuitem) {
-								//var_dump($menuitem);
-								$entry = "<li ";
-								if ($menuitem[ML_MENU_GROUP] == $view->getMenuGroup())
-									$entry .= "class='active' ";
-								$entry .= "><a href='{$menuitem[ML_MENU_LOCATION]}'>" .
-									$menuitem[ML_MENU_ENTRY] . "</a></li>";
-								echo ($entry);
-							}
-							?>
-						</ul>
+								<?php
+								include_once 'include/menuarray.php';
+								foreach ($menuarray as $key => $menuitem) {
+									//var_dump($menuitem);
+									$entry = "<li ";
+									if ($menuitem[ML_MENU_GROUP] == $view->getMenuGroup())
+										$entry .= "class='active' ";
+									$entry .= "><a href='{$menuitem[ML_MENU_LOCATION]}'>" .
+										$menuitem[ML_MENU_ENTRY] . "</a></li>";
+									echo ($entry);
+								}
+								?>
+								</ul>
 					</div>
 					<?php include 'include/themeswitcher.php'; ?>
 				</div>
