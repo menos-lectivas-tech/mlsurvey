@@ -8,7 +8,7 @@ Donate to remove the back-link (webthemez.com) in this web template
 /* Fuentes retiradas: la tipografía la define --ml-font en theme.css con
    una pila del sistema. El @import era http:// (bloqueado como contenido
    mixto bajo HTTPS) y bloqueaba el pintado esperando a Google. */
-@import url('font-awesome.css');  
+/*@import url('font-awesome.css'); */
 @import url('animate.css');
 
 body {

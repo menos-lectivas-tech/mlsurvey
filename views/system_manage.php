@@ -18,9 +18,18 @@ class SystemManage extends View
         "png" => "png"
     ];
     private const IMAGE_MIME = "image";
-    function addHead()
+
+
+    #[Override]
+    public function loadStyles()
     {
 ?>
+        <link href="css/questions.css" rel="stylesheet" />
+    <?php
+    }
+    function addHead()
+    {
+    ?>
         <script type="text/javascript" src="vendor/hugerte/hugerte/hugerte.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
         <!-- Viste el marco del editor con el tema; el JS se ocupa del iframe. -->
         <link href="css/hugerte-theme.css" rel="stylesheet" />
@@ -87,14 +96,11 @@ class SystemManage extends View
         $maincontent = $row["maincontent"];
         $contact = $row["contact"];
         $icon = $row["icon"];
-        $facebook = $row["facebook"];
-        $twitter = $row["twitter"];
-        $linkedin = $row["linkedin"];
-        $pinterest = $row["pinterest"];
-        $googleplus = $row["googleplus"];
-        $mastodon = $row["mastodon"];
-        $bluesky = $row["bluesky"];
-        $telegram = $row["telegram"];
+        $socialmedia = array ();
+        foreach (Config::SOCIALMEDIA as $sm){
+            $socialmedia[$sm] = $row[$sm];
+        }
+        
         $allowediconstxt = "";
         $allowediconsaccept = "";
         foreach (self::SUPPORTED_IMAGES as $key => $value) {
@@ -284,6 +290,19 @@ class SystemManage extends View
                 <p><label for="maincontent">Texto principal:</label>
                     <textarea class="description" name="maincontent" id="maincontent"><?= htmlspecialchars($maincontent ?? ""); ?></textarea>
                 </p>
+                <details class="ml-survey-preview">
+                    <summary>Redes sociales <small>(pulsa para desplegar)</small></summary>
+                    <p></p>
+                <?php
+                foreach (Config::SOCIALMEDIA as $sm){
+                    ?>
+                    <p><label for="<?= $sm; ?>"><?= $sm; ?></label>
+                    <input type="text" id="<?= $sm; ?>" name="<?= $sm; ?>" value="<?= htmlspecialchars ($socialmedia[$sm] ?? ""); ?>">
+                    </p>
+                    <?php
+                }
+                ?>
+                </details>
                 <div class="option" id="mailtest" style="display: none;">
                     <p><label for="sendtest">Enviar mensaje de prueba:</label>
                         <input type="checkbox" id="sendtest" name="sendtest">
@@ -328,9 +347,15 @@ class SystemManage extends View
             logMessage(LOGGER_ERROR, "Time zone {$timezone} not loaded in the database.");
             return;
         }
+        $socialmediaarray = array ();
+        foreach (Config::SOCIALMEDIA as $sm){
+            $socialmediaarray[] = $sm . "=:" .$sm;
+        }
+        $socialmediaupdate = implode(",", $socialmediaarray);
         $query = $dbconn->prepare("UPDATE {SystemConfig} SET
             timezone = :timezone, alloweddomains = :domain, contact = :contact,
-            mainheader = :mh, maincontent = :mc, sitename = :sn, icon = :icon
+            mainheader = :mh, maincontent = :mc, sitename = :sn, icon = :icon,
+            {$socialmediaupdate}
             WHERE configid = :id");
         $query->bindParam(":id", $cid, PDO::PARAM_INT);
         $query->bindParam(":timezone", $timezone, PDO::PARAM_STR);
@@ -359,6 +384,9 @@ class SystemManage extends View
             $_REQUEST['contact'],
             PDO::PARAM_STR
         );
+        foreach (Config::SOCIALMEDIA as $sm){
+            $query->bindParam(":{$sm}", $_REQUEST[$sm], PDO::PARAM_STR);
+        }
         $file = $this->saveFile();
         if ($file === null) {
             echo ("<p><strong>Error subiendo icono {$this->fileerror}</strong></p>");
