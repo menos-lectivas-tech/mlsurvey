@@ -57,6 +57,10 @@ define('CONFIG', [
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
 "survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',
+/**
+ * For using the default icon when no icon is defined
+ */
+"use_default_icon" => true,
 ]);
 PHPEOF
     chown www-data:www-data "$CONFIG_FILE"

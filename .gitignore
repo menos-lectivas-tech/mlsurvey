@@ -5,6 +5,7 @@ logs/
 log/
 test/
 img/old/
+img/appicon/
 files/
 views/test*
 .env

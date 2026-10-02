@@ -25,6 +25,7 @@ MariaDB must be initialized and configured with an user and a database for the a
 composer require hugerte/hugerte
 composer require phpmailer/phpmailer
 ```
+If you need to install languages packs for HugeRTE follow [these instructions](https://github.com/hugerte/hugerte-docs#localization)
 
 ### Create the database
 ```sh

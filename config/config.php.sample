@@ -57,4 +57,9 @@ const CONFIG = [
  * false: every user can edit a survey.
  */
 "survey_edit_restric" => false,
+
+/**
+ * For using the default icon when no icon is defined
+ */
+"use_default_icon" => true,
 ];
