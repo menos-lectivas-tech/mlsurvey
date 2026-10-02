@@ -178,6 +178,12 @@ header .navbar .container {
     text-decoration: none;
 }
 
+/* Marca sin enlace (páginas sin navegación): sin efecto hover. */
+.navbar-default .ml-brand-static:hover {
+    color: var(--ml-text);
+    cursor: default;
+}
+
 /* Marca de agua del logotipo mientras no haya uno real. */
 .ml-brand-mark {
     display: inline-grid;

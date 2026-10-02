@@ -57,6 +57,11 @@ class Participate extends View {
         return ML_MENU_GROUP_SURVEYS;
     }
 
+    /* Sin menú: el usuario se centra en solicitar el voto / votar. */
+    function showNavigation (){
+        return false;
+    }
+
     public function loadStyles (){
         ?>
         <link href="css/button3.css" rel="stylesheet" />
