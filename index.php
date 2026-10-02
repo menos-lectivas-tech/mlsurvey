@@ -194,7 +194,7 @@ $view->doInit();
 						<div class="col-lg-6">
 							<div class="copyright">
 								<p>
-									<span>Powered by: <a href="https://github.com/pacoandres/mlsurvey" target="_blank">mlsurvey</a></span>
+									<span>Powered by: <a href="https://github.com/menos-lectivas-tech/mlsurvey" target="_blank">mlsurvey</a></span>
 								</p>
 								<p>
 									<span>Special thanks to: <a href="https://github.com/PHPMailer/PHPMailer" target="_blank">PHPMailer</a>,
