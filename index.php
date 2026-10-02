@@ -67,6 +67,7 @@ $view->doInit();
 	<meta name="description" content="Plataforma de consultas y votaciones." />
 	<meta name="color-scheme" content="light dark" />
 	<!-- css -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css">
 	<link href="css/bootstrap.min.css" rel="stylesheet" />
 	<link href="css/fancybox/jquery.fancybox.css" rel="stylesheet">
 	<link href="css/style.css" rel="stylesheet" />
@@ -108,13 +109,13 @@ $view->doInit();
 							<?php else: ?>
 								<span class="navbar-brand ml-brand-static">
 								<?php endif;
-								
-								if (!empty(Config::$icon)) {
-									$iconfile = FileParams::ICON_DIR . Config::$icon;
+
+							if (!empty(Config::$icon)) {
+								$iconfile = FileParams::ICON_DIR . Config::$icon;
 								?>
 									<img src="<?= $iconfile; ?>" alt="">
 								<?php
-								} else if (!empty(Config::PARAMS["use_default_icon"])) { ?>
+							} else if (!empty(Config::PARAMS["use_default_icon"])) { ?>
 									<span class="ml-brand-mark" aria-hidden="true">ml</span>
 								<?php } ?>
 								<span>
@@ -159,11 +160,16 @@ $view->doInit();
 		<footer>
 			<div class="container">
 				<div class="row">
-					<div class="widget">
-						<h5 class="widgetheading">mlsurvey</h5>
-						<p>Consultas y votaciones en línea: participación con código,
-							resultados publicados al cierre.</p>
-					</div>
+					<?php
+					if (!empty(Config::PARAMS["use_default_icon"])): ?>
+						<div class="widget">
+							<h5 class="widgetheading">mlsurvey</h5>
+							<p>Consultas y votaciones en línea: participación con código,
+								resultados publicados al cierre.</p>
+						</div>
+					<?php
+					endif;
+					?>
 					<div class="widget">
 						<h5 class="widgetheading">Navegación</h5>
 						<ul class="link-list">
@@ -199,16 +205,24 @@ $view->doInit();
 						</div>
 						<div class="col-lg-6">
 							<ul class="social-network">
-								<li><a href="#" data-placement="top" title="Facebook"><i class="fa fa-facebook"></i></a></li>
-								<li><a href="#" data-placement="top" title="Twitter"><i class="fa fa-twitter"></i></a></li>
+								<?php
+								foreach (Config::SOCIALMEDIA as $brand){
+									if (!empty (Config::$socialmedia[$brand])){
+										$url = Config::$socialmedia[$brand];
+									echo ("<li><a href='{$url}' data-placement='top' 
+									title='{$brand}'><i class='fa-brands fa-{$brand}'></i></a></li>");
+									}
+								}?>
+								
+								<!--<li><a href="#" data-placement="top" title="Twitter"><i class="fa fa-twitter"></i></a></li>
 								<li><a href="#" data-placement="top" title="Linkedin"><i class="fa fa-linkedin"></i></a></li>
 								<li><a href="#" data-placement="top" title="Pinterest"><i class="fa fa-pinterest"></i></a></li>
 								<li><a href="#" data-placement="top" title="Google plus"><i class="fa fa-google-plus"></i></a></li>
-								<!--
-						<i class="fa-brands fa-mastodon"></i>
-						<i class="fa-brands fa-bluesky"></i>
-						<i class="fa-brands fa-telegram"></i>
-						-->
+
+								<li><a href="#" data-placement="top" title="mastodon"><i class="fa fa-mastodon"></i></a></li>
+								<li><a href="#" data-placement="top" title="bluesky"><i class="fa-brands fa-bluesky"></i></a></li>
+								<li><i class="fa fa-telegram"></i></li>-->
+
 							</ul>
 						</div>
 					</div>

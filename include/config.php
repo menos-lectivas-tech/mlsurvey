@@ -10,6 +10,17 @@ class Config {
         "db_pass",
         "email_method"
     ];
+    public const SOCIALMEDIA = [
+        "facebook",
+        "twitter",
+        "linkedin",
+        "pinterest",
+        "googleplus",
+        "mastodon",
+        "bluesky",
+        "telegram",
+    ];
+
     public static string $timezone = "";
     public static string $mainheader = "";
     public static string $maincontent = "";
@@ -18,6 +29,12 @@ class Config {
     public static bool $haveconfig = false;
     public static string $sitename = "";
     public static string $contact = "";
+
+    //Social media
+    public static array $socialmedia = array ();
+
+
+
     public static function getSystemConfig (){
         $db =dbConn ();
 
@@ -33,6 +50,10 @@ class Config {
             self::$alloweddomains = $row["alloweddomains"] == null ? "":$row["alloweddomains"];
             self::$sitename = $row["sitename"] == null ? "":$row["sitename"];
             self::$contact = $row["contact"] == null ? "":$row["contact"];
+            foreach (self::SOCIALMEDIA as $brand){
+                self::$socialmedia[$brand] = $row[$brand] == null ? "" : $row[$brand];
+            }
+
             self::$haveconfig = true;
         }
         $query->closeCursor ();
