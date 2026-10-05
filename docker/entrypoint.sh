@@ -54,6 +54,11 @@ define('CONFIG', [
 "altcha_enabled" => getenv('ALTCHA_ENABLED') === 'false' ? false : true,
 "altcha_hmac_key" => getenv('ALTCHA_HMAC_KEY') ?: '',
 
+// Firma del extracto de formacion: autoridades de confianza y NIF de los
+// sellos admitidos (separados por comas).
+"pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
+"pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
+
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
 "survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',

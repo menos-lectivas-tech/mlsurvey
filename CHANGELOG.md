@@ -1,4 +1,7 @@
 # 0.3-beta
+- Participation now requires the digitally signed training record PDF (extracto de
+  formación): the participant is identified by the hash of the DNI read from it and
+  the email address is only used for sending the link.
 - Added an ALTCHA captcha to the participation request form.
 - Dockerized
 - Changes in index.php for including acknowledgments in subfooter.

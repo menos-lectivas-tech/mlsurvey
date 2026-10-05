@@ -15,6 +15,7 @@ require_once 'utils/token.php';
 require_once 'utils/altcha.php';
 require_once 'utils/showsurvey.php';
 require_once 'utils/crypt.php';
+require_once 'utils/pdfsign.php';
 
 class GetCode extends View {
 
@@ -50,8 +51,10 @@ class GetCode extends View {
      * Depending on the request parameters the class takes different actions:
      * - If it's not a submit and the request does't have survey information the class shows
      * the main page.
-     * - If it's a submit from Surveys class with survey info, the form for asking email addres.
-     * - If it's an own submit, sends the email and shows the result (success or failure).
+     * - If it's a submit from Surveys class with survey info, the form for asking the signed
+     * training record PDF and the email addres.
+     * - If it's an own submit, checks the PDF, sends the email and shows the result
+     * (success or failure).
      */
     public function show (){
         if (isset ($_REQUEST[self::ACTION])){
@@ -99,18 +102,28 @@ class GetCode extends View {
             ?>
             <section class="ml-participate-card">
                 <h3>Participar en la consulta</h3>
-                <p>Introduce tu dirección de correo y te enviaremos un enlace personal
-                    para participar.</p>
-                <p>Si la dirección es de un <em>dominio autorizado</em><sup>*</sup> recibirás un mensaje con un enlace.
+                <p>Adjunta tu <em>extracto de formación</em> en PDF, tal como lo descargaste
+                    (firmado digitalmente), e introduce tu dirección de correo: te enviaremos
+                    un enlace personal para participar.</p>
+                <p>El extracto solo se usa para comprobar su firma y leer tu DNI, con el que se
+                   evita que una misma persona participe dos veces. El fichero no se guarda.</p>
+                <p>Si el extracto es válido y la dirección es de un <em>dominio autorizado</em><sup>*</sup>
+                   recibirás un mensaje con un enlace.
                    Comprueba tu correo y pincha en el enlace para participar. El enlace recibido caduca en
                    una hora.</p>
-                <p>Si quieres pensarte las respuestas antes de introducir tu dirección de correo, puedes
+                <p>Si quieres pensarte las respuestas antes de enviar tus datos, puedes
                    verlas pinchando en <em>Ver las preguntas de la consulta</em> debajo de este recuadro.</p>
-                <form id="getcode" name="getcode" method="POST" action="get_code">
+                <form id="getcode" name="getcode" method="POST" action="get_code"
+                    enctype="multipart/form-data">
                     <?= setTokenHTML (); ?>
                     <!-- La consulta va en el propio formulario: en la sesión
                          la pisaría otra pestaña con otra consulta abierta. -->
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
+                    <label for="extracto">Extracto de formación (PDF firmado)</label>
+                    <div class="ml-participate-row">
+                        <input type="file" name="extracto" id="extracto" required
+                            accept="application/pdf,.pdf">
+                    </div>
                     <label for="email">Dirección de correo
                       <p><small><em>* Los dominios autorizados son:
                        <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
@@ -142,19 +155,19 @@ class GetCode extends View {
     }
 
     /**
-     * If the email address is not in Parciciants table the method generates a ECDSA key pair,
-     * encrypts private key using the email address and stores the hased email address and the
+     * If the DNI is not in Parciciants table the method generates a ECDSA key pair,
+     * encrypts private key using the DNI and stores the hased DNI and the
      * key pair in Participants table.
      */
-    private function insertParticipant ($db, $email, $hashmail){
+    private function insertParticipant ($db, $dni, $hashdni){
         $keypair = generateKeyPair ();
 
-        openssl_pkey_export($keypair, $privatekey, $email);
+        openssl_pkey_export($keypair, $privatekey, $dni);
         $public_key_details = openssl_pkey_get_details($keypair);
         $publickey = $public_key_details['key'];
         $query = $db->prepare ("INSERT into {Participants} (participant, privatekey, publickey) " .
             "values (:part, :priv, :pub)");
-        $query->bindParam (":part", $hashmail, PDO::PARAM_STR);
+        $query->bindParam (":part", $hashdni, PDO::PARAM_STR);
         $query->bindParam (":priv", $privatekey, PDO::PARAM_STR);
         $query->bindParam (":pub", $publickey, PDO::PARAM_STR);
         $query->execute ();
@@ -162,22 +175,22 @@ class GetCode extends View {
     }
 
     /**
-     * In first place, this method gets the email address from the requests and
-     * calls insertParticipant if the address isn't in Participants table and is in the configured
-     * allowed domains.
+     * In first place, this method gets the email address and the training record PDF from
+     * the request, checks that the PDF is digitally signed and the signature is not broken,
+     * and reads the DNI from it. The hash of the DNI identifies the participant: the email
+     * address is only used for sending the link.
      * 
-     * If the address was already in the Participants table ckecks if this email address
-     * has participated in the survey. If it has, shows a message and ends.
+     * It calls insertParticipant if the DNI isn't in Participants table. If it was already
+     * there ckecks if this DNI has participated in the survey. If it has, shows a message
+     * and ends.
      * 
-     * If the email address hasn't participated in the survey, the method 
-     * generates a random 256bit key, encrypts the email address with this key 
-     * (as it is needed later) and stores the key (hashed), the encrypted email and the
+     * If the DNI hasn't participated in the survey, the method 
+     * generates a random 256bit key, encrypts the DNI with this key 
+     * (as it is needed later) and stores the key (hashed), the encrypted DNI and the
      * survey ID in the Participation table. Then it sends this information to the email address
      * formatted as an URL.
      */
     private function generateCode (){
-        /* Normalizada: el hash de la dirección identifica a la persona, y
-           Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
         $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
             strtolower (trim ($_REQUEST['email'])) : "";
         $surveyid = $_REQUEST['surveyid'] ?? null;
@@ -209,19 +222,24 @@ class GetCode extends View {
                 return;
             }
 
-            $hashmail = hash ('sha256', $email);
+            $dni = $this->getDni ();
+            if ($dni === null)
+                return;
+            /* El hash del DNI identifica a la persona: el correo solo sirve
+               para hacerle llegar el enlace. */
+            $hashdni = hash ('sha256', $dni);
 
-            if (!lockParticipant ($db, $hashmail)){
-                echo ("<p><strong>Hay otra petición en curso con esta dirección de correo. " .
+            if (!lockParticipant ($db, $hashdni)){
+                echo ("<p><strong>Hay otra petición en curso con este extracto de formación. " .
                     "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
 
             }
             try {
-                $reserved = $this->reserveCode ($db, $email, $hashmail, $surveyid);
+                $reserved = $this->reserveCode ($db, $dni, $hashdni, $surveyid);
             }
             finally {
-                unlockParticipant ($db, $hashmail);
+                unlockParticipant ($db, $hashdni);
             }
             if ($reserved === null)
                 return;
@@ -239,17 +257,47 @@ class GetCode extends View {
     }
 
 
+    /* Comprueba la firma del extracto de formación subido y devuelve el DNI
+       que figura en él, o null (con el motivo ya mostrado) si no vale. El
+       fichero se queda en el temporal de la subida: no se guarda. */
+    private function getDni (): ?string {
+        $file = $_FILES['extracto'] ?? null;
+        if (!is_array ($file) || !is_int ($file['error'] ?? null) ||
+                $file['error'] == UPLOAD_ERR_NO_FILE){
+            echo ("<p><strong>Hay que adjuntar el extracto de formación en PDF.</strong></p>");
+            return null;
+        }
+        if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE){
+            echo ("<p><strong>El fichero está vacío o es demasiado grande.</strong></p>");
+            return null;
+        }
+        if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file ($file['tmp_name'])){
+            echo ("<p><strong>Error al recibir el extracto de formación.</strong></p>");
+            logMessage (LOGGER_ERROR, "Upload error {$file['error']} getting training record.");
+            return null;
+        }
+        try {
+            checkPdfSignature ($file['tmp_name']);
+            return getPdfDni ($file['tmp_name']);
+        }
+        catch (PdfSignException $e){
+            echo ("<p><strong>" . h ($e->getMessage ()) . "</strong></p>");
+            return null;
+        }
+    }
+
+
     /* Busca o crea a la participante y guarda la petición de código. Se
-       llama con el bloqueo de la dirección cogido. Devuelve [pid, código],
+       llama con el bloqueo del DNI cogido. Devuelve [pid, código],
        o null si no procede (ya ha participado o ya pidió uno hace poco). */
-    private function reserveCode ($db, $email, $hashmail, $surveyid){
+    private function reserveCode ($db, $dni, $hashdni, $surveyid){
         $participants = $db->prepare ("SELECT participantid From {Participants} " .
             "WHERE participant = :participant ORDER BY participantid LIMIT 1");
-        $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
+        $participants->bindParam (":participant", $hashdni, PDO::PARAM_STR);
         $participants->execute ();
         $participantid = -1;
         if ($participants->rowCount () == 0){
-            $participantid = $this->insertParticipant ($db, $email, $hashmail);
+            $participantid = $this->insertParticipant ($db, $dni, $hashdni);
         }
         else {
             $participant = $participants->fetch ();
@@ -262,24 +310,24 @@ class GetCode extends View {
             return null;
         }*/
         if (hasParticipated ($db, $participantid, $surveyid)){
-            echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
+            echo ("<p><strong>Ya se ha votado en esta consulta con este DNI.</strong></p>");
             return null;
         }
 
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite
-           por hora se comprueba con esta etiqueta fija por correo y consulta. */
-        $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
+           por hora se comprueba con esta etiqueta fija por DNI y consulta. */
+        $requesttag = hash ('sha256', $hashdni . ':' . $surveyid);
         if ($this->checkParticipation ($db, $requesttag, $surveyid)){
             return null;
         }
 
         $code = random_bytes (32);
         $passwd = hash ('sha256', $code);
-        $encryptedmail = base64_encode (encrypt ($email, $code));
+        $encrypteddni = base64_encode (encrypt ($dni, $code));
         $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
             "values (:id, :sid, :pwd, :tag)");
-        $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
+        $query->bindParam (":id", $encrypteddni, PDO::PARAM_STR);
         $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
         $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
         $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
@@ -341,7 +389,7 @@ class GetCode extends View {
         $query->execute ();
         if ($query->rowCount () > 0){
             echo ("<p><strong>Ya existe una peticion de participación 
-                para esta consulta con la dirección de correo indicada </strong></p>");
+                para esta consulta con este DNI </strong></p>");
             echo ("Podrás realizar una nueva petición en una hora.");
             $ret = true;
         }

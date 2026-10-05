@@ -46,6 +46,18 @@ const CONFIG = [
 "altcha_hmac_key" => '',
 
 /**
+ * Signed training record PDF (extracto de formación) asked for participating.
+ * pdf_ca_file: PEM file with the certification authorities trusted for the
+ * signature. Only these are trusted, not the system ones.
+ * pdf_signer_ids: serialNumber (NIF) of the certificates allowed to sign the
+ * PDF. S7800001E is the Comunidad de Madrid electronic seal.
+ * It needs the openssl and pdftotext (poppler-utils) commands.
+ */
+
+"pdf_ca_file" => 'certs/extracto_ca.pem',
+"pdf_signer_ids" => ['S7800001E'],
+
+/**
  * For enabling stress test bypasses
  */
 

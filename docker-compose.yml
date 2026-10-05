@@ -100,6 +100,10 @@ services:
       # ni localhost hay que ponerlo a false.
       ALTCHA_ENABLED: ${ALTCHA_ENABLED:-true}
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
+      # Firma del extracto de formacion: autoridades de confianza y NIF de
+      # los sellos admitidos, separados por comas.
+      PDF_CA_FILE: ${PDF_CA_FILE:-certs/extracto_ca.pem}
+      PDF_SIGNER_IDS: ${PDF_SIGNER_IDS:-S7800001E}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}

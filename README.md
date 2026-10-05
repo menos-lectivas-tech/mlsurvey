@@ -1,10 +1,13 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
+* Identify participants by a digitally signed training record PDF (_extracto de formación_):
+  the signature is checked and the DNI is read from it, so each person can vote only once.
 * The system needs to be as anonymous as possible.
 
-To archieve this the email addresses are stored with a deterministic Hash function (SHA-256).
-Clearly, someone with access to the database who knew the email addresses of all potential participants could compromise anonymity. This is something we will aim to address in future releases.
+To archieve this the DNI is stored with a deterministic Hash function (SHA-256); the email
+address is only used for sending the participation link and the PDF is not stored.
+Clearly, someone with access to the database could compromise anonymity by hashing every possible DNI. This is something we will aim to address in future releases.
 
 # Installation
 
@@ -14,6 +17,7 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
+* The `openssl` and `pdftotext` (poppler-utils) commands, for checking the signed PDF.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -52,6 +56,9 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
+* `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
+  PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
+  electronic seal (`S7800001E`) by default.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -126,6 +133,8 @@ the database to be ready before serving requests.
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
+| `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
+| `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you
