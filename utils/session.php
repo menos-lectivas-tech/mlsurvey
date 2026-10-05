@@ -1,10 +1,22 @@
 <?php
+require_once 'utils/host.php';
 
 /**
  * Safe start session checking if it has been started before.
  */
 function startSession (){
     if (session_id() == ""){
+        /* Los atributos de la cookie se fijan aquí y no en php.ini: así no
+           dependen de cómo esté configurado el servidor. Secure solo con
+           HTTPS: servida por HTTP, el navegador descartaría la cookie y no
+           habría sesión. */
+        session_set_cookie_params ([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => isHttps (),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
         session_start();
     }
 }

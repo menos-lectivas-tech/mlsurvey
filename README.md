@@ -1,8 +1,14 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
-* Identify participants by a digitally signed training record PDF (_extracto de formación_):
-  the signature is checked and the DNI is read from it, so each person can vote only once.
+* Identify participants by two PDFs, so each person can vote only once: the
+  digitally signed training record (_extracto de formación_) and a PDF that proves they are
+  civil servants. Those in the _Clases Pasivas_ pension scheme upload the digitally signed
+  MUFACE membership certificate and the rest (career civil servants who joined from 2011 on
+  and interim ones) the Social Security work history report (_informe de vida
+  laboral_), which must show they are currently working for a public employer. The signatures
+  are checked, the DNI is read from the training record and the one in the other PDF must be
+  the same. Note that the work history report is not digitally signed, so it could be forged.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI is stored with a deterministic Hash function (SHA-256); the email
@@ -59,6 +65,13 @@ Every configuration item has a description, you only need to notice:
 * `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
   PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
   electronic seal (`S7800001E`) by default.
+* `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
+  membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
+  electronic seal (`Q2861001B`) by default.
+* `pdf_max_age_days` is how old the MUFACE certificate or the work history report can be
+  (30 days by default) and
+  `pdf_public_employers` the employers accepted in the work history report: it must have an open
+  row whose contribution account code or employer name contains one of these texts.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -135,6 +148,10 @@ the database to be ready before serving requests.
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
 | `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
+| `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
+| `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
+| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate or the work history report can be, counting from its issue date. |
+| `PDF_PUBLIC_EMPLOYERS` | `COMUNIDAD DE MADRID CONSEJERIA DE EDUCACI,COMUNIDAD MADRID A.TERRITORIALES` | Comma separated texts: the work history report must have an open row whose contribution account code or employer name contains one of them. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

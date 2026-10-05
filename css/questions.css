@@ -173,6 +173,23 @@
     margin-bottom: 14px;
 }
 
+.ml-participate-kind {
+    border: 0;
+    padding: 0;
+    margin: 0 0 14px;
+}
+
+.ml-participate-kind legend {
+    font-size: inherit;
+    font-weight: 600;
+    border: 0;
+    margin-bottom: 6px;
+}
+
+.ml-participate-card .ml-participate-kind label {
+    font-weight: 400;
+}
+
 .ml-participate-row input[type="email"] {
     flex: 1 1 260px;
     min-width: 0;

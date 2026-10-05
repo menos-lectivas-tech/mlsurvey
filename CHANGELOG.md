@@ -2,6 +2,10 @@
 - Participation now requires the digitally signed training record PDF (extracto de
   formación): the participant is identified by the hash of the DNI read from it and
   the email address is only used for sending the link.
+- Participation also requires a PDF that proves the participant is a civil servant: the
+  digitally signed MUFACE membership certificate (Clases Pasivas) or the work history report,
+  informe de vida laboral (the rest: career civil servants who joined from 2011 on and
+  interim ones). Its DNI must be the one in the training record.
 - Added an ALTCHA captcha to the participation request form.
 - Dockerized
 - Changes in index.php for including acknowledgments in subfooter.

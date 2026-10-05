@@ -59,6 +59,15 @@ define('CONFIG', [
 "pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
 "pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
 
+// Documento que acredita el regimen (Clases Pasivas o resto): sello de MUFACE admitido para el
+// certificado de afiliacion, antiguedad maxima del PDF y empresas publicas
+// validas en la vida laboral (listas separadas por comas).
+"muface_ca_file" => getenv('MUFACE_CA_FILE') ?: 'certs/muface_ca.pem',
+"muface_signer_ids" => array_map('trim', explode(',', getenv('MUFACE_SIGNER_IDS') ?: 'Q2861001B')),
+"pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
+"pdf_public_employers" => array_map('trim', explode(',', getenv('PDF_PUBLIC_EMPLOYERS') ?:
+    'COMUNIDAD DE MADRID CONSEJERIA DE EDUCACI,COMUNIDAD MADRID A.TERRITORIALES')),
+
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
 "survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',

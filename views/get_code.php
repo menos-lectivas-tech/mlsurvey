@@ -20,6 +20,12 @@ require_once 'utils/pdfsign.php';
 class GetCode extends View {
 
     private const ACTION = "Solicitar";
+    private const KIND_PASSIVE = "pasivas";
+    private const KIND_OTHER = "resto";
+    /* Páginas en las que se descarga cada documento. */
+    private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
+    private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
+    private const URL_VIDA_LABORAL = "https://portal.seg-social.gob.es/wps/portal/importass/importass/Categorias/Vida+laboral+e+informes/Informes+sobre+tu+situacion+laboral/Informe+de+tu+vida+laboral";
 
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
@@ -51,8 +57,10 @@ class GetCode extends View {
      * Depending on the request parameters the class takes different actions:
      * - If it's not a submit and the request does't have survey information the class shows
      * the main page.
-     * - If it's a submit from Surveys class with survey info, the form for asking the signed
-     * training record PDF and the email addres.
+     * - If it's a submit from Surveys class with survey info, the form for asking the
+     * pension scheme (Clases Pasivas or the rest), the signed training record PDF, the
+     * PDF that proves it and the email addres.
+     * The DNI is not asked for: it is read from the training record.
      * - If it's an own submit, checks the PDF, sends the email and shows the result
      * (success or failure).
      */
@@ -99,15 +107,19 @@ class GetCode extends View {
                 removeToken ();
                 return;
             }
+            $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
             ?>
             <section class="ml-participate-card">
                 <h3>Participar en la consulta</h3>
-                <p>Adjunta tu <em>extracto de formación</em> en PDF, tal como lo descargaste
-                    (firmado digitalmente), e introduce tu dirección de correo: te enviaremos
-                    un enlace personal para participar.</p>
-                <p>El extracto solo se usa para comprobar su firma y leer tu DNI, con el que se
-                   evita que una misma persona participe dos veces. El fichero no se guarda.</p>
-                <p>Si el extracto es válido y la dirección es de un <em>dominio autorizado</em><sup>*</sup>
+                <p>Adjunta tu <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                    rel="noopener noreferrer"><em>extracto de formación</em></a> en PDF, tal como lo descargaste
+                    (firmado digitalmente), indica si perteneces a Clases Pasivas o no
+                    y adjunta también el documento que lo acredita. Introduce tu
+                    dirección de correo: te enviaremos un enlace personal para participar.</p>
+                <p>Los documentos solo se usan para comprobar que son válidos y que son de la
+                   misma persona. Con el DNI que figura en el extracto se evita que una misma
+                   persona participe dos veces. Los ficheros no se guardan.</p>
+                <p>Si los documentos son válidos y la dirección es de un <em>dominio autorizado</em><sup>*</sup>
                    recibirás un mensaje con un enlace.
                    Comprueba tu correo y pincha en el enlace para participar. El enlace recibido caduca en
                    una hora.</p>
@@ -119,9 +131,27 @@ class GetCode extends View {
                     <!-- La consulta va en el propio formulario: en la sesión
                          la pisaría otra pestaña con otra consulta abierta. -->
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
-                    <label for="extracto">Extracto de formación (PDF firmado)</label>
+                    <label for="extracto"><a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                        rel="noopener noreferrer">Extracto de formación</a> (PDF firmado)</label>
                     <div class="ml-participate-row">
                         <input type="file" name="extracto" id="extracto" required
+                            accept="application/pdf,.pdf">
+                    </div>
+                    <fieldset class="ml-participate-kind">
+                        <legend>Mi régimen es</legend>
+                        <label><input type="radio" name="tipo" value="<?= self::KIND_PASSIVE; ?>" required>
+                            Clases Pasivas: adjunto mi <a href="<?= self::URL_MUFACE; ?>" target="_blank"
+                            rel="noopener noreferrer"><em>certificado de afiliación a MUFACE</em></a>
+                            (firmado digitalmente, expedido en los últimos <?= $maxage; ?> días)</label>
+                        <label><input type="radio" name="tipo" value="<?= self::KIND_OTHER; ?>" required checked>
+                            Resto (funcionarios/as de carrera que ingresaron a partir de 2011
+                            e interinos/as): adjunto mi <a href="<?= self::URL_VIDA_LABORAL; ?>" target="_blank"
+                            rel="noopener noreferrer"><em>informe de vida laboral</em></a>
+                            (expedido en los últimos <?= $maxage; ?> días)</label>
+                    </fieldset>
+                    <label for="documento">Certificado de MUFACE o vida laboral (PDF)</label>
+                    <div class="ml-participate-row">
+                        <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
                     <label for="email">Dirección de correo
@@ -175,10 +205,15 @@ class GetCode extends View {
     }
 
     /**
-     * In first place, this method gets the email address and the training record PDF from
-     * the request, checks that the PDF is digitally signed and the signature is not broken,
-     * and reads the DNI from it. The hash of the DNI identifies the participant: the email
-     * address is only used for sending the link.
+     * In first place, this method gets the email address, the pension scheme and
+     * the two PDFs from the request. The training record must be digitally signed: the
+     * DNI is read from it.
+     * The other PDF, for those in Clases Pasivas, is the MUFACE membership certificate: its
+     * digital signature is checked too. For the rest (career civil servants who joined from
+     * 2011 on and interim ones) it is the work history report (vida laboral): it must show that the holder is working for a public employer. The
+     * DNI in this PDF must be the one in the training record.
+     * The hash of the DNI identifies the participant: the email address is only used for
+     * sending the link.
      * 
      * It calls insertParticipant if the DNI isn't in Participants table. If it was already
      * there ckecks if this DNI has participated in the survey. If it has, shows a message
@@ -230,7 +265,7 @@ class GetCode extends View {
             $hashdni = hash ('sha256', $dni);
 
             if (!lockParticipant ($db, $hashdni)){
-                echo ("<p><strong>Hay otra petición en curso con este extracto de formación. " .
+                echo ("<p><strong>Hay otra petición en curso con el DNI del extracto. " .
                     "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
 
@@ -257,33 +292,72 @@ class GetCode extends View {
     }
 
 
-    /* Comprueba la firma del extracto de formación subido y devuelve el DNI
-       que figura en él, o null (con el motivo ya mostrado) si no vale. El
-       fichero se queda en el temporal de la subida: no se guarda. */
-    private function getDni (): ?string {
-        $file = $_FILES['extracto'] ?? null;
+    /* Devuelve la ruta temporal de un PDF subido, o null (con el motivo ya
+       mostrado) si no ha llegado bien. */
+    private function getUpload (string $field, string $docname): ?string {
+        $file = $_FILES[$field] ?? null;
         if (!is_array ($file) || !is_int ($file['error'] ?? null) ||
                 $file['error'] == UPLOAD_ERR_NO_FILE){
-            echo ("<p><strong>Hay que adjuntar el extracto de formación en PDF.</strong></p>");
+            echo ("<p><strong>Hay que adjuntar el {$docname} en PDF.</strong></p>");
             return null;
         }
         if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE){
-            echo ("<p><strong>El fichero está vacío o es demasiado grande.</strong></p>");
+            echo ("<p><strong>El fichero del {$docname} está vacío o es demasiado grande.</strong></p>");
             return null;
         }
         if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file ($file['tmp_name'])){
-            echo ("<p><strong>Error al recibir el extracto de formación.</strong></p>");
-            logMessage (LOGGER_ERROR, "Upload error {$file['error']} getting training record.");
+            echo ("<p><strong>Error al recibir el {$docname}.</strong></p>");
+            logMessage (LOGGER_ERROR, "Upload error {$file['error']} getting the PDF.");
             return null;
         }
+        return $file['tmp_name'];
+    }
+
+
+    /* Comprueba la firma del extracto de formación y el documento subido
+       según el régimen elegido (certificado de MUFACE firmado o
+       informe de vida laboral), y que los dos son de la misma persona.
+       Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
+       si no vale. Los ficheros se quedan en el temporal de la subida: no se
+       guardan. */
+    private function getDni (): ?string {
+        $kind = $_REQUEST['tipo'] ?? null;
+        if ($kind !== self::KIND_PASSIVE && $kind !== self::KIND_OTHER){
+            echo ("<p><strong>Hay que indicar si perteneces a Clases Pasivas o al resto.</strong></p>");
+            return null;
+        }
+        $docname = $kind === self::KIND_PASSIVE ? "certificado de afiliación a MUFACE" :
+            "informe de vida laboral";
+        $extracto = $this->getUpload ('extracto', "extracto de formación");
+        if ($extracto === null)
+            return null;
+        $document = $this->getUpload ('documento', $docname);
+        if ($document === null)
+            return null;
+        /* Para que el mensaje de error diga de qué fichero habla. */
+        $checking = "extracto de formación";
         try {
-            checkPdfSignature ($file['tmp_name']);
-            return getPdfDni ($file['tmp_name']);
+            checkExtractoSignature ($extracto);
+            $dni = getPdfDni ($extracto);
+            $checking = $docname;
+            if ($kind === self::KIND_PASSIVE){
+                checkMufaceSignature ($document);
+                $documentdni = getMufaceDni ($document);
+            }
+            else
+                $documentdni = getVidaLaboralDni ($document);
         }
         catch (PdfSignException $e){
-            echo ("<p><strong>" . h ($e->getMessage ()) . "</strong></p>");
+            echo ("<p><strong>" . ucfirst ($checking) . ": " . h ($e->getMessage ()) . "</strong></p>");
             return null;
         }
+        if (!hash_equals ($dni, $documentdni)){
+            echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
+                "formación.</strong></p>");
+            logMessage (LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
+            return null;
+        }
+        return $dni;
     }
 
 
@@ -310,7 +384,7 @@ class GetCode extends View {
             return null;
         }*/
         if (hasParticipated ($db, $participantid, $surveyid)){
-            echo ("<p><strong>Ya se ha votado en esta consulta con este DNI.</strong></p>");
+            echo ("<p><strong>Ya se ha votado en esta consulta con el DNI del extracto.</strong></p>");
             return null;
         }
 
@@ -389,7 +463,7 @@ class GetCode extends View {
         $query->execute ();
         if ($query->rowCount () > 0){
             echo ("<p><strong>Ya existe una peticion de participación 
-                para esta consulta con este DNI </strong></p>");
+                para esta consulta con el DNI del extracto </strong></p>");
             echo ("Podrás realizar una nueva petición en una hora.");
             $ret = true;
         }
