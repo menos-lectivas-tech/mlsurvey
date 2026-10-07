@@ -190,6 +190,11 @@
     font-weight: 400;
 }
 
+.ml-participate-card .ml-participate-consent {
+    font-weight: 400;
+    margin-bottom: 14px;
+}
+
 .ml-participate-row input[type="email"] {
     flex: 1 1 260px;
     min-width: 0;

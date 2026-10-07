@@ -154,6 +154,11 @@ class GetCode extends View {
                         <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
+                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                        value="1" required>
+                        Acepto que los documentos que adjunto se usen exclusivamente para
+                        verificar que soy docente de la enseñanza pública. En ningún caso
+                        se almacenarán dichos documentos en el servidor.</label>
                     <label for="email">Dirección de correo
                       <p><small><em>* Los dominios autorizados son:
                        <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
@@ -231,6 +236,12 @@ class GetCode extends View {
         $surveyid = $_REQUEST['surveyid'] ?? null;
         if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
+        /* El required del formulario se puede saltar: se comprueba también aquí. */
+        if (($_REQUEST['acepto'] ?? null) !== "1"){
+            echo ("<p><strong>Para participar hay que aceptar el uso de los documentos " .
+                "para verificar que eres docente de la enseñanza pública.</strong></p>");
             return;
         }
         if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
