@@ -190,6 +190,48 @@
     font-weight: 400;
 }
 
+.ml-participate-card .ml-participate-kind label {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+/* Título de cada documento, con su icono de información y, debajo y en
+   pequeño, dónde se obtiene. */
+.ml-participate-doc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 6px;
+    margin-bottom: 6px;
+}
+
+.ml-participate-card .ml-participate-doc label {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+}
+
+.ml-participate-doc small {
+    flex-basis: 100%;
+    color: var(--ml-text-soft);
+}
+
+.ml-info {
+    display: inline-flex;
+    padding: 4px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ml-accent-text);
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.ml-info:hover,
+.ml-info:focus-visible {
+    background: var(--ml-surface-2);
+}
+
 .ml-participate-card .ml-participate-consent {
     font-weight: 400;
     margin-bottom: 14px;

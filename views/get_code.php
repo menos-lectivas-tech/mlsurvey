@@ -16,6 +16,7 @@ require_once 'utils/altcha.php';
 require_once 'utils/showsurvey.php';
 require_once 'utils/crypt.php';
 require_once 'utils/pdfsign.php';
+require_once 'include/icons.php';
 
 class GetCode extends View {
 
@@ -108,67 +109,102 @@ class GetCode extends View {
                 return;
             }
             $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
+            $domains = Config::$alloweddomains == "" ? "cualquiera" :
+                str_replace (" ", ", ", Config::$alloweddomains);
+            /* Documento que acredita cada régimen: al cambiar de régimen se
+               cambian el título, el enlace y la explicación del segundo fichero. */
+            $docs = [
+                self::KIND_PASSIVE => [
+                    'label' => "Clases Pasivas",
+                    'name' => "Certificado de afiliación a MUFACE",
+                    'url' => self::URL_MUFACE,
+                    'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
+                        "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
+                        "expedido en los últimos {$maxage} días.",
+                ],
+                self::KIND_OTHER => [
+                    'label' => "Resto",
+                    'name' => "Informe de vida laboral",
+                    'url' => self::URL_VIDA_LABORAL,
+                    'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
+                        "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
+                        "{$maxage} días.",
+                ],
+            ];
+            $doc = $docs[self::KIND_OTHER];
             ?>
             <section class="ml-participate-card">
-                <h3>Participar en la consulta</h3>
-                <p>Adjunta tu <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                    rel="noopener noreferrer"><em>extracto de formación</em></a> en PDF, tal como lo descargaste
-                    (firmado digitalmente), indica si perteneces a Clases Pasivas o no
-                    y adjunta también el documento que lo acredita. Introduce tu
-                    dirección de correo: te enviaremos un enlace personal para participar.</p>
-                <p>Los documentos solo se usan para comprobar que son válidos y que son de la
-                   misma persona. Con el DNI que figura en el extracto se evita que una misma
-                   persona participe dos veces. Los ficheros no se guardan.</p>
-                <p>La dirección de correo queda asociada a tus documentos: en esta y en
-                   próximas consultas tendrás que usar siempre la misma.
-                   <strong>Revísala bien antes de enviar: si la tecleas mal no recibirás
-                   el enlace y ya no podrás votar.</strong></p>
-                <p>Si los documentos son válidos y la dirección es de un <em>dominio autorizado</em><sup>*</sup>
-                   recibirás un mensaje con un enlace.
-                   Comprueba tu correo y pincha en el enlace para participar. El enlace recibido caduca en
-                   una hora.</p>
-                <p>Si quieres pensarte las respuestas antes de enviar tus datos, puedes
-                   verlas pinchando en <em>Ver las preguntas de la consulta</em> debajo de este recuadro.</p>
+                <h3>Participar en la consulta
+                    <?= $this->infoButton ("Cómo participar",
+                        "Adjunta los dos documentos e indica tu dirección de correo. Si son " .
+                        "válidos recibirás un mensaje con un enlace personal para participar, " .
+                        "que caduca en una hora.\n\n" .
+                        "Los documentos solo se usan para comprobar que son válidos y que son " .
+                        "de la misma persona. Con el DNI que figura en el extracto se evita " .
+                        "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
+                        "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
+                        "verlas en «Ver las preguntas de la consulta», debajo de este recuadro."); ?>
+                </h3>
+                <p>Adjunta dos documentos y te enviaremos por correo un enlace para participar.</p>
                 <form id="getcode" name="getcode" method="POST" action="get_code"
                     enctype="multipart/form-data">
                     <?= setTokenHTML (); ?>
                     <!-- La consulta va en el propio formulario: en la sesión
                          la pisaría otra pestaña con otra consulta abierta. -->
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
-                    <label for="extracto"><a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                        rel="noopener noreferrer">Extracto de formación</a> (PDF firmado)</label>
+                    <fieldset class="ml-participate-kind">
+                        <legend>Mi régimen es
+                            <?= $this->infoButton ("Régimen",
+                                "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
+                                "antes de 2011.\n\n" .
+                                "Resto: funcionarios/as de carrera que ingresaron a partir de " .
+                                "2011 e interinos/as.\n\n" .
+                                "Según el régimen se pide un documento distinto."); ?>
+                        </legend>
+                        <?php foreach ($docs as $kind => $d){ ?>
+                        <label><input type="radio" name="tipo" value="<?= $kind; ?>" required
+                            data-name="<?= h ($d['name']); ?>" data-url="<?= h ($d['url']); ?>"
+                            data-info="<?= h ($d['info']); ?>"
+                            <?= $kind === self::KIND_OTHER ? "checked" : ""; ?>>
+                            <?= h ($d['label']); ?></label>
+                        <?php } ?>
+                    </fieldset>
+                    <div class="ml-participate-doc">
+                        <label for="extracto">Extracto de formación</label>
+                        <?= $this->infoButton ("Extracto de formación",
+                            "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
+                            "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."); ?>
+                        <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                            rel="noopener noreferrer">aquí</a></small>
+                    </div>
                     <div class="ml-participate-row">
                         <input type="file" name="extracto" id="extracto" required
                             accept="application/pdf,.pdf">
                     </div>
-                    <fieldset class="ml-participate-kind">
-                        <legend>Mi régimen es</legend>
-                        <label><input type="radio" name="tipo" value="<?= self::KIND_PASSIVE; ?>" required>
-                            Clases Pasivas: adjunto mi <a href="<?= self::URL_MUFACE; ?>" target="_blank"
-                            rel="noopener noreferrer"><em>certificado de afiliación a MUFACE</em></a>
-                            (firmado digitalmente, expedido en los últimos <?= $maxage; ?> días)</label>
-                        <label><input type="radio" name="tipo" value="<?= self::KIND_OTHER; ?>" required checked>
-                            Resto (funcionarios/as de carrera que ingresaron a partir de 2011
-                            e interinos/as): adjunto mi <a href="<?= self::URL_VIDA_LABORAL; ?>" target="_blank"
-                            rel="noopener noreferrer"><em>informe de vida laboral</em></a>
-                            (expedido en los últimos <?= $maxage; ?> días)</label>
-                    </fieldset>
-                    <label for="documento">Certificado de MUFACE o vida laboral (PDF)</label>
+                    <div class="ml-participate-doc">
+                        <label for="documento" id="documento-name"><?= h ($doc['name']); ?></label>
+                        <?= $this->infoButton ($doc['name'], $doc['info'], "documento-info"); ?>
+                        <small>Obtener <a href="<?= h ($doc['url']); ?>" id="documento-url"
+                            target="_blank" rel="noopener noreferrer">aquí</a></small>
+                    </div>
                     <div class="ml-participate-row">
                         <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
                     <label class="ml-participate-consent"><input type="checkbox" name="acepto"
                         value="1" required>
-                        Acepto que los documentos que adjunto se usen exclusivamente para
-                        verificar que soy docente de la enseñanza pública. En ningún caso
-                        se almacenarán dichos documentos en el servidor.</label>
-                    <label for="email">Dirección de correo
-                      <p><small><em>* Los dominios autorizados son:
-                       <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
-                           Config::$alloweddomains));?>
-                       </em></small></p>
-                    </label>
+                        Acepto que los documentos se usen solo para verificar que soy docente
+                        de la enseñanza pública. No se almacenan.</label>
+                    <div class="ml-participate-doc">
+                        <label for="email">Dirección de correo</label>
+                        <?= $this->infoButton ("Dirección de correo",
+                            "Dominios autorizados: {$domains}.\n\n" .
+                            "La dirección queda asociada a tus documentos: en esta y en " .
+                            "próximas consultas tendrás que usar siempre la misma.\n\n" .
+                            "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
+                            "el enlace y ya no podrás votar."); ?>
+                        <small>Revísala bien: ahí recibirás el enlace.</small>
+                    </div>
                     <div class="ml-participate-row">
                         <input type="email" name="email" id="email" required
                             placeholder="nombre@dominio.es" autocomplete="email">
@@ -179,6 +215,41 @@ class GetCode extends View {
                     </div>
                 </form>
             </section>
+            <script>
+            (function (){
+                var form = document.getElementById ("getcode");
+                var file = document.getElementById ("documento");
+                var info = document.getElementById ("documento-info");
+
+                /* El segundo documento depende del régimen elegido. */
+                function showDocument (clear){
+                    var kind = form.querySelector ('input[name="tipo"]:checked');
+                    if (!kind)
+                        return;
+                    document.getElementById ("documento-name").textContent = kind.dataset.name;
+                    document.getElementById ("documento-url").href = kind.dataset.url;
+                    info.dataset.title = kind.dataset.name;
+                    info.setAttribute ("aria-label", "Más información: " + kind.dataset.name);
+                    info.dataset.info = kind.dataset.info;
+                    /* El fichero elegido era el del otro régimen. */
+                    if (clear)
+                        file.value = "";
+                }
+                form.querySelectorAll ('input[name="tipo"]').forEach (function (radio){
+                    radio.addEventListener ("change", function (){ showDocument (true); });
+                });
+                /* Al recargar, el navegador puede conservar el régimen marcado. */
+                showDocument (false);
+                window.addEventListener ("pageshow", function (){ showDocument (false); });
+
+                document.querySelectorAll (".ml-participate-card .ml-info").forEach (function (button){
+                    button.addEventListener ("click", function (){
+                        mlDialog.alert ({title: button.dataset.title, message: button.dataset.info,
+                            confirmText: "Cerrar"});
+                    });
+                });
+            })();
+            </script>
 
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
@@ -191,6 +262,13 @@ class GetCode extends View {
             echo ("<p><strong>Error al acceder a la consulta seleccionada.</strong></p>");
             logMessage (LOGGER_ERROR, "Error {$e} getting survey for code.");
         }
+    }
+
+    /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
+    private function infoButton (string $title, string $info, string $id = ""): string {
+        return '<button type="button" class="ml-info"' . ($id === "" ? "" : ' id="' . h ($id) . '"') .
+            ' aria-label="Más información: ' . h ($title) . '" data-title="' . h ($title) .
+            '" data-info="' . h ($info) . '">' . mlIcon ('info') . '</button>';
     }
 
     /**
