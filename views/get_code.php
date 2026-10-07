@@ -119,6 +119,10 @@ class GetCode extends View {
                 <p>Los documentos solo se usan para comprobar que son válidos y que son de la
                    misma persona. Con el DNI que figura en el extracto se evita que una misma
                    persona participe dos veces. Los ficheros no se guardan.</p>
+                <p>La dirección de correo queda asociada a tus documentos: en esta y en
+                   próximas consultas tendrás que usar siempre la misma.
+                   <strong>Revísala bien antes de enviar: si la tecleas mal no recibirás
+                   el enlace y ya no podrás votar.</strong></p>
                 <p>Si los documentos son válidos y la dirección es de un <em>dominio autorizado</em><sup>*</sup>
                    recibirás un mensaje con un enlace.
                    Comprueba tu correo y pincha en el enlace para participar. El enlace recibido caduca en
@@ -191,18 +195,19 @@ class GetCode extends View {
 
     /**
      * If the DNI is not in Parciciants table the method generates a ECDSA key pair,
-     * encrypts private key using the DNI and stores the hased DNI and the
-     * key pair in Participants table.
+     * encrypts private key using the DNI and stores the hashed email address
+     * (participant), the hashed DNI (dnihashed) and the key pair in Participants table.
      */
-    private function insertParticipant ($db, $dni, $hashdni){
+    private function insertParticipant ($db, $dni, $hashdni, $hashemail){
         $keypair = generateKeyPair ();
 
         openssl_pkey_export($keypair, $privatekey, $dni);
         $public_key_details = openssl_pkey_get_details($keypair);
         $publickey = $public_key_details['key'];
-        $query = $db->prepare ("INSERT into {Participants} (participant, privatekey, publickey) " .
-            "values (:part, :priv, :pub)");
-        $query->bindParam (":part", $hashdni, PDO::PARAM_STR);
+        $query = $db->prepare ("INSERT into {Participants} (participant, dnihashed, privatekey, publickey) " .
+            "values (:part, :dni, :priv, :pub)");
+        $query->bindParam (":part", $hashemail, PDO::PARAM_STR);
+        $query->bindParam (":dni", $hashdni, PDO::PARAM_STR);
         $query->bindParam (":priv", $privatekey, PDO::PARAM_STR);
         $query->bindParam (":pub", $publickey, PDO::PARAM_STR);
         $query->execute ();
@@ -217,12 +222,13 @@ class GetCode extends View {
      * digital signature is checked too. For the rest (career civil servants who joined from
      * 2011 on and interim ones) it is the work history report (vida laboral): it must show that the holder is working for a public employer. The
      * DNI in this PDF must be the one in the training record.
-     * The hash of the DNI identifies the participant: the email address is only used for
-     * sending the link.
+     * The hash of the DNI (dnihashed) identifies the participant. The hash of the email
+     * address is stored with it (participant), and both are unique: the same documents can't be used from several
+     * addresses, nor the same address with the documents of several people.
      * 
      * It calls insertParticipant if the DNI isn't in Participants table. If it was already
-     * there ckecks if this DNI has participated in the survey. If it has, shows a message
-     * and ends.
+     * there checks that the email address is the one stored and if this DNI has participated
+     * in the survey. If it has, shows a message and ends.
      * 
      * If the DNI hasn't participated in the survey, the method 
      * generates a random 256bit key, encrypts the DNI with this key 
@@ -271,9 +277,11 @@ class GetCode extends View {
             $dni = $this->getDni ();
             if ($dni === null)
                 return;
-            /* El hash del DNI identifica a la persona: el correo solo sirve
-               para hacerle llegar el enlace. */
+            /* El hash del DNI identifica a la persona. El del correo se guarda
+               con él para que no se usen los mismos documentos desde varias
+               direcciones. */
             $hashdni = hash ('sha256', $dni);
+            $hashemail = hash ('sha256', $email);
 
             if (!lockParticipant ($db, $hashdni)){
                 echo ("<p><strong>Hay otra petición en curso con el DNI del extracto. " .
@@ -282,7 +290,7 @@ class GetCode extends View {
 
             }
             try {
-                $reserved = $this->reserveCode ($db, $dni, $hashdni, $surveyid);
+                $reserved = $this->reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid);
             }
             finally {
                 unlockParticipant ($db, $hashdni);
@@ -374,21 +382,51 @@ class GetCode extends View {
 
     /* Busca o crea a la participante y guarda la petición de código. Se
        llama con el bloqueo del DNI cogido. Devuelve [pid, código],
-       o null si no procede (ya ha participado o ya pidió uno hace poco). */
-    private function reserveCode ($db, $dni, $hashdni, $surveyid){
-        $participants = $db->prepare ("SELECT participantid From {Participants} " .
-            "WHERE participant = :participant ORDER BY participantid LIMIT 1");
-        $participants->bindParam (":participant", $hashdni, PDO::PARAM_STR);
+       o null si no procede (el DNI o el correo ya están asociados a otro,
+       ya ha participado o ya pidió uno hace poco). */
+    private function reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid){
+        $participants = $db->prepare ("SELECT participantid, participant, dnihashed From {Participants} " .
+            "WHERE participant = :participant OR dnihashed = :dni");
+        $participants->bindParam (":participant", $hashemail, PDO::PARAM_STR);
+        $participants->bindParam (":dni", $hashdni, PDO::PARAM_STR);
         $participants->execute ();
-        $participantid = -1;
-        if ($participants->rowCount () == 0){
-            $participantid = $this->insertParticipant ($db, $dni, $hashdni);
-        }
-        else {
-            $participant = $participants->fetch ();
-            $participantid = $participant['participantid'];
-        }
+        $rows = $participants->fetchAll ();
         $participants->closeCursor ();
+        $participantid = -1;
+        foreach ($rows as $row){
+            /* Las filas anteriores a los documentos no tienen DNI y la tabla
+               es inmutable: no se les puede asociar uno, y su clave privada
+               está cifrada con el correo. */
+            if ($row['dnihashed'] === null){
+                echo ("<p><strong>La dirección de correo indicada ya se usó antes de que se " .
+                    "pidieran los documentos y no se puede asociar a ellos. Hay que usar otra " .
+                    "dirección.</strong></p>");
+                return null;
+            }
+            if ($row['dnihashed'] !== $hashdni){
+                $this->emailInUse ();
+                return null;
+            }
+            if ($row['participant'] !== $hashemail){
+                echo ("<p><strong>Los documentos adjuntados ya se han usado con otra dirección " .
+                    "de correo. Hay que usar siempre la misma dirección.</strong></p>");
+                return null;
+            }
+            $participantid = $row['participantid'];
+        }
+        if ($participantid == -1){
+            try {
+                $participantid = $this->insertParticipant ($db, $dni, $hashdni, $hashemail);
+            }
+            catch (PDOException $e){
+                /* Dos peticiones simultáneas con el mismo correo y distinto
+                   DNI: el bloqueo es por DNI, las para el índice único. */
+                if ($e->getCode () != "23000")
+                    throw $e;
+                $this->emailInUse ();
+                return null;
+            }
+        }
         /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
             //Needs a time limit.
             echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
@@ -418,6 +456,12 @@ class GetCode extends View {
         $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
         $query->execute ();
         return [$db->lastInsertId (), $code];
+    }
+
+
+    private function emailInUse (){
+        echo ("<p><strong>La dirección de correo indicada ya se ha usado con los documentos " .
+            "de otra persona.</strong></p>");
     }
 
 

@@ -11,8 +11,10 @@ With this project we are trying to develop an online voting system based on the 
   the same. Note that the work history report is not digitally signed, so it could be forged.
 * The system needs to be as anonymous as possible.
 
-To archieve this the DNI is stored with a deterministic Hash function (SHA-256); the email
-address is only used for sending the participation link and the PDF is not stored.
+To archieve this the DNI and the email address are stored with a deterministic Hash function
+(SHA-256), each one in its own unique column (`participant` for the email address and
+`dnihashed` for the DNI), so the same documents can't be used from several
+email addresses; the PDF is not stored.
 Clearly, someone with access to the database could compromise anonymity by hashing every possible DNI. This is something we will aim to address in future releases.
 
 # Installation

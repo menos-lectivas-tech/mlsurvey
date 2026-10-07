@@ -1,7 +1,9 @@
 # 0.3-beta
 - Participation now requires the digitally signed training record PDF (extracto de
-  formación): the participant is identified by the hash of the DNI read from it and
-  the email address is only used for sending the link.
+  formación): the participant is identified by the hash of the DNI read from it.
+- `Participants.participant` keeps the hash of the email address and the new column
+  `dnihashed` stores the hash of the DNI. Both are unique: the same documents can't be
+  used from several addresses (run `php updatedb.php`).
 - Participation also requires a PDF that proves the participant is a civil servant: the
   digitally signed MUFACE membership certificate (Clases Pasivas) or the work history report,
   informe de vida laboral (the rest: career civil servants who joined from 2011 on and

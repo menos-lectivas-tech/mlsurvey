@@ -131,7 +131,7 @@ class Participate extends View {
             $hashdni = hash ('sha256', $this->dni);
 
             $participants = $db->prepare ("SELECT participantid, privatekey " .
-                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
+                "FROM {Participants} WHERE dnihashed = :part ORDER BY participantid LIMIT 1");
 
             $participants->bindParam (":part", $hashdni, PDO::PARAM_STR);
             $participants->execute ();
