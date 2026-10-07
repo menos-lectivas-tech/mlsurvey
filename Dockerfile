@@ -1,8 +1,9 @@
 FROM php:8.3-apache
 
-# Dependencias de sistema: composer necesita git/unzip para descargar los paquetes.
+# Dependencias de sistema: composer necesita git/unzip para descargar los paquetes;
+# openssl y pdftotext (poppler-utils) comprueban la firma del extracto de formacion.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git unzip \
+    && apt-get install -y --no-install-recommends git unzip openssl poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql opcache \
     && a2enmod rewrite headers

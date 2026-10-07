@@ -27,7 +27,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 2;
+$maxversion = 3;
 
 try {
   if (!versionTableExists ()){
@@ -42,6 +42,10 @@ try {
     $db->exec ("ALTER TABLE {Participation} ADD COLUMN (requesttag CHAR(64) NULL)");
     $db->exec ("CREATE INDEX Participation_request_IDX USING BTREE ON {Participation}
       (surveyid, requesttag, participationdate)");
+  }
+  if ($version < 3){
+    $db->exec ("ALTER TABLE {Participants} ADD COLUMN (dnihashed CHAR(64) NULL)");
+    $db->exec ("CREATE UNIQUE INDEX Participants_dnihashed_IDX USING BTREE ON {Participants} (dnihashed)");
   }
   
   $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");

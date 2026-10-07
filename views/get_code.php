@@ -15,10 +15,18 @@ require_once 'utils/token.php';
 require_once 'utils/altcha.php';
 require_once 'utils/showsurvey.php';
 require_once 'utils/crypt.php';
+require_once 'utils/pdfsign.php';
+require_once 'include/icons.php';
 
 class GetCode extends View {
 
     private const ACTION = "Solicitar";
+    private const KIND_PASSIVE = "pasivas";
+    private const KIND_OTHER = "resto";
+    /* Páginas en las que se descarga cada documento. */
+    private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
+    private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
+    private const URL_VIDA_LABORAL = "https://portal.seg-social.gob.es/wps/portal/importass/importass/Categorias/Vida+laboral+e+informes/Informes+sobre+tu+situacion+laboral/Informe+de+tu+vida+laboral";
 
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
@@ -50,8 +58,12 @@ class GetCode extends View {
      * Depending on the request parameters the class takes different actions:
      * - If it's not a submit and the request does't have survey information the class shows
      * the main page.
-     * - If it's a submit from Surveys class with survey info, the form for asking email addres.
-     * - If it's an own submit, sends the email and shows the result (success or failure).
+     * - If it's a submit from Surveys class with survey info, the form for asking the
+     * pension scheme (Clases Pasivas or the rest), the signed training record PDF, the
+     * PDF that proves it and the email addres.
+     * The DNI is not asked for: it is read from the training record.
+     * - If it's an own submit, checks the PDF, sends the email and shows the result
+     * (success or failure).
      */
     public function show (){
         if (isset ($_REQUEST[self::ACTION])){
@@ -96,27 +108,103 @@ class GetCode extends View {
                 removeToken ();
                 return;
             }
+            $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
+            $domains = Config::$alloweddomains == "" ? "cualquiera" :
+                str_replace (" ", ", ", Config::$alloweddomains);
+            /* Documento que acredita cada régimen: al cambiar de régimen se
+               cambian el título, el enlace y la explicación del segundo fichero. */
+            $docs = [
+                self::KIND_PASSIVE => [
+                    'label' => "Clases Pasivas",
+                    'name' => "Certificado de afiliación a MUFACE",
+                    'url' => self::URL_MUFACE,
+                    'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
+                        "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
+                        "expedido en los últimos {$maxage} días.",
+                ],
+                self::KIND_OTHER => [
+                    'label' => "Resto",
+                    'name' => "Informe de vida laboral",
+                    'url' => self::URL_VIDA_LABORAL,
+                    'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
+                        "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
+                        "{$maxage} días.",
+                ],
+            ];
+            $doc = $docs[self::KIND_OTHER];
             ?>
             <section class="ml-participate-card">
-                <h3>Participar en la consulta</h3>
-                <p>Introduce tu dirección de correo y te enviaremos un enlace personal
-                    para participar.</p>
-                <p>Si la dirección es de un <em>dominio autorizado</em><sup>*</sup> recibirás un mensaje con un enlace.
-                   Comprueba tu correo y pincha en el enlace para participar. El enlace recibido caduca en
-                   una hora.</p>
-                <p>Si quieres pensarte las respuestas antes de introducir tu dirección de correo, puedes
-                   verlas pinchando en <em>Ver las preguntas de la consulta</em> debajo de este recuadro.</p>
-                <form id="getcode" name="getcode" method="POST" action="get_code">
+                <h3>Participar en la consulta
+                    <?= $this->infoButton ("Cómo participar",
+                        "Adjunta los dos documentos e indica tu dirección de correo. Si son " .
+                        "válidos recibirás un mensaje con un enlace personal para participar, " .
+                        "que caduca en una hora.\n\n" .
+                        "Los documentos solo se usan para comprobar que son válidos y que son " .
+                        "de la misma persona. Con el DNI que figura en el extracto se evita " .
+                        "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
+                        "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
+                        "verlas en «Ver las preguntas de la consulta», debajo de este recuadro."); ?>
+                </h3>
+                <p>Adjunta dos documentos y te enviaremos por correo un enlace para participar.</p>
+                <form id="getcode" name="getcode" method="POST" action="get_code"
+                    enctype="multipart/form-data">
                     <?= setTokenHTML (); ?>
                     <!-- La consulta va en el propio formulario: en la sesión
                          la pisaría otra pestaña con otra consulta abierta. -->
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
-                    <label for="email">Dirección de correo
-                      <p><small><em>* Los dominios autorizados son:
-                       <?= Config::$alloweddomains == ""? "cualquiera" : h (str_replace (" ", ", ",
-                           Config::$alloweddomains));?>
-                       </em></small></p>
-                    </label>
+                    <fieldset class="ml-participate-kind">
+                        <legend>Mi régimen es
+                            <?= $this->infoButton ("Régimen",
+                                "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
+                                "antes de 2011.\n\n" .
+                                "Resto: funcionarios/as de carrera que ingresaron a partir de " .
+                                "2011 e interinos/as.\n\n" .
+                                "Según el régimen se pide un documento distinto."); ?>
+                        </legend>
+                        <?php foreach ($docs as $kind => $d){ ?>
+                        <label><input type="radio" name="tipo" value="<?= $kind; ?>" required
+                            data-name="<?= h ($d['name']); ?>" data-url="<?= h ($d['url']); ?>"
+                            data-info="<?= h ($d['info']); ?>"
+                            <?= $kind === self::KIND_OTHER ? "checked" : ""; ?>>
+                            <?= h ($d['label']); ?></label>
+                        <?php } ?>
+                    </fieldset>
+                    <div class="ml-participate-doc">
+                        <label for="extracto">Extracto de formación</label>
+                        <?= $this->infoButton ("Extracto de formación",
+                            "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
+                            "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."); ?>
+                        <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                            rel="noopener noreferrer">aquí</a></small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="file" name="extracto" id="extracto" required
+                            accept="application/pdf,.pdf">
+                    </div>
+                    <div class="ml-participate-doc">
+                        <label for="documento" id="documento-name"><?= h ($doc['name']); ?></label>
+                        <?= $this->infoButton ($doc['name'], $doc['info'], "documento-info"); ?>
+                        <small>Obtener <a href="<?= h ($doc['url']); ?>" id="documento-url"
+                            target="_blank" rel="noopener noreferrer">aquí</a></small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="file" name="documento" id="documento" required
+                            accept="application/pdf,.pdf">
+                    </div>
+                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                        value="1" required>
+                        Acepto que los documentos se usen solo para verificar que soy docente
+                        de la enseñanza pública. No se almacenan.</label>
+                    <div class="ml-participate-doc">
+                        <label for="email">Dirección de correo</label>
+                        <?= $this->infoButton ("Dirección de correo",
+                            "Dominios autorizados: {$domains}.\n\n" .
+                            "La dirección queda asociada a tus documentos: en esta y en " .
+                            "próximas consultas tendrás que usar siempre la misma.\n\n" .
+                            "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
+                            "el enlace y ya no podrás votar."); ?>
+                        <small>Revísala bien: ahí recibirás el enlace.</small>
+                    </div>
                     <div class="ml-participate-row">
                         <input type="email" name="email" id="email" required
                             placeholder="nombre@dominio.es" autocomplete="email">
@@ -127,6 +215,41 @@ class GetCode extends View {
                     </div>
                 </form>
             </section>
+            <script>
+            (function (){
+                var form = document.getElementById ("getcode");
+                var file = document.getElementById ("documento");
+                var info = document.getElementById ("documento-info");
+
+                /* El segundo documento depende del régimen elegido. */
+                function showDocument (clear){
+                    var kind = form.querySelector ('input[name="tipo"]:checked');
+                    if (!kind)
+                        return;
+                    document.getElementById ("documento-name").textContent = kind.dataset.name;
+                    document.getElementById ("documento-url").href = kind.dataset.url;
+                    info.dataset.title = kind.dataset.name;
+                    info.setAttribute ("aria-label", "Más información: " + kind.dataset.name);
+                    info.dataset.info = kind.dataset.info;
+                    /* El fichero elegido era el del otro régimen. */
+                    if (clear)
+                        file.value = "";
+                }
+                form.querySelectorAll ('input[name="tipo"]').forEach (function (radio){
+                    radio.addEventListener ("change", function (){ showDocument (true); });
+                });
+                /* Al recargar, el navegador puede conservar el régimen marcado. */
+                showDocument (false);
+                window.addEventListener ("pageshow", function (){ showDocument (false); });
+
+                document.querySelectorAll (".ml-participate-card .ml-info").forEach (function (button){
+                    button.addEventListener ("click", function (){
+                        mlDialog.alert ({title: button.dataset.title, message: button.dataset.info,
+                            confirmText: "Cerrar"});
+                    });
+                });
+            })();
+            </script>
 
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
@@ -141,20 +264,28 @@ class GetCode extends View {
         }
     }
 
+    /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
+    private function infoButton (string $title, string $info, string $id = ""): string {
+        return '<button type="button" class="ml-info"' . ($id === "" ? "" : ' id="' . h ($id) . '"') .
+            ' aria-label="Más información: ' . h ($title) . '" data-title="' . h ($title) .
+            '" data-info="' . h ($info) . '">' . mlIcon ('info') . '</button>';
+    }
+
     /**
-     * If the email address is not in Parciciants table the method generates a ECDSA key pair,
-     * encrypts private key using the email address and stores the hased email address and the
-     * key pair in Participants table.
+     * If the DNI is not in Parciciants table the method generates a ECDSA key pair,
+     * encrypts private key using the DNI and stores the hashed email address
+     * (participant), the hashed DNI (dnihashed) and the key pair in Participants table.
      */
-    private function insertParticipant ($db, $email, $hashmail){
+    private function insertParticipant ($db, $dni, $hashdni, $hashemail){
         $keypair = generateKeyPair ();
 
-        openssl_pkey_export($keypair, $privatekey, $email);
+        openssl_pkey_export($keypair, $privatekey, $dni);
         $public_key_details = openssl_pkey_get_details($keypair);
         $publickey = $public_key_details['key'];
-        $query = $db->prepare ("INSERT into {Participants} (participant, privatekey, publickey) " .
-            "values (:part, :priv, :pub)");
-        $query->bindParam (":part", $hashmail, PDO::PARAM_STR);
+        $query = $db->prepare ("INSERT into {Participants} (participant, dnihashed, privatekey, publickey) " .
+            "values (:part, :dni, :priv, :pub)");
+        $query->bindParam (":part", $hashemail, PDO::PARAM_STR);
+        $query->bindParam (":dni", $hashdni, PDO::PARAM_STR);
         $query->bindParam (":priv", $privatekey, PDO::PARAM_STR);
         $query->bindParam (":pub", $publickey, PDO::PARAM_STR);
         $query->execute ();
@@ -162,27 +293,39 @@ class GetCode extends View {
     }
 
     /**
-     * In first place, this method gets the email address from the requests and
-     * calls insertParticipant if the address isn't in Participants table and is in the configured
-     * allowed domains.
+     * In first place, this method gets the email address, the pension scheme and
+     * the two PDFs from the request. The training record must be digitally signed: the
+     * DNI is read from it.
+     * The other PDF, for those in Clases Pasivas, is the MUFACE membership certificate: its
+     * digital signature is checked too. For the rest (career civil servants who joined from
+     * 2011 on and interim ones) it is the work history report (vida laboral): it must show that the holder is working for a public employer. The
+     * DNI in this PDF must be the one in the training record.
+     * The hash of the DNI (dnihashed) identifies the participant. The hash of the email
+     * address is stored with it (participant), and both are unique: the same documents can't be used from several
+     * addresses, nor the same address with the documents of several people.
      * 
-     * If the address was already in the Participants table ckecks if this email address
-     * has participated in the survey. If it has, shows a message and ends.
+     * It calls insertParticipant if the DNI isn't in Participants table. If it was already
+     * there checks that the email address is the one stored and if this DNI has participated
+     * in the survey. If it has, shows a message and ends.
      * 
-     * If the email address hasn't participated in the survey, the method 
-     * generates a random 256bit key, encrypts the email address with this key 
-     * (as it is needed later) and stores the key (hashed), the encrypted email and the
+     * If the DNI hasn't participated in the survey, the method 
+     * generates a random 256bit key, encrypts the DNI with this key 
+     * (as it is needed later) and stores the key (hashed), the encrypted DNI and the
      * survey ID in the Participation table. Then it sends this information to the email address
      * formatted as an URL.
      */
     private function generateCode (){
-        /* Normalizada: el hash de la dirección identifica a la persona, y
-           Nombre@Dominio.es y nombre@dominio.es son el mismo buzón. */
         $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
             strtolower (trim ($_REQUEST['email'])) : "";
         $surveyid = $_REQUEST['surveyid'] ?? null;
         if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
+            return;
+        }
+        /* El required del formulario se puede saltar: se comprueba también aquí. */
+        if (($_REQUEST['acepto'] ?? null) !== "1"){
+            echo ("<p><strong>Para participar hay que aceptar el uso de los documentos " .
+                "para verificar que eres docente de la enseñanza pública.</strong></p>");
             return;
         }
         if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -209,19 +352,26 @@ class GetCode extends View {
                 return;
             }
 
-            $hashmail = hash ('sha256', $email);
+            $dni = $this->getDni ();
+            if ($dni === null)
+                return;
+            /* El hash del DNI identifica a la persona. El del correo se guarda
+               con él para que no se usen los mismos documentos desde varias
+               direcciones. */
+            $hashdni = hash ('sha256', $dni);
+            $hashemail = hash ('sha256', $email);
 
-            if (!lockParticipant ($db, $hashmail)){
-                echo ("<p><strong>Hay otra petición en curso con esta dirección de correo. " .
+            if (!lockParticipant ($db, $hashdni)){
+                echo ("<p><strong>Hay otra petición en curso con el DNI del extracto. " .
                     "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
 
             }
             try {
-                $reserved = $this->reserveCode ($db, $email, $hashmail, $surveyid);
+                $reserved = $this->reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid);
             }
             finally {
-                unlockParticipant ($db, $hashmail);
+                unlockParticipant ($db, $hashdni);
             }
             if ($reserved === null)
                 return;
@@ -239,52 +389,157 @@ class GetCode extends View {
     }
 
 
+    /* Devuelve la ruta temporal de un PDF subido, o null (con el motivo ya
+       mostrado) si no ha llegado bien. */
+    private function getUpload (string $field, string $docname): ?string {
+        $file = $_FILES[$field] ?? null;
+        if (!is_array ($file) || !is_int ($file['error'] ?? null) ||
+                $file['error'] == UPLOAD_ERR_NO_FILE){
+            echo ("<p><strong>Hay que adjuntar el {$docname} en PDF.</strong></p>");
+            return null;
+        }
+        if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE){
+            echo ("<p><strong>El fichero del {$docname} está vacío o es demasiado grande.</strong></p>");
+            return null;
+        }
+        if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file ($file['tmp_name'])){
+            echo ("<p><strong>Error al recibir el {$docname}.</strong></p>");
+            logMessage (LOGGER_ERROR, "Upload error {$file['error']} getting the PDF.");
+            return null;
+        }
+        return $file['tmp_name'];
+    }
+
+
+    /* Comprueba la firma del extracto de formación y el documento subido
+       según el régimen elegido (certificado de MUFACE firmado o
+       informe de vida laboral), y que los dos son de la misma persona.
+       Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
+       si no vale. Los ficheros se quedan en el temporal de la subida: no se
+       guardan. */
+    private function getDni (): ?string {
+        $kind = $_REQUEST['tipo'] ?? null;
+        if ($kind !== self::KIND_PASSIVE && $kind !== self::KIND_OTHER){
+            echo ("<p><strong>Hay que indicar si perteneces a Clases Pasivas o al resto.</strong></p>");
+            return null;
+        }
+        $docname = $kind === self::KIND_PASSIVE ? "certificado de afiliación a MUFACE" :
+            "informe de vida laboral";
+        $extracto = $this->getUpload ('extracto', "extracto de formación");
+        if ($extracto === null)
+            return null;
+        $document = $this->getUpload ('documento', $docname);
+        if ($document === null)
+            return null;
+        /* Para que el mensaje de error diga de qué fichero habla. */
+        $checking = "extracto de formación";
+        try {
+            checkExtractoSignature ($extracto);
+            $dni = getPdfDni ($extracto);
+            $checking = $docname;
+            if ($kind === self::KIND_PASSIVE){
+                checkMufaceSignature ($document);
+                $documentdni = getMufaceDni ($document);
+            }
+            else
+                $documentdni = getVidaLaboralDni ($document);
+        }
+        catch (PdfSignException $e){
+            echo ("<p><strong>" . ucfirst ($checking) . ": " . h ($e->getMessage ()) . "</strong></p>");
+            return null;
+        }
+        if (!hash_equals ($dni, $documentdni)){
+            echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
+                "formación.</strong></p>");
+            logMessage (LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
+            return null;
+        }
+        return $dni;
+    }
+
+
     /* Busca o crea a la participante y guarda la petición de código. Se
-       llama con el bloqueo de la dirección cogido. Devuelve [pid, código],
-       o null si no procede (ya ha participado o ya pidió uno hace poco). */
-    private function reserveCode ($db, $email, $hashmail, $surveyid){
-        $participants = $db->prepare ("SELECT participantid From {Participants} " .
-            "WHERE participant = :participant ORDER BY participantid LIMIT 1");
-        $participants->bindParam (":participant", $hashmail, PDO::PARAM_STR);
+       llama con el bloqueo del DNI cogido. Devuelve [pid, código],
+       o null si no procede (el DNI o el correo ya están asociados a otro,
+       ya ha participado o ya pidió uno hace poco). */
+    private function reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid){
+        $participants = $db->prepare ("SELECT participantid, participant, dnihashed From {Participants} " .
+            "WHERE participant = :participant OR dnihashed = :dni");
+        $participants->bindParam (":participant", $hashemail, PDO::PARAM_STR);
+        $participants->bindParam (":dni", $hashdni, PDO::PARAM_STR);
         $participants->execute ();
-        $participantid = -1;
-        if ($participants->rowCount () == 0){
-            $participantid = $this->insertParticipant ($db, $email, $hashmail);
-        }
-        else {
-            $participant = $participants->fetch ();
-            $participantid = $participant['participantid'];
-        }
+        $rows = $participants->fetchAll ();
         $participants->closeCursor ();
+        $participantid = -1;
+        foreach ($rows as $row){
+            /* Las filas anteriores a los documentos no tienen DNI y la tabla
+               es inmutable: no se les puede asociar uno, y su clave privada
+               está cifrada con el correo. */
+            if ($row['dnihashed'] === null){
+                echo ("<p><strong>La dirección de correo indicada ya se usó antes de que se " .
+                    "pidieran los documentos y no se puede asociar a ellos. Hay que usar otra " .
+                    "dirección.</strong></p>");
+                return null;
+            }
+            if ($row['dnihashed'] !== $hashdni){
+                $this->emailInUse ();
+                return null;
+            }
+            if ($row['participant'] !== $hashemail){
+                echo ("<p><strong>Los documentos adjuntados ya se han usado con otra dirección " .
+                    "de correo. Hay que usar siempre la misma dirección.</strong></p>");
+                return null;
+            }
+            $participantid = $row['participantid'];
+        }
+        if ($participantid == -1){
+            try {
+                $participantid = $this->insertParticipant ($db, $dni, $hashdni, $hashemail);
+            }
+            catch (PDOException $e){
+                /* Dos peticiones simultáneas con el mismo correo y distinto
+                   DNI: el bloqueo es por DNI, las para el índice único. */
+                if ($e->getCode () != "23000")
+                    throw $e;
+                $this->emailInUse ();
+                return null;
+            }
+        }
         /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
             //Needs a time limit.
             echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
             return null;
         }*/
         if (hasParticipated ($db, $participantid, $surveyid)){
-            echo ("<p><strong>La dirección de correo indicada ya ha participado en esta consulta.</strong></p>");
+            echo ("<p><strong>Ya se ha votado en esta consulta con el DNI del extracto.</strong></p>");
             return null;
         }
 
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite
-           por hora se comprueba con esta etiqueta fija por correo y consulta. */
-        $requesttag = hash ('sha256', $hashmail . ':' . $surveyid);
+           por hora se comprueba con esta etiqueta fija por DNI y consulta. */
+        $requesttag = hash ('sha256', $hashdni . ':' . $surveyid);
         if ($this->checkParticipation ($db, $requesttag, $surveyid)){
             return null;
         }
 
         $code = random_bytes (32);
         $passwd = hash ('sha256', $code);
-        $encryptedmail = base64_encode (encrypt ($email, $code));
+        $encrypteddni = base64_encode (encrypt ($dni, $code));
         $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
             "values (:id, :sid, :pwd, :tag)");
-        $query->bindParam (":id", $encryptedmail, PDO::PARAM_STR);
+        $query->bindParam (":id", $encrypteddni, PDO::PARAM_STR);
         $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
         $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
         $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
         $query->execute ();
         return [$db->lastInsertId (), $code];
+    }
+
+
+    private function emailInUse (){
+        echo ("<p><strong>La dirección de correo indicada ya se ha usado con los documentos " .
+            "de otra persona.</strong></p>");
     }
 
 
@@ -341,7 +596,7 @@ class GetCode extends View {
         $query->execute ();
         if ($query->rowCount () > 0){
             echo ("<p><strong>Ya existe una peticion de participación 
-                para esta consulta con la dirección de correo indicada </strong></p>");
+                para esta consulta con el DNI del extracto </strong></p>");
             echo ("Podrás realizar una nueva petición en una hora.");
             $ret = true;
         }

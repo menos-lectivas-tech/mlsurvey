@@ -83,11 +83,11 @@ function getSignAlgo (){
     return OPENSSL_ALGO_SHA256;
 }
 
-/* Serializa las peticiones de una misma dirección: sin esto, dos
+/* Serializa las peticiones de una misma persona: sin esto, dos
    peticiones simultáneas creaban cada una su fila en Participants (y la
    tabla no admite borrados) o se saltaban el límite de una por hora. */
-function lockParticipant ($db, $hashmail): bool {
-    $name = "mlsurvey:" . substr ($hashmail, 0, 48);
+function lockParticipant ($db, $hash): bool {
+    $name = "mlsurvey:" . substr ($hash, 0, 48);
     $query = $db->prepare ("SELECT GET_LOCK(:name, 10)");
     $query->bindParam (":name", $name, PDO::PARAM_STR);
     $query->execute ();
@@ -96,13 +96,13 @@ function lockParticipant ($db, $hashmail): bool {
     if ($locked){
         /* La conexión es persistente: si la petición muere antes de
            soltarlo, el bloqueo seguiría vivo en ella. */
-        register_shutdown_function ('unlockParticipant', $db, $hashmail);
+        register_shutdown_function ('unlockParticipant', $db, $hash);
     }
     return $locked;
 }
 
-function unlockParticipant ($db, $hashmail){
-    $name = "mlsurvey:" . substr ($hashmail, 0, 48);
+function unlockParticipant ($db, $hash){
+    $name = "mlsurvey:" . substr ($hash, 0, 48);
     try {
         /* Si ya estaba suelto no pasa nada: RELEASE_LOCK devuelve 0. */
         $query = $db->prepare ("SELECT RELEASE_LOCK(:name)");

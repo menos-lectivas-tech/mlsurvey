@@ -69,13 +69,16 @@ CREATE TABLE SystemConfig (
 
 CREATE TABLE Participants (
 	participantid INT UNSIGNED auto_increment NOT NULL,
-	participant CHAR(64) NOT NULL,
+	participant CHAR(64) NOT NULL, /*sha256 of the email address*/
+	dnihashed CHAR(64) NULL, /*sha256 of the DNI; NULL in rows older than the column*/
 	privatekey TEXT NOT NULL,
 	publickey TEXT NOT NULL,
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
 /*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
 CREATE UNIQUE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
+/*Los mismos documentos no se pueden usar desde varias direcciones, ni una dirección con varios.*/
+CREATE UNIQUE INDEX Participants_dnihashed_IDX USING BTREE ON Participants (dnihashed);
 
 CREATE TABLE Participation (
 	participationid INT UNSIGNED auto_increment NOT NULL,
@@ -124,7 +127,7 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 2);
+INSERT INTO Version values (1, 3);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
