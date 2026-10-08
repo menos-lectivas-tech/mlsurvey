@@ -27,7 +27,7 @@ class Participate extends View {
     private const FORM_FIELD = "participation";
     private const PARTICIPATIONS_MAX = 20;
     private $key = "";
-    private string $dni = "";
+    private string $email = "";
     private int $surveyid = -1;
 
     /**
@@ -106,9 +106,9 @@ class Participate extends View {
             $db = dbConn ();
             
             /*
-            Gets the DNI from the Participation table using the key in the request
+            Gets the email from the Participation table using the key in the request
             */
-            if (!$this->getDni ($db, $pid, $code) && !$this->istest){
+            if (!$this->getEmail ($db, $pid, $code) && !$this->istest){
                 echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
                 return;
             }
@@ -126,14 +126,14 @@ class Participate extends View {
             /*
             Gets the private key for singing the responses, then it's encrypting
             using the random key in the cookie. If the key can't be obtined using the
-            DNI the security is compromised
+            email the security is compromised
             */
-            $hashdni = hash ('sha256', $this->dni);
+            $hashemail = hash ('sha256', $this->email);
 
             $participants = $db->prepare ("SELECT participantid, privatekey " .
-                "FROM {Participants} WHERE dnihashed = :part ORDER BY participantid LIMIT 1");
+                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
 
-            $participants->bindParam (":part", $hashdni, PDO::PARAM_STR);
+            $participants->bindParam (":part", $hashemail, PDO::PARAM_STR);
             $participants->execute ();
             if ($participants->rowCount () == 0){
                 $this->securityError ();
@@ -145,12 +145,12 @@ class Participate extends View {
             $participants->closeCursor ();
             if (hasParticipated ($db, $participantid, $this->surveyid)){
                 ?>
-                <p><strong>Ya se ha votado en esta consulta con este DNI.</strong></p>
+                <p><strong>Ya se ha votado en esta consulta con esta dirección de correo.</strong></p>
                 <?php
                 return;
             }
             
-            $key = openssl_pkey_get_private ($privatekeycryp, $this->dni);
+            $key = openssl_pkey_get_private ($privatekeycryp, $this->email);
             if ($key === false){
                 ?>
                 <strong><p>La solicitud de participación tiene un problema de seguridad.</p>
@@ -418,16 +418,16 @@ class Participate extends View {
     }
 
     /**
-     * Decrypts the participant DNI stored in the Participation table and
-     * stores it in $dni private variable.
+     * Decrypts the participant email stored in the Participation table and
+     * stores it in $email private variable.
      * 
      * @param PDO $db PDO database object.
      * @param int $pid The participation id.
-     * @param string $code The key for decrypting the DNI.
+     * @param string $code The key for decrypting the email.
      * 
      * @return bool
      */
-    private function getDni ($db, $pid, $code){
+    private function getEmail ($db, $pid, $code){
         $hcode = hash ('sha256', $code);
         /* El enlace caduca en una hora y solo sirve mientras la consulta está abierta. */
         $query = $db->prepare ("SELECT p.surveyid, p.participant FROM {Participation} p " .
@@ -441,7 +441,7 @@ class Participate extends View {
         if ($query->rowCount () == 0)
             return false;
         $row = $query->fetch ();
-        $this->dni = decrypt (base64_decode ($row['participant']), $code);
+        $this->email = decrypt (base64_decode ($row['participant']), $code);
         $this->surveyid = $row['surveyid'];
         return true;
     }
