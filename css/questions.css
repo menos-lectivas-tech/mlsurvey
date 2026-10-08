@@ -150,6 +150,13 @@
     margin: 24px 0;
 }
 
+.ml-participate-subcard {
+    background: var(--ml-accent-soft);
+    /*border: 1px solid var(--ml-accent);*/
+    padding: 12px;
+    margin: 0;
+}
+
 .ml-participate-card > h3 {
     margin-bottom: 8px;
 }

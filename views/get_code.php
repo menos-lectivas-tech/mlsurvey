@@ -18,8 +18,10 @@ require_once 'utils/crypt.php';
 require_once 'utils/pdfsign.php';
 require_once 'include/icons.php';
 
-class GetCode extends View {
+class GetCode extends View
+{
 
+    private int $maxage = 30;
     private const ACTION = "Solicitar";
     private const KIND_PASSIVE = "pasivas";
     private const KIND_OTHER = "resto";
@@ -27,21 +29,51 @@ class GetCode extends View {
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
     private const URL_VIDA_LABORAL = "https://portal.seg-social.gob.es/wps/portal/importass/importass/Categorias/Vida+laboral+e+informes/Informes+sobre+tu+situacion+laboral/Informe+de+tu+vida+laboral";
+    
 
-    function getMenuGroup (){
+
+    private array $docs = array ();
+
+    function __construct()
+    {
+        if (isset (Config::PARAMS["pdf_max_age_days"]))
+            $this->maxage = Config::PARAMS["pdf_max_age_days"];
+        $this->docs = [
+            self::KIND_PASSIVE => [
+                'label' => "Clases Pasivas",
+                'name' => "Certificado de afiliación a MUFACE",
+                'url' => self::URL_MUFACE,
+                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
+                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
+                    "expedido en los últimos {self::MAXAGE} días.",
+            ],
+            self::KIND_OTHER => [
+                'label' => "Resto",
+                'name' => "Informe de vida laboral",
+                'url' => self::URL_VIDA_LABORAL,
+                'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
+                    "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
+                    "{$this->maxage} días.",
+            ],
+        ];
+    }
+    function getMenuGroup()
+    {
         return ML_MENU_GROUP_SURVEYS;
     }
 
     /* Sin menú: el usuario se centra en solicitar el voto / votar. */
-    function showNavigation (){
+    function showNavigation()
+    {
         return false;
     }
-    
-    public function loadStyles (){
-        ?>
+
+    public function loadStyles()
+    {
+?>
         <link href="css/button3.css" rel="stylesheet" />
         <link href="css/questions.css" rel="stylesheet" />
-        <?= altchaStyleHTML (); ?>
+        <?= altchaStyleHTML(); ?>
         <?php
     }
 
@@ -50,8 +82,9 @@ class GetCode extends View {
      * Thanks to ALTCHA: https://altcha.org/
      * We're using the simplest implementation of ALTCHA  with the ALTCHA widget.
      */
-    public function addHead (){
-        echo (altchaScriptHTML ());
+    public function addHead()
+    {
+        echo (altchaScriptHTML());
     }
 
     /**
@@ -65,231 +98,240 @@ class GetCode extends View {
      * - If it's an own submit, checks the PDF, sends the email and shows the result
      * (success or failure).
      */
-    public function show (){
-        if (isset ($_REQUEST[self::ACTION])){
-            if (!checkToken ()){
-                tokenError ();
+    public function show()
+    {
+        if (isset($_REQUEST[self::ACTION])) {
+            if (!checkToken()) {
+                tokenError();
                 return;
             }
-            if (!altchaCheck ()){
-                altchaError ();
+            if (!altchaCheck()) {
+                altchaError();
                 return;
             }
-            $this->generateCode ();
+            $this->generateCode();
             return;
         }
-        
+
         /* La página de una consulta se carga con GET (get_code?responseid=N)
            para que se pueda enlazar y recargar sin reenviar el formulario. */
-        if (!isset ($_GET['responseid'])){
-            showMain ();
+        if (!isset($_GET['responseid'])) {
+            showMain();
             return;
         }
         $surveyid = $_GET['responseid'];
-        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
+        if (!is_string($surveyid) || !ctype_digit($surveyid)) {
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
         }
         try {
-            $db = dbConn ();
-            $surveyname = $this->getSurveyName ($db, $surveyid);
-            if ($surveyname === null){
+            $db = dbConn();
+            $surveyname = $this->getSurveyName($db, $surveyid);
+            if ($surveyname === null) {
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
-                logMessage (LOGGER_ERROR, "Survey {$surveyid} does not exist.");
+                logMessage(LOGGER_ERROR, "Survey {$surveyid} does not exist.");
                 return;
             }
             /* Sin formulario si no se puede participar: el envío se rechazaría igualmente. */
-            if (!$this->isActive ($db, $surveyid)){
-                echo ("<p><strong>La consulta <em>" . h ($surveyname) .
+            if (!$this->isActive($db, $surveyid)) {
+                echo ("<p><strong>La consulta <em>" . h($surveyname) .
                     "</em> no está abierta.</strong></p>");
                 return;
             }
-            if (!showSurveyHeader ($db, $surveyid, true)){
-                removeToken ();
+            if (!showSurveyHeader($db, $surveyid, true)) {
+                removeToken();
                 return;
             }
-            $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
+
             $domains = Config::$alloweddomains == "" ? "cualquiera" :
-                str_replace (" ", ", ", Config::$alloweddomains);
+                str_replace(" ", ", ", Config::$alloweddomains);
             /* Documento que acredita cada régimen: al cambiar de régimen se
                cambian el título, el enlace y la explicación del segundo fichero. */
-            $docs = [
-                self::KIND_PASSIVE => [
-                    'label' => "Clases Pasivas",
-                    'name' => "Certificado de afiliación a MUFACE",
-                    'url' => self::URL_MUFACE,
-                    'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
-                        "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
-                        "expedido en los últimos {$maxage} días.",
-                ],
-                self::KIND_OTHER => [
-                    'label' => "Resto",
-                    'name' => "Informe de vida laboral",
-                    'url' => self::URL_VIDA_LABORAL,
-                    'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
-                        "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
-                        "{$maxage} días.",
-                ],
-            ];
-            $doc = $docs[self::KIND_OTHER];
-            ?>
+
+            $doc = $this->docs[self::KIND_OTHER];
+            $token = setTokenHTML();
+        ?>
             <section class="ml-participate-card">
                 <h3>Participar en la consulta
-                    <?= $this->infoButton ("Cómo participar",
-                        "Adjunta los dos documentos e indica tu dirección de correo. Si son " .
-                        "válidos recibirás un mensaje con un enlace personal para participar, " .
-                        "que caduca en una hora.\n\n" .
-                        "Los documentos solo se usan para comprobar que son válidos y que son " .
-                        "de la misma persona. Con el DNI que figura en el extracto se evita " .
-                        "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
-                        "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
-                        "verlas en «Ver las preguntas de la consulta», debajo de este recuadro."); ?>
+                    <?= $this->infoButton(
+                        "Cómo participar",
+                        "PRIMERA VEZ: despliega \"Primera vez\", adjunta los dos documentos e indica tu dirección de correo. Si son " .
+                            "válidos recibirás un mensaje con un enlace personal para participar, " .
+                            "que caduca en una hora.\n" .
+                            "Los documentos solo se usan para comprobar que son válidos y que son " .
+                            "de la misma persona. Con el DNI que figura en el extracto se evita " .
+                            "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
+                            "RESTO: simplemente tienes que introducir tu dirección de correo.\n\n" .
+                            "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
+                            "verlas en «Ver las preguntas de la consulta», debajo de este recuadro."
+                    ); ?>
                 </h3>
-                <p>Adjunta dos documentos y te enviaremos por correo un enlace para participar.</p>
                 <form id="getcode" name="getcode" method="POST" action="get_code"
                     enctype="multipart/form-data">
-                    <?= setTokenHTML (); ?>
-                    <!-- La consulta va en el propio formulario: en la sesión
+                    <input type="hidden" name="firsttime" id="firsttime" value="no">
+                    <details class="ml-survey-preview" id="firsttimedetails">
+                        <summary>Primera vez</summary>
+                        <div class="ml-participate-subcard">
+                            <p>Adjunta dos documentos y te enviaremos por correo un enlace para participar.</p>
+
+                            <?= $token; ?>
+                            <!-- La consulta va en el propio formulario: en la sesión
                          la pisaría otra pestaña con otra consulta abierta. -->
-                    <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
-                    <fieldset class="ml-participate-kind">
-                        <legend>Mi régimen es
-                            <?= $this->infoButton ("Régimen",
-                                "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
-                                "antes de 2011.\n\n" .
-                                "Resto: funcionarios/as de carrera que ingresaron a partir de " .
-                                "2011 e interinos/as.\n\n" .
-                                "Según el régimen se pide un documento distinto."); ?>
-                        </legend>
-                        <?php foreach ($docs as $kind => $d){ ?>
-                        <label><input type="radio" name="tipo" value="<?= $kind; ?>" required
-                            data-name="<?= h ($d['name']); ?>" data-url="<?= h ($d['url']); ?>"
-                            data-info="<?= h ($d['info']); ?>"
-                            <?= $kind === self::KIND_OTHER ? "checked" : ""; ?>>
-                            <?= h ($d['label']); ?></label>
-                        <?php } ?>
-                    </fieldset>
-                    <div class="ml-participate-doc">
-                        <label for="extracto">Extracto de formación</label>
-                        <?= $this->infoButton ("Extracto de formación",
-                            "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
-                            "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."); ?>
-                        <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                            rel="noopener noreferrer">aquí</a></small>
-                    </div>
-                    <div class="ml-participate-row">
-                        <input type="file" name="extracto" id="extracto" required
-                            accept="application/pdf,.pdf">
-                    </div>
-                    <div class="ml-participate-doc">
-                        <label for="documento" id="documento-name"><?= h ($doc['name']); ?></label>
-                        <?= $this->infoButton ($doc['name'], $doc['info'], "documento-info"); ?>
-                        <small>Obtener <a href="<?= h ($doc['url']); ?>" id="documento-url"
-                            target="_blank" rel="noopener noreferrer">aquí</a></small>
-                    </div>
-                    <div class="ml-participate-row">
-                        <input type="file" name="documento" id="documento" required
-                            accept="application/pdf,.pdf">
-                    </div>
-                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
-                        value="1" required>
-                        Acepto que los documentos se usen solo para verificar que soy docente
-                        de la enseñanza pública. No se almacenan.</label>
+                            <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
+                            <fieldset class="ml-participate-kind">
+                                <legend>Mi régimen es
+                                    <?= $this->infoButton(
+                                        "Régimen",
+                                        "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
+                                            "antes de 2011.\n\n" .
+                                            "Resto: funcionarios/as de carrera que ingresaron a partir de " .
+                                            "2011 e interinos/as.\n\n" .
+                                            "Según el régimen se pide un documento distinto."
+                                    ); ?>
+                                </legend>
+                                <?php foreach ($this->docs as $kind => $d) { ?>
+                                    <label><input type="radio" name="tipo" id="tipo-<?= $kind; ?>" value="<?= $kind; ?>"
+                                            data-name="<?= h($d['name']); ?>" data-url="<?= h($d['url']); ?>"
+                                            data-info="<?= h($d['info']); ?>"
+                                            <?= $kind === self::KIND_OTHER ? "checked" : ""; ?>>
+                                        <?= h($d['label']); ?></label>
+                                <?php } ?>
+                            </fieldset>
+                            <div class="ml-participate-doc">
+                                <label for="extracto">Extracto de formación</label>
+                                <?= $this->infoButton(
+                                    "Extracto de formación",
+                                    "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
+                                        "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
+                                ); ?>
+                                <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                                        rel="noopener noreferrer">aquí</a></small>
+                            </div>
+                            <div class="ml-participate-row">
+                                <input type="file" name="extracto" id="extracto"
+                                    accept="application/pdf,.pdf">
+                            </div>
+                            <div class="ml-participate-doc">
+                                <label for="documento" id="documento-name"><?= h($doc['name']); ?></label>
+                                <?= $this->infoButton($doc['name'], $doc['info'], "documento-info"); ?>
+                                <small>Obtener <a href="<?= h($doc['url']); ?>" id="documento-url"
+                                        target="_blank" rel="noopener noreferrer">aquí</a></small>
+                            </div>
+                            <div class="ml-participate-row">
+                                <input type="file" name="documento" id="documento"
+                                    accept="application/pdf,.pdf">
+                            </div>
+                            <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                                    value="1" id="acepto">
+                                Acepto que los documentos se usen solo para verificar que soy docente
+                                de la enseñanza pública. No se almacenan.</label>
+                    </details>
                     <div class="ml-participate-doc">
                         <label for="email">Dirección de correo</label>
-                        <?= $this->infoButton ("Dirección de correo",
+                        <?= $this->infoButton(
+                            "Dirección de correo",
                             "Dominios autorizados: {$domains}.\n\n" .
-                            "La dirección queda asociada a tus documentos: en esta y en " .
-                            "próximas consultas tendrás que usar siempre la misma.\n\n" .
-                            "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
-                            "el enlace y ya no podrás votar."); ?>
+                                "La dirección queda asociada a tus documentos: en esta y en " .
+                                "próximas consultas tendrás que usar siempre la misma.\n\n" .
+                                "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
+                                "el enlace y ya no podrás votar."
+                        ); ?>
                         <small>Revísala bien: ahí recibirás el enlace.</small>
                     </div>
                     <div class="ml-participate-row">
                         <input type="email" name="email" id="email" required
                             placeholder="nombre@dominio.es" autocomplete="email">
-                        <?= altchaWidgetHTML (); ?>
+                        <?= altchaWidgetHTML(); ?>
                         <button type="submit" class="button-3 ml-participate-btn"
                             name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">
                             Participar en la consulta</button>
                     </div>
                 </form>
+                </div>
             </section>
             <script>
-            (function (){
-                var form = document.getElementById ("getcode");
-                var file = document.getElementById ("documento");
-                var info = document.getElementById ("documento-info");
+                (function() {
+                    var form = document.getElementById("getcode");
+                    var file = document.getElementById("documento");
+                    var info = document.getElementById("documento-info");
 
-                /* El segundo documento depende del régimen elegido. */
-                function showDocument (clear){
-                    var kind = form.querySelector ('input[name="tipo"]:checked');
-                    if (!kind)
-                        return;
-                    document.getElementById ("documento-name").textContent = kind.dataset.name;
-                    document.getElementById ("documento-url").href = kind.dataset.url;
-                    info.dataset.title = kind.dataset.name;
-                    info.setAttribute ("aria-label", "Más información: " + kind.dataset.name);
-                    info.dataset.info = kind.dataset.info;
-                    /* El fichero elegido era el del otro régimen. */
-                    if (clear)
-                        file.value = "";
-                }
-                form.querySelectorAll ('input[name="tipo"]').forEach (function (radio){
-                    radio.addEventListener ("change", function (){ showDocument (true); });
-                });
-                /* Al recargar, el navegador puede conservar el régimen marcado. */
-                showDocument (false);
-                window.addEventListener ("pageshow", function (){ showDocument (false); });
-
-                document.querySelectorAll (".ml-participate-card .ml-info").forEach (function (button){
-                    button.addEventListener ("click", function (){
-                        mlDialog.alert ({title: button.dataset.title, message: button.dataset.info,
-                            confirmText: "Cerrar"});
+                    /* El segundo documento depende del régimen elegido. */
+                    function showDocument(clear) {
+                        var kind = form.querySelector('input[name="tipo"]:checked');
+                        if (!kind)
+                            return;
+                        document.getElementById("documento-name").textContent = kind.dataset.name;
+                        document.getElementById("documento-url").href = kind.dataset.url;
+                        info.dataset.title = kind.dataset.name;
+                        info.setAttribute("aria-label", "Más información: " + kind.dataset.name);
+                        info.dataset.info = kind.dataset.info;
+                        /* El fichero elegido era el del otro régimen. */
+                        if (clear)
+                            file.value = "";
+                    }
+                    form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
+                        radio.addEventListener("change", function() {
+                            showDocument(true);
+                        });
                     });
-                });
-            })();
+                    /* Al recargar, el navegador puede conservar el régimen marcado. */
+                    showDocument(false);
+                    window.addEventListener("pageshow", function() {
+                        showDocument(false);
+                    });
+
+                    document.querySelectorAll(".ml-participate-card .ml-info").forEach(function(button) {
+                        button.addEventListener("click", function() {
+                            mlDialog.alert({
+                                title: button.dataset.title,
+                                message: button.dataset.info,
+                                confirmText: "Cerrar"
+                            });
+                        });
+                    });
+                })();
             </script>
 
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
-                <?php showSurveyQuestions ($db, $surveyid, true); ?>
+                <?php showSurveyQuestions($db, $surveyid, true); ?>
             </details>
-            <?php
-        }
-        catch (Exception $e){
-            removeToken ();
+        <?php
+        } catch (Exception $e) {
+            removeToken();
             echo ("<p><strong>Error al acceder a la consulta seleccionada.</strong></p>");
-            logMessage (LOGGER_ERROR, "Error {$e} getting survey for code.");
+            logMessage(LOGGER_ERROR, "Error {$e} getting survey for code.");
         }
     }
 
     /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
-    private function infoButton (string $title, string $info, string $id = ""): string {
-        return '<button type="button" class="ml-info"' . ($id === "" ? "" : ' id="' . h ($id) . '"') .
-            ' aria-label="Más información: ' . h ($title) . '" data-title="' . h ($title) .
-            '" data-info="' . h ($info) . '">' . mlIcon ('info') . '</button>';
+    private function infoButton(string $title, string $info, string $id = ""): string
+    {
+        return '<button type="button" class="ml-info"' . ($id === "" ? "" : ' id="' . h($id) . '"') .
+            ' aria-label="Más información: ' . h($title) . '" data-title="' . h($title) .
+            '" data-info="' . h($info) . '">' . mlIcon('info') . '</button>';
     }
 
     /**
-     * If the DNI is not in Parciciants table the method generates a ECDSA key pair,
-     * encrypts private key using the DNI and stores the hashed email address
+     * If the DNI and email are not in Parciciants table the method generates a ECDSA key pair,
+     * encrypts private key using the email and stores the hashed email address
      * (participant), the hashed DNI (dnihashed) and the key pair in Participants table.
      */
-    private function insertParticipant ($db, $dni, $hashdni, $hashemail){
-        $keypair = generateKeyPair ();
+    private function insertParticipant($db, $email, $hashdni, $hashemail)
+    {
+        $keypair = generateKeyPair();
 
-        openssl_pkey_export($keypair, $privatekey, $dni);
+        openssl_pkey_export($keypair, $privatekey, $email);
         $public_key_details = openssl_pkey_get_details($keypair);
         $publickey = $public_key_details['key'];
-        $query = $db->prepare ("INSERT into {Participants} (participant, dnihashed, privatekey, publickey) " .
+        $query = $db->prepare("INSERT into {Participants} (participant, dnihashed, privatekey, publickey) " .
             "values (:part, :dni, :priv, :pub)");
-        $query->bindParam (":part", $hashemail, PDO::PARAM_STR);
-        $query->bindParam (":dni", $hashdni, PDO::PARAM_STR);
-        $query->bindParam (":priv", $privatekey, PDO::PARAM_STR);
-        $query->bindParam (":pub", $publickey, PDO::PARAM_STR);
-        $query->execute ();
-        return $db->lastInsertId ();
+        $query->bindParam(":part", $hashemail, PDO::PARAM_STR);
+        $query->bindParam(":dni", $hashdni, PDO::PARAM_STR);
+        $query->bindParam(":priv", $privatekey, PDO::PARAM_STR);
+        $query->bindParam(":pub", $publickey, PDO::PARAM_STR);
+        $query->execute();
+        return $db->lastInsertId();
     }
 
     /**
@@ -314,97 +356,116 @@ class GetCode extends View {
      * survey ID in the Participation table. Then it sends this information to the email address
      * formatted as an URL.
      */
-    private function generateCode (){
-        $email = isset ($_REQUEST['email']) && is_string ($_REQUEST['email']) ?
-            strtolower (trim ($_REQUEST['email'])) : "";
+    private function generateCode()
+    {
+        $email = isset($_REQUEST['email']) && is_string($_REQUEST['email']) ?
+            strtolower(trim($_REQUEST['email'])) : "";
+        $firsttime = ($_REQUEST["firsttime"] == "yes");
         $surveyid = $_REQUEST['surveyid'] ?? null;
-        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
+        if (!is_string($surveyid) || !ctype_digit($surveyid)) {
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
         }
         /* El required del formulario se puede saltar: se comprueba también aquí. */
-        if (($_REQUEST['acepto'] ?? null) !== "1"){
+        if ($firsttime && ($_REQUEST['acepto'] ?? null) !== "1") {
             echo ("<p><strong>Para participar hay que aceptar el uso de los documentos " .
                 "para verificar que eres docente de la enseñanza pública.</strong></p>");
             return;
         }
-        if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false) {
+        if ($email == "" || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             echo ("<p><strong>La dirección de correo es incorrecta.</strong></p>");
             return;
         }
-
+        $start_time = microtime(true);
         $surveyname = "";
         try {
 
-            $db = dbConn ();
+            $db = dbConn();
             /* El nombre va tal cual en el correo y escapado en la página. */
-            $mailsurveyname = $this->getSurveyName ($db, $surveyid);
-            if ($mailsurveyname === null){
+            $mailsurveyname = $this->getSurveyName($db, $surveyid);
+            if ($mailsurveyname === null) {
                 echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
                 return;
             }
-            $surveyname = h ($mailsurveyname);
-            if (!$this->isActive ($db, $surveyid)){
+            $surveyname = h($mailsurveyname);
+            if (!$this->isActive($db, $surveyid)) {
                 echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
                 return;
             }
-            if (!$this->checkDomain ($db, $email)){
+            if (!$this->checkDomain($db, $email)) {
                 return;
             }
+            $hashdni = "";
+            if ($firsttime){
+                $dni = $this->getDni();
+                if ($dni === null)
+                    return;
+                /* El hash del DNI identifica a la persona. El del correo se guarda
+                con él para que no se usen los mismos documentos desde varias
+                direcciones. */
+                $hashdni = hash('sha256', $dni);
+            }
+            $hashemail = hash('sha256', $email);
 
-            $dni = $this->getDni ();
-            if ($dni === null)
-                return;
-            /* El hash del DNI identifica a la persona. El del correo se guarda
-               con él para que no se usen los mismos documentos desde varias
-               direcciones. */
-            $hashdni = hash ('sha256', $dni);
-            $hashemail = hash ('sha256', $email);
-
-            if (!lockParticipant ($db, $hashdni)){
+            if ($firsttime && !lockParticipant($db, $hashdni)) {
                 echo ("<p><strong>Hay otra petición en curso con el DNI del extracto. " .
                     "Inténtalo de nuevo en unos segundos.</strong></p>");
                 return;
-
+            }
+            if (!lockParticipant($db, $hashemail)) {
+                echo ("<p><strong>Hay otra petición en curso con la dirección de correo indicada. " .
+                    "Inténtalo de nuevo en unos segundos.</strong></p>");
+                if ($firsttime)
+                    unlockParticipant($db, $hashdni);
+                return;
             }
             try {
-                $reserved = $this->reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid);
-            }
-            finally {
-                unlockParticipant ($db, $hashdni);
+                if ($firsttime)
+                    $reserved = $this->reserveCode($db, $email, $hashdni, $hashemail, $surveyid);
+                else
+                    $reserved = $this->reserveCodeEmail ($db, $email, $hashemail, $surveyid);
+            } finally {
+                unlockParticipant($db, $hashemail);
+                if ($firsttime)
+                    unlockParticipant($db, $hashdni);
             }
             if ($reserved === null)
                 return;
             [$pid, $code] = $reserved;
-            $mailer = new MlMailer ();
-            $mailer->configure ();
-            $mailer->sendCode ($email, $pid, url_base64_encode ($code), $mailsurveyname);
-            echo ("<p><strong>El código para participar en la consulta <em>{$surveyname}</em> " . 
+            $end_time = microtime(true);
+            $exectime = $end_time - $start_time;
+            logMessage(LOGGER_DEBUG, "Get code exec time {$exectime}.");
+            $mailer = new MlMailer();
+            $mailer->configure();
+            $mailer->sendCode($email, $pid, url_base64_encode($code), $mailsurveyname);
+            echo ("<p><strong>El código para participar en la consulta <em>{$surveyname}</em> " .
                 "ha sido enviado a la dirección indicada.</strong></p>");
-        }
-        catch (Exception $e){
+        } catch (Exception $e) {
             echo ("<p><strong>Error generando código para la consulta <em>{$surveyname}</em></strong></p>");
-            logMessage (LOGGER_ERROR, "Error {$e} when generating code for survey");
+            logMessage(LOGGER_ERROR, "Error {$e} when generating code for survey");
         }
     }
 
 
     /* Devuelve la ruta temporal de un PDF subido, o null (con el motivo ya
        mostrado) si no ha llegado bien. */
-    private function getUpload (string $field, string $docname): ?string {
+    private function getUpload(string $field, string $docname): ?string
+    {
         $file = $_FILES[$field] ?? null;
-        if (!is_array ($file) || !is_int ($file['error'] ?? null) ||
-                $file['error'] == UPLOAD_ERR_NO_FILE){
+        if (
+            !is_array($file) || !is_int($file['error'] ?? null) ||
+            $file['error'] == UPLOAD_ERR_NO_FILE
+        ) {
             echo ("<p><strong>Hay que adjuntar el {$docname} en PDF.</strong></p>");
             return null;
         }
-        if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE){
+        if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE) {
             echo ("<p><strong>El fichero del {$docname} está vacío o es demasiado grande.</strong></p>");
             return null;
         }
-        if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file ($file['tmp_name'])){
+        if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
             echo ("<p><strong>Error al recibir el {$docname}.</strong></p>");
-            logMessage (LOGGER_ERROR, "Upload error {$file['error']} getting the PDF.");
+            logMessage(LOGGER_ERROR, "Upload error {$file['error']} getting the PDF.");
             return null;
         }
         return $file['tmp_name'];
@@ -417,91 +478,126 @@ class GetCode extends View {
        Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
        si no vale. Los ficheros se quedan en el temporal de la subida: no se
        guardan. */
-    private function getDni (): ?string {
+    private function getDni(): ?string
+    {
         $kind = $_REQUEST['tipo'] ?? null;
-        if ($kind !== self::KIND_PASSIVE && $kind !== self::KIND_OTHER){
+        if ($kind !== self::KIND_PASSIVE && $kind !== self::KIND_OTHER) {
             echo ("<p><strong>Hay que indicar si perteneces a Clases Pasivas o al resto.</strong></p>");
             return null;
         }
         $docname = $kind === self::KIND_PASSIVE ? "certificado de afiliación a MUFACE" :
             "informe de vida laboral";
-        $extracto = $this->getUpload ('extracto', "extracto de formación");
+        $extracto = $this->getUpload('extracto', "extracto de formación");
         if ($extracto === null)
             return null;
-        $document = $this->getUpload ('documento', $docname);
+        $document = $this->getUpload('documento', $docname);
         if ($document === null)
             return null;
         /* Para que el mensaje de error diga de qué fichero habla. */
         $checking = "extracto de formación";
         try {
-            checkExtractoSignature ($extracto);
-            $dni = getPdfDni ($extracto);
+            checkExtractoSignature($extracto);
+            $dni = getPdfDni($extracto);
             $checking = $docname;
-            if ($kind === self::KIND_PASSIVE){
-                checkMufaceSignature ($document);
-                $documentdni = getMufaceDni ($document);
-            }
-            else
-                $documentdni = getVidaLaboralDni ($document);
-        }
-        catch (PdfSignException $e){
-            echo ("<p><strong>" . ucfirst ($checking) . ": " . h ($e->getMessage ()) . "</strong></p>");
+            if ($kind === self::KIND_PASSIVE) {
+                checkMufaceSignature($document);
+                $documentdni = getMufaceDni($document);
+            } else
+                $documentdni = getVidaLaboralDni($document);
+        } catch (PdfSignException $e) {
+            echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
             return null;
         }
-        if (!hash_equals ($dni, $documentdni)){
+        if (!hash_equals($dni, $documentdni)) {
             echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
                 "formación.</strong></p>");
-            logMessage (LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
+            logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
             return null;
         }
         return $dni;
     }
 
+    private function reserveCodeEmail ($db, $email, $hashemail, $surveyid){
+        $participantid = -1;
+        $participants = $db->prepare("SELECT participantid
+            FROM {Participants}
+            WHERE participant = :participant LIMIT 1");
+        $participants->bindParam(":participant", $hashemail, PDO::PARAM_STR);
+        $participants->execute ();
+        if ($participants->rowCount () == 0){
+            echo ("La dirección de correo indicada no ha participado anteriormente.");
+            return null;
+        }
+        $participantid = $participants->fetch()["participantid"];
+        if (hasParticipated($db, $participantid, $surveyid)) {
+            echo ("<p><strong>Ya se ha votado en esta consulta con la dirección de correo indicada.</strong></p>");
+            return null;
+        }
 
+        /* participant va cifrado con un código aleatorio distinto en cada
+           petición, así que no sirve para buscar las anteriores: el límite
+           por hora se comprueba con esta etiqueta fija por email y consulta. */
+        $requesttag = hash('sha256', $hashemail . ':' . $surveyid);
+        if ($this->checkParticipation($db, $requesttag, $surveyid)) {
+            return null;
+        }
+
+        $code = random_bytes(32);
+        $passwd = hash('sha256', $code);
+        $encryptedemail = base64_encode(encrypt($email, $code));
+        $query = $db->prepare("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
+            "values (:id, :sid, :pwd, :tag)");
+        $query->bindParam(":id", $encryptedemail, PDO::PARAM_STR);
+        $query->bindParam(":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam(":pwd", $passwd, PDO::PARAM_STR);
+        $query->bindParam(":tag", $requesttag, PDO::PARAM_STR);
+        $query->execute();
+        return [$db->lastInsertId(), $code];
+    }
     /* Busca o crea a la participante y guarda la petición de código. Se
        llama con el bloqueo del DNI cogido. Devuelve [pid, código],
        o null si no procede (el DNI o el correo ya están asociados a otro,
        ya ha participado o ya pidió uno hace poco). */
-    private function reserveCode ($db, $dni, $hashdni, $hashemail, $surveyid){
-        $participants = $db->prepare ("SELECT participantid, participant, dnihashed From {Participants} " .
+    private function reserveCode($db, $email, $hashdni, $hashemail, $surveyid)
+    {
+        $participants = $db->prepare("SELECT participantid, participant, dnihashed From {Participants} " .
             "WHERE participant = :participant OR dnihashed = :dni");
-        $participants->bindParam (":participant", $hashemail, PDO::PARAM_STR);
-        $participants->bindParam (":dni", $hashdni, PDO::PARAM_STR);
-        $participants->execute ();
-        $rows = $participants->fetchAll ();
-        $participants->closeCursor ();
+        $participants->bindParam(":participant", $hashemail, PDO::PARAM_STR);
+        $participants->bindParam(":dni", $hashdni, PDO::PARAM_STR);
+        $participants->execute();
+        $rows = $participants->fetchAll();
+        $participants->closeCursor();
         $participantid = -1;
-        foreach ($rows as $row){
+        foreach ($rows as $row) {
             /* Las filas anteriores a los documentos no tienen DNI y la tabla
                es inmutable: no se les puede asociar uno, y su clave privada
                está cifrada con el correo. */
-            if ($row['dnihashed'] === null){
+            if ($row['dnihashed'] === null) {
                 echo ("<p><strong>La dirección de correo indicada ya se usó antes de que se " .
                     "pidieran los documentos y no se puede asociar a ellos. Hay que usar otra " .
                     "dirección.</strong></p>");
                 return null;
             }
-            if ($row['dnihashed'] !== $hashdni){
-                $this->emailInUse ();
+            if ($row['dnihashed'] !== $hashdni) {
+                $this->emailInUse();
                 return null;
             }
-            if ($row['participant'] !== $hashemail){
+            if ($row['participant'] !== $hashemail) {
                 echo ("<p><strong>Los documentos adjuntados ya se han usado con otra dirección " .
                     "de correo. Hay que usar siempre la misma dirección.</strong></p>");
                 return null;
             }
             $participantid = $row['participantid'];
         }
-        if ($participantid == -1){
+        if ($participantid == -1) {
             try {
-                $participantid = $this->insertParticipant ($db, $dni, $hashdni, $hashemail);
-            }
-            catch (PDOException $e){
+                $participantid = $this->insertParticipant($db, $email, $hashdni, $hashemail);
+            } catch (PDOException $e) {
                 /* Dos peticiones simultáneas con el mismo correo y distinto
                    DNI: el bloqueo es por DNI, las para el índice único. */
-                if ($e->getCode () != "23000")
+                if ($e->getCode() != "23000")
                     throw $e;
-                $this->emailInUse ();
+                $this->emailInUse();
                 return null;
             }
         }
@@ -510,53 +606,55 @@ class GetCode extends View {
             echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
             return null;
         }*/
-        if (hasParticipated ($db, $participantid, $surveyid)){
-            echo ("<p><strong>Ya se ha votado en esta consulta con el DNI del extracto.</strong></p>");
+        if (hasParticipated($db, $participantid, $surveyid)) {
+            echo ("<p><strong>Ya se ha votado en esta consulta con la dirección de correo indicada.</strong></p>");
             return null;
         }
 
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite
-           por hora se comprueba con esta etiqueta fija por DNI y consulta. */
-        $requesttag = hash ('sha256', $hashdni . ':' . $surveyid);
-        if ($this->checkParticipation ($db, $requesttag, $surveyid)){
+           por hora se comprueba con esta etiqueta fija por email y consulta. */
+        $requesttag = hash('sha256', $hashemail . ':' . $surveyid);
+        if ($this->checkParticipation($db, $requesttag, $surveyid)) {
             return null;
         }
 
-        $code = random_bytes (32);
-        $passwd = hash ('sha256', $code);
-        $encrypteddni = base64_encode (encrypt ($dni, $code));
-        $query = $db->prepare ("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
+        $code = random_bytes(32);
+        $passwd = hash('sha256', $code);
+        $encryptedemail = base64_encode(encrypt($email, $code));
+        $query = $db->prepare("INSERT into {Participation} (participant, surveyid, participationkey, requesttag) " .
             "values (:id, :sid, :pwd, :tag)");
-        $query->bindParam (":id", $encrypteddni, PDO::PARAM_STR);
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->bindParam (":pwd", $passwd, PDO::PARAM_STR);
-        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
-        $query->execute ();
-        return [$db->lastInsertId (), $code];
+        $query->bindParam(":id", $encryptedemail, PDO::PARAM_STR);
+        $query->bindParam(":sid", $surveyid, PDO::PARAM_INT);
+        $query->bindParam(":pwd", $passwd, PDO::PARAM_STR);
+        $query->bindParam(":tag", $requesttag, PDO::PARAM_STR);
+        $query->execute();
+        return [$db->lastInsertId(), $code];
     }
 
 
-    private function emailInUse (){
+    private function emailInUse()
+    {
         echo ("<p><strong>La dirección de correo indicada ya se ha usado con los documentos " .
             "de otra persona.</strong></p>");
     }
 
 
-    private function checkDomain ($db, $email){
-        $query = $db->prepare ("SELECT alloweddomains FROM {SystemConfig} LIMIT 1");
-        $query->execute ();
-        if ($query->rowCount () == 0){
+    private function checkDomain($db, $email)
+    {
+        $query = $db->prepare("SELECT alloweddomains FROM {SystemConfig} LIMIT 1");
+        $query->execute();
+        if ($query->rowCount() == 0) {
             echo ("<p><strong>El sistema no está configurado aún. No se puede participar.</strong></p>");
             return false;
         }
         $domainstring = $query->fetch()['alloweddomains'] ?? "";
-        $query->closeCursor ();
-        $domains = array_filter (explode (" ", strtolower (trim ($domainstring))));
+        $query->closeCursor();
+        $domains = array_filter(explode(" ", strtolower(trim($domainstring))));
         /* Sin dominios configurados puede participar cualquiera. */
-        if (empty ($domains))
+        if (empty($domains))
             return true;
-        $emaildomain = substr (strrchr ($email, "@"), 1);
+        $emaildomain = substr(strrchr($email, "@"), 1);
         foreach ($domains as $key => $domain) {
             if ($emaildomain == $domain)
                 return true;
@@ -566,41 +664,78 @@ class GetCode extends View {
     }
 
 
-    private function getSurveyName ($db, $sid): ?string {
-        $query = $db->prepare ("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
-        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
-        $query->execute ();
-        $name = $query->fetchColumn ();
-        $query->closeCursor ();
+    private function getSurveyName($db, $sid): ?string
+    {
+        $query = $db->prepare("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
+        $query->bindParam(":sid", $sid, PDO::PARAM_INT);
+        $query->execute();
+        $name = $query->fetchColumn();
+        $query->closeCursor();
         return $name === false ? null : $name;
     }
 
-    private function isActive ($db, $sid){
-        $query = $db->prepare ("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
+    private function isActive($db, $sid)
+    {
+        $query = $db->prepare("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
             AND startdate < NOW() AND enddate > NOW()");
-        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
-        $query->execute ();
-        $active = $query->rowCount () > 0;
-        $query->closeCursor ();
+        $query->bindParam(":sid", $sid, PDO::PARAM_INT);
+        $query->execute();
+        $active = $query->rowCount() > 0;
+        $query->closeCursor();
         return $active;
     }
 
-    private function checkParticipation ($db, $requesttag, $sid){
+    private function checkParticipation($db, $requesttag, $sid)
+    {
 
         $ret = false;
-        $query = $db->prepare ("SELECT 1 FROM {Participation} WHERE 
+        $query = $db->prepare("SELECT 1 FROM {Participation} WHERE 
             requesttag = :tag AND surveyid = :sid
             AND participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR)");
-        $query->bindParam (":tag", $requesttag, PDO::PARAM_STR);
-        $query->bindParam (":sid", $sid, PDO::PARAM_INT);
-        $query->execute ();
-        if ($query->rowCount () > 0){
+        $query->bindParam(":tag", $requesttag, PDO::PARAM_STR);
+        $query->bindParam(":sid", $sid, PDO::PARAM_INT);
+        $query->execute();
+        if ($query->rowCount() > 0) {
             echo ("<p><strong>Ya existe una peticion de participación 
-                para esta consulta con el DNI del extracto </strong></p>");
+                para esta consulta con la dirección de correo indicada.</strong></p>");
             echo ("Podrás realizar una nueva petición en una hora.");
             $ret = true;
         }
-        $query->closeCursor ();
+        $query->closeCursor();
         return $ret;
+    }
+
+    public function addJavascript()
+    {
+        ?>
+        <script>
+            function activateFirstTime(value) {
+                const objectids = [
+                    <?php foreach (array_keys($this->docs) as $kind) { ?> 
+                        "tipo-<?= $kind; ?>",
+                    <?php
+                    }
+                    ?> "extracto",
+                    "documento",
+                    "acepto"
+                ];
+                for (var i = 0; i < objectids.length; i++) {
+                    document.getElementById(objectids[i]).required = value;
+                }
+                document.getElementById("firsttime").value = value ? "yes":"no";
+            }
+            $(document).ready(function() {
+                document.getElementById("firsttimedetails").
+                addEventListener("toggle", (event) => {
+                    if (firsttimedetails.open) {
+                        activateFirstTime(true);
+                    } else {
+                        activateFirstTime(false);
+                    }
+                });
+
+            })
+        </script>
+<?php
     }
 }
