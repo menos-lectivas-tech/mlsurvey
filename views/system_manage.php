@@ -83,8 +83,8 @@ class SystemManage extends View
         $query = $dbconn->query("SELECT * from {SystemConfig} LIMIT 1");
         if ($query->rowCount() < 1) {
             $query->closeCursor();
-            $dbconn->exec("INSERT into {SystemConfig} (timezone, alloweddomains) " .
-                "values ('', '')");
+            $dbconn->exec("INSERT into {SystemConfig} (timezone, alloweddomains, modifiedby) " .
+                "values ('', '', 0)");
             $query = $dbconn->query("SELECT * from {SystemConfig} LIMIT 1");
         }
         $row = $query->fetch();
@@ -355,6 +355,7 @@ class SystemManage extends View
         $query = $dbconn->prepare("UPDATE {SystemConfig} SET
             timezone = :timezone, alloweddomains = :domain, contact = :contact,
             mainheader = :mh, maincontent = :mc, sitename = :sn, icon = :icon,
+            modifiedby = :uid,
             {$socialmediaupdate}
             WHERE configid = :id");
         $query->bindParam(":id", $cid, PDO::PARAM_INT);
@@ -384,6 +385,10 @@ class SystemManage extends View
             $_REQUEST['contact'],
             PDO::PARAM_STR
         );
+        $query->bindParam(
+            ":uid", 
+            $_SESSION["userid"], 
+            PDO::PARAM_INT);
         foreach (Config::SOCIALMEDIA as $sm){
             $query->bindParam(":{$sm}", $_REQUEST[$sm], PDO::PARAM_STR);
         }
