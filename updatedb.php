@@ -27,7 +27,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 3;
+$maxversion = 4;
 
 try {
   if (!versionTableExists ()){
@@ -47,10 +47,16 @@ try {
     $db->exec ("ALTER TABLE {Participants} ADD COLUMN (dnihashed CHAR(64) NULL)");
     $db->exec ("CREATE UNIQUE INDEX Participants_dnihashed_IDX USING BTREE ON {Participants} (dnihashed)");
   }
+  if ($version < 4){
+    $db->exec("ALTER TABLE {SystemConfig} ADD COLUMN (modifiedby INT UNSIGNED NULL)");
+    $db->exec ("ALTER TABLE {SystemConfig} ADD SYSTEM VERSIONING PARTITION BY SYSTEM_TIME");
+  }
   
-  $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");
-  $query->bindParam (":ver", $maxversion, PDO::PARAM_INT);
-  $query->execute ();
+  if ($version < $maxversion){
+    $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");
+    $query->bindParam (":ver", $maxversion, PDO::PARAM_INT);
+    $query->execute ();
+  }
 }
 catch (Exception $e){
   echo ("Error updating datablase {$e}");

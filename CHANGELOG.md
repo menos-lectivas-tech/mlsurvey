@@ -1,4 +1,7 @@
-# 0.3-beta
+# 1.0.1
+- Added versioning to SystemConfig table
+
+# 1.0
 - Participation now requires the digitally signed training record PDF (extracto de
   formación): the participant is identified by the hash of the DNI read from it.
 - `Participants.participant` keeps the hash of the email address and the new column

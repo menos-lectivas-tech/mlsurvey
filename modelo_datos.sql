@@ -64,8 +64,11 @@ CREATE TABLE SystemConfig (
 	bluesky VARCHAR(256) NULL,
 	telegram VARCHAR(256) NULL,
 	contact VARCHAR(256) NULL,
+	modifiedby INT UNSIGNED NOT NULL,
 	CONSTRAINT SystemConfig_PK PRIMARY KEY (configid)
-);
+)
+WITH SYSTEM VERSIONING
+PARTITION BY SYSTEM_TIME;
 
 CREATE TABLE Participants (
 	participantid INT UNSIGNED auto_increment NOT NULL,
@@ -127,7 +130,7 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 3);
+INSERT INTO Version values (1, 4);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
