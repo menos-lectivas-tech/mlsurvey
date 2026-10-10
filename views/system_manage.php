@@ -249,7 +249,7 @@ class SystemManage extends View
                     plugins: 'link autolink lists',
                     toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist'
                 }));
-                <?= empty($icon) ? "" : "addFile ('{$icon}');"; ?>
+                <?= empty($icon) ? "" : "addFile (" . json_encode($icon) . ");"; ?>
             });
         </script>
         <h2>Configuración del sistema.</h2>
@@ -347,6 +347,21 @@ class SystemManage extends View
             logMessage(LOGGER_ERROR, "Time zone {$timezone} not loaded in the database.");
             return;
         }
+        /* Los dominios se normalizan y validan también aquí, no solo en el
+           navegador: se guardan separados por espacios y en minúsculas, que es
+           como los compara checkDomain. Vacío = sin restricción. Una coma u
+           otro separador dejaría un «dominio» que no casa con ninguno y nadie
+           podría participar. */
+        $domainraw = is_string($_REQUEST['alloweddomains'] ?? null) ? $_REQUEST['alloweddomains'] : "";
+        $domainlist = preg_split('/\s+/', strtolower(trim($domainraw)), -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($domainlist as $d){
+            if (!preg_match('/^[a-z0-9]+([\-.][a-z0-9]+)*\.[a-z]{2,}$/', $d)){
+                echo ("<p><strong>El dominio «" . h($d) . "» no es válido. Escribe los dominios " .
+                    "separados por espacios (por ejemplo: educa.madrid.org example.org).</strong></p>");
+                return;
+            }
+        }
+        $domains = implode(" ", $domainlist);
         $socialmediaarray = array ();
         foreach (Config::SOCIALMEDIA as $sm){
             $socialmediaarray[] = $sm . "=:" .$sm;
@@ -362,7 +377,7 @@ class SystemManage extends View
         $query->bindParam(":timezone", $timezone, PDO::PARAM_STR);
         $query->bindParam(
             ":domain",
-            $_REQUEST['alloweddomains'],
+            $domains,
             PDO::PARAM_STR
         );
         $query->bindParam(
@@ -392,9 +407,11 @@ class SystemManage extends View
         foreach (Config::SOCIALMEDIA as $sm){
             $query->bindParam(":{$sm}", $_REQUEST[$sm], PDO::PARAM_STR);
         }
+        /* saveFile() devuelve false cuando el icono no vale (no == null): con
+           un icono inválido no se guarda nada, ni se borra el que ya había. */
         $file = $this->saveFile();
-        if ($file === null) {
-            echo ("<p><strong>Error subiendo icono {$this->fileerror}</strong></p>");
+        if ($file === false) {
+            echo ("<p><strong>Error subiendo icono: {$this->fileerror}.</strong></p>");
             logMessage(LOGGER_ERROR, "{$this->fileerror} uploading icon");
             return;
         } else {
@@ -406,6 +423,7 @@ class SystemManage extends View
             );
         }
         $query->execute();
+        echo ("<p><strong>Configuración guardada.</strong></p>");
 
         if (isset($_REQUEST["sendtest"])) {
             $mailer = new MLMailer();
@@ -441,6 +459,13 @@ class SystemManage extends View
         }
 
         $name = basename($fileinfo["name"]);
+        /* Solo imágenes, también por la extensión: el servidor web decide el
+           tipo por ella, y un .php con cabecera de imagen se ejecutaría. */
+        $name = preg_replace('/[\x00-\x1f\x7f]/', '', $name);
+        if (!preg_match('/^[^.].*\.(png|jpe?g|svg)$/i', $name)) {
+            $this->fileerror = "El icono debe tener extensión .png, .jpg o .svg";
+            return false;
+        }
         $tmp_name = $fileinfo["tmp_name"];
         $res = $this->isImage($tmp_name);
         if ($res == 2) {

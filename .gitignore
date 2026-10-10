@@ -11,3 +11,5 @@ views/test*
 .env
 modelo_datos_ml.sql
 *.delete
+test-docs
+

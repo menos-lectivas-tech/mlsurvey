@@ -67,7 +67,7 @@ class UserManage extends View {
             unset ($_REQUEST[self::ADDACTION]);
             switch ($action) {
                 case 'Aceptar':
-                    $user = $_REQUEST['user'] ?? "";
+                    $user = trim ($_REQUEST['user'] ?? "");
                     $passwd = $_REQUEST['passwd'] ?? "";
                     if ($user == "" || $passwd == ""){
                         echo ("<h3>El nombre de usuaria y la clave no pueden estar vacíos</h3>");
@@ -264,8 +264,34 @@ onload='document.getElementById("user").focus();'>
         <?php
     }
 
+    /* Id de la usuaria sobre la que se actúa: un entero positivo y distinto
+       del de la propia sesión (nadie se gestiona a sí misma por aquí, así no
+       se puede autoeliminar ni dejar el sistema sin administradoras), o null
+       si la petición no trae uno válido. */
+    private function targetUserId (): ?int {
+        startSession ();
+        $id = $_REQUEST['userid'] ?? null;
+        if (!is_string ($id) || !ctype_digit ($id))
+            return null;
+        if ((int) $id === (int) ($_SESSION['userid'] ?? 0))
+            return null;
+        /* Y tiene que existir: así modificar/eliminar un id inexistente no
+           revienta (getUserName lanzaba excepción) ni dice «hecho» sin tocar
+           ninguna fila. */
+        $query = dbConn ()->prepare ("SELECT 1 FROM {Users} WHERE userid = :id");
+        $query->bindValue (":id", (int) $id, PDO::PARAM_INT);
+        $query->execute ();
+        $exists = $query->rowCount () > 0;
+        $query->closeCursor ();
+        return $exists ? (int) $id : null;
+    }
+
     private function deleteUser (){
-        $userid = $_REQUEST['userid'];
+        $userid = $this->targetUserId ();
+        if ($userid === null){
+            echo ("<strong>Usuaria no válida.</strong>");
+            return;
+        }
         $username = "";
         try {
             $username = getUserName ($userid);
@@ -279,7 +305,11 @@ onload='document.getElementById("user").focus();'>
     }
 
     private function showModifyUser (){
-        $userid = $_REQUEST['userid'];
+        $userid = $this->targetUserId ();
+        if ($userid === null){
+            echo ('<div class="col-md-8"><strong>Usuaria no válida.</strong></div>');
+            return;
+        }
         $dbconn = dbConn ();
         $name = getUserName ($userid);
         $isadmin = "";
@@ -322,8 +352,12 @@ onload='document.getElementById("user").focus();'>
         <?php
     }
     private function modifyUser (){
-        $userid = $_REQUEST['userid'];
-        $newname = $_REQUEST['user'] ?? "";
+        $userid = $this->targetUserId ();
+        if ($userid === null){
+            echo ('<strong>Usuaria no válida.</strong>');
+            return;
+        }
+        $newname = trim ($_REQUEST['user'] ?? "");
         $newpasswd = $_REQUEST['passwd'] ?? "";
         if ($newname == ""){
             echo ('<strong>El nombre de usuaria no puede estar vacío</strong>');
