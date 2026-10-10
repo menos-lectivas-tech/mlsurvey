@@ -105,4 +105,26 @@ class MLMailer extends PHPMailer {
             throw new Exception("Error {$this->ErrorInfo} sending code email.");
         }
     }
+
+    /**
+     * Sends the message confirming that the address has been registered as participant.
+     * The message is hardcoded, but must be configurable in the future.
+     * 
+     * @param string $recipient Recipient's mail address
+     * 
+     * @throws Exception with the error info.
+     */
+    public function sendRegistered ($recipient){
+        $theurl = rtrim (getURL (), "/") . "/surveys";
+        $sitename = Config::$sitename != "" ? Config::$sitename : "mlsurvey";
+        $this->setFrom ($this->m_from);
+        $this->addAddress ($recipient);
+        $this->Subject = "Registro completado en {$sitename}";
+        $this->Body = "Te has registrado correctamente en {$sitename} con esta dirección de correo.\n\n" .
+            "A partir de ahora, para participar en una consulta solo tendrás que indicar " .
+            "esta dirección. Las consultas activas están en:\n{$theurl}";
+        if (!$this->send ()){
+            throw new Exception("Error {$this->ErrorInfo} sending registration email.");
+        }
+    }
 }
