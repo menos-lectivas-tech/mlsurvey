@@ -76,7 +76,7 @@ class MLMailer extends PHPMailer {
         }
         $this->Subject = "Mensaje de prueba de MLSurvey";
         //This could be better in an external file or something
-        $this->Body = "Es un mensaje de prueba de NLSurvey";
+        $this->Body = "Es un mensaje de prueba de mlsurvey";
 
         if (!$this->send ()){
             throw new Exception("Error {$this->ErrorInfo} sending test email.");

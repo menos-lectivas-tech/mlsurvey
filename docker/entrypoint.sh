@@ -16,6 +16,14 @@ export APACHE_START_WORKERS="${APACHE_START_WORKERS:-25}"
 export APACHE_MAX_SPARE_WORKERS="${APACHE_MAX_SPARE_WORKERS:-75}"
 export APACHE_LISTEN_BACKLOG="${APACHE_LISTEN_BACKLOG:-1024}"
 
+# Directorios de subida: tienen que existir y ser escribibles por www-data.
+# El de iconos no lo crea la imagen, y en desarrollo (codigo montado) manda la
+# propiedad del host, asi que sin esto subir un icono falla con «permiso denegado».
+for d in files img/appicon log; do
+    mkdir -p "${APP_DIR}/${d}" 2>/dev/null || true
+    chown www-data:www-data "${APP_DIR}/${d}" 2>/dev/null || true
+done
+
 # config/config.php se genera leyendo el entorno: si montas el tuyo propio, se respeta.
 if [ -f "$CONFIG_FILE" ] && ! grep -q "$MARKER" "$CONFIG_FILE" 2>/dev/null; then
     echo "[mlsurvey] config/config.php propio detectado, no se sobreescribe."
