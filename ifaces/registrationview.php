@@ -161,7 +161,7 @@ abstract class RegistrationView extends View
                 </div>
                 <div class="ml-participate-row">
                     <input type="email" name="email" id="email" required
-                        placeholder="nombre.apellido@educa.madrid.org" autocomplete="email">
+                        >
                     <?= altchaWidgetHTML(); ?>
                     <button type="submit" class="button-3 ml-participate-btn"
                         name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">

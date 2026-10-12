@@ -59,7 +59,7 @@ class ResponseSurvey extends View {
             <?= setTokenHTML (); ?>
             <p><label for="email">Dirección de correo:</label>
             <input type="email" name="email" id="email" class="ml-field-md" required
-                placeholder="nombre.apellido@educa.madrid.org"></p>
+                ></p>
             <p><label for="code">Código:</label>
             <input type="password" name="code" id="code" inputmode="numeric"
             size="6" minlength="6" maxlength="6" required></p>
