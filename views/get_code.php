@@ -232,11 +232,21 @@ class GetCode extends RegistrationView
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite
            por hora se comprueba con esta etiqueta fija por email y consulta. */
-        $requesttag = hash('sha256', $hashemail . ':' . $surveyid);
+        $requesttag = $this->requestTag($hashemail, $surveyid);
         if ($this->checkParticipation($db, $requesttag, $surveyid)) {
             return null;
         }
+        return $this->insertParticipation($db, $email, $requesttag, $surveyid);
+    }
 
+    protected function requestTag($hashemail, $surveyid): string
+    {
+        return hash('sha256', $hashemail . ':' . $surveyid);
+    }
+
+    /* Genera un código nuevo y guarda la petición. Devuelve [pid, código]. */
+    protected function insertParticipation($db, $email, $requesttag, $surveyid)
+    {
         $code = random_bytes(32);
         $passwd = hash('sha256', $code);
         $encryptedemail = base64_encode(encrypt($email, $code));
@@ -250,7 +260,7 @@ class GetCode extends RegistrationView
         return [$db->lastInsertId(), $code];
     }
 
-    private function getSurveyName($db, $sid): ?string
+    protected function getSurveyName($db, $sid): ?string
     {
         $query = $db->prepare("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid");
         $query->bindParam(":sid", $sid, PDO::PARAM_INT);
@@ -260,7 +270,7 @@ class GetCode extends RegistrationView
         return $name === false ? null : $name;
     }
 
-    private function isActive($db, $sid)
+    protected function isActive($db, $sid)
     {
         $query = $db->prepare("SELECT 1 FROM {Surveys} WHERE surveyid = :sid
             AND startdate < NOW() AND enddate > NOW()");
@@ -284,7 +294,9 @@ class GetCode extends RegistrationView
         if ($query->rowCount() > 0) {
             echo ("<p><strong>Ya existe una peticion de participación 
                 para esta consulta con la dirección de correo indicada.</strong></p>");
-            echo ("Podrás realizar una nueva petición en una hora.");
+            echo ("<p>Podrás realizar una nueva petición en una hora. Si no te ha llegado el " .
+                "mensaje, pasados 5 minutos puedes <a href='resend?responseid=" . (int) $sid .
+                "'>pedir que te lo reenviemos</a>.</p>");
             $ret = true;
         }
         $query->closeCursor();

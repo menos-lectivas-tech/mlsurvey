@@ -1,5 +1,7 @@
 # 1.1
 - Added a Register page for registering before vote.
+- Added a Resend page (not in the menu) for sending the participation URL again to
+  someone who has already requested it.
 
 # 1.0.1
 - Added versioning to SystemConfig table
