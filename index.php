@@ -111,9 +111,9 @@ $view->doInit();
 								<?php endif;
 
 							if (!empty(Config::$icon)) {
-								$iconfile = FileParams::ICON_DIR . Config::$icon;
+								$iconfile = FileParams::ICON_DIR . rawurlencode(Config::$icon);
 								?>
-									<img src="<?= $iconfile; ?>" alt="">
+									<img src="<?= h($iconfile); ?>" alt="">
 								<?php
 							} else if (!empty(Config::PARAMS["use_default_icon"])) { ?>
 									<span class="ml-brand-mark" aria-hidden="true">ml</span>
@@ -207,9 +207,10 @@ $view->doInit();
 							<ul class="social-network">
 								<?php
 								foreach (Config::SOCIALMEDIA as $brand){
-									if (!empty (Config::$socialmedia[$brand])){
-										$url = Config::$socialmedia[$brand];
-									echo ("<li><a href='{$url}' data-placement='top' 
+									if (!empty (Config::$socialmedia[$brand]) &&
+										isSafeUrl (Config::$socialmedia[$brand])){
+										$url = h (Config::$socialmedia[$brand]);
+									echo ("<li><a href=\"{$url}\" data-placement='top'
 									title='{$brand}'><i class='fa-brands fa-{$brand}'></i></a></li>");
 									}
 								}?>

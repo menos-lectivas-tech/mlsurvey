@@ -21,8 +21,8 @@ INSERT INTO Users (username, passwd, `role`) VALUES ('admin', '$2y$10$b1Z0iC4TCY
 INSERT INTO Users (username, passwd, `role`) VALUES ('profesora', '$2y$10$loC.cYvR0R12ApxvPmvhNOeg4VYDmDLv5/tWsAFnH26Q8Aj.EXMpi', '');
 
 /* ---------- Configuracion del sistema ---------- */
-INSERT INTO SystemConfig (configid, timezone, alloweddomains)
-    VALUES (1, 'Europe/Madrid', 'educa.madrid.org');
+INSERT INTO SystemConfig (configid, timezone, alloweddomains, modifiedby)
+    VALUES (1, 'Europe/Madrid', 'educa.madrid.org', 1);
 /* La configuracion de correo ya no vive aqui: esta en config/config.php, que el
    entrypoint genera a partir de las variables EMAIL_* de docker-compose. */
 
@@ -82,6 +82,23 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
     (3, 2, 1, 'Si'),
     (3, 2, 2, 'No'),
     (3, 2, 3, 'Me es indiferente');
+
+/* 4: Formacion permanente del profesorado */
+INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby) VALUES
+    (4, 'Formacion permanente del profesorado', '<p>Consulta <strong>abierta</strong> y aun sin respuestas: se puede solicitar codigo y participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 20 DAY), 1, 1);
+INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
+    (4, 1, '<p>&iquest;Que modalidad de formacion prefieres?</p>', 0, 0, NULL);
+INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
+    (4, 1, 1, 'Presencial'),
+    (4, 1, 2, 'En linea'),
+    (4, 1, 3, 'Mixta');
+INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
+    (4, 2, '<p>&iquest;Sobre que temas te gustaria formarte? <em>(puedes elegir varias)</em></p>', 1, 1, NULL);
+INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
+    (4, 2, 1, 'Competencia digital'),
+    (4, 2, 2, 'Atencion a la diversidad'),
+    (4, 2, 3, 'Convivencia'),
+    (4, 2, 4, 'Idiomas');
 
 /* ---------- Participantes (claves ECDSA secp256k1 reales) ---------- */
 /* participant = sha256(correo). La clave privada esta cifrada con el correo. */

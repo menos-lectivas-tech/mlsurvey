@@ -26,7 +26,9 @@ class Login extends View {
             $this->onSuccess ();
             return;
         }
-        if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'Entrar'){
+        /* Solo por POST: así las credenciales nunca viajan en la URL (historial,
+           logs del servidor, cabecera Referer). */
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_REQUEST['action'] ?? '') == 'Entrar'){
             unset ($_REQUEST['action']);
             if ($this->validate () == 0)
                 return;
