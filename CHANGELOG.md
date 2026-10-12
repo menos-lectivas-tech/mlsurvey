@@ -1,3 +1,6 @@
+# 1.1
+- Added a Register page for registering before vote.
+
 # 1.0.1
 - Added versioning to SystemConfig table
 
