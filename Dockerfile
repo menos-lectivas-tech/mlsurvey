@@ -20,6 +20,7 @@ WORKDIR /var/www/html
 RUN composer require --no-interaction --no-progress --optimize-autoloader \
         phpmailer/phpmailer:^6.9 \
         hugerte/hugerte:^1.0 \
+        zoon/php-bounce-handler \
     && chown -R www-data:www-data /var/www/html
 
 COPY --chown=www-data:www-data . /var/www/html/

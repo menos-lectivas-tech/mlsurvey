@@ -136,7 +136,7 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 5);
+INSERT INTO Version values (1, 6);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
@@ -164,14 +164,6 @@ BEGIN
   SET MESSAGE_TEXT = 'Error: This table is immutable. Modifications are not allowed. (UPDATES).';
 END$$
 
-
-CREATE TRIGGER Participants_no_delete
-BEFORE DELETE ON Participants
-FOR EACH ROW
-BEGIN
-  SIGNAL SQLSTATE '45000' 
-  SET MESSAGE_TEXT = 'Error: This table is immutable. Deletions are not allowed. (DELETES).';
-END$$
 
 CREATE TRIGGER Voted_no_update
 BEFORE UPDATE ON Voted

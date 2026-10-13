@@ -41,7 +41,13 @@ MariaDB must be initialized and configured with an user and a database for the a
 ```sh
 composer require hugerte/hugerte
 composer require phpmailer/phpmailer
+composer require zoon/php-bounce-handler
 ```
+Or just run
+```sh
+composer update
+```
+
 If you need to install languages packs for HugeRTE follow [these instructions](https://github.com/hugerte/hugerte-docs#localization)
 
 ### Create the database
@@ -103,6 +109,38 @@ And then
 The participation request form is protected with [ALTCHA](https://altcha.org/), a
 proof of work captcha that needs no external service: the widget is served from
 `js/altcha/` and the challenges are generated and checked by `utils/altcha.php`.
+
+### Configure the mail bounce checker
+For avoiding conflicts with a wrong typed email address the application comes with a script 
+(`checkbounce.php`) that cleans the `Participats`.
+You need to feed the script with a bouced email and the script deletes the row.
+
+These are the steps for doing it with postfix (maybe you need to change users, account names
+ and directories):
+1. Add to `/etc/postfix/virtual_map` (or your virtual map file) the line:
+   ```
+   no-reply  www-data@domain
+   ```
+2. Add a pipe to `/etc/postfix/master.cf`:
+   ```
+   mlsurveybounce unix - n  n - - pipe flags=FR user=www-data directory=/var/www/mlsurvey argv=/usr/bin/php checkbounce.php
+   ```
+3. Add to `/etc/postfix/transport` (or your transport file) the line:
+   ```
+   www-data@dominio mlsurveybounce:
+   ```
+4. Update postfix databases:
+  ```sh
+  sudo postmap /etc/postfix/virtual_map
+  sudo postmap /etc/postfix/transport
+  ```
+5. If you didn't have virtual maps or transports in postfix, add them to `/etc/postfix/main.cf`
+  ```
+  virtual_maps = hash:/etc/postfix/virtual_map
+  transport_maps = hash:/etc/postfix/transport
+  allow_mail_to_commands = alias,forward,include
+  ```
+6. Reload Postfix configuration.
 
 ## Running the application with Docker Compose
 

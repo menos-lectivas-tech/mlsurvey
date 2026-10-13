@@ -27,7 +27,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 5;
+$maxversion = 6;
 
 try {
   if (!versionTableExists ()){
@@ -81,7 +81,9 @@ try {
     $db->exec ("ALTER TABLE {Responses} DROP COLUMN IF EXISTS participantid, DROP COLUMN IF EXISTS responsesign");
     $db->exec ("ALTER TABLE {Participants} DROP COLUMN IF EXISTS privatekey, DROP COLUMN IF EXISTS publickey");
   }
-  
+  if ($version < 6){
+    $db->exec("DROP TRIGGER Participants_no_delete");
+  }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");
     $query->bindParam (":ver", $maxversion, PDO::PARAM_INT);

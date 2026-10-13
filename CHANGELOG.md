@@ -3,6 +3,10 @@
   in each survey and `Responses` drops `participantid` and the per participant signature
   (`responsesign`), which identified the voter as well. The key pair columns of
   `Participants` and `verify_responses.php` are removed (run `php updatedb.php`).
+- The script `checkbounce.php` can be connected to an email receiver for delete from `Participants`
+  table when email address is not reachable. Configuration instructions in `README.md`.
+  As this script needs to delete rows in `Participants` table the trigger that prevents this is
+  dropped.
 
 # 1.1
 - Added a Register page for registering before vote.
