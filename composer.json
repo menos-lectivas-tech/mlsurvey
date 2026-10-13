@@ -1,0 +1,7 @@
+{
+    "require": {
+        "phpmailer/phpmailer": "^6.9",
+        "hugerte/hugerte": "^1.0",
+        "zoon/php-bounce-handler": "^8.0.4"
+    }
+}
