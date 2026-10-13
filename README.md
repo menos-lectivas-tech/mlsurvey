@@ -17,6 +17,11 @@ To archieve this the DNI and the email address are stored with a deterministic H
 email addresses; the PDF is not stored.
 Clearly, someone with access to the database could compromise anonymity by hashing every possible DNI. This is something we will aim to address in future releases.
 
+Votes are not linked to participants: `Responses` stores each vote with no reference to who
+cast it, and `Voted` only records which participants have already voted in each survey (with
+no date nor sequence number), so each person can vote only once but a vote can't be traced
+back to its author from the database.
+
 # Installation
 
 ## Manual installation

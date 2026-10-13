@@ -1,5 +1,13 @@
+# 1.2
+- Votes are no longer linked to participants: the new `Voted` table records who has voted
+  in each survey and `Responses` drops `participantid` and the per participant signature
+  (`responsesign`), which identified the voter as well. The key pair columns of
+  `Participants` and `verify_responses.php` are removed (run `php updatedb.php`).
+
 # 1.1
 - Added a Register page for registering before vote.
+- Added a Resend page (not in the menu) for sending the participation URL again to
+  someone who has already requested it.
 
 # 1.0.1
 - Added versioning to SystemConfig table
