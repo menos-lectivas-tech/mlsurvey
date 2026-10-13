@@ -16,7 +16,7 @@ require_once 'utils/dbutils.php';
 function hasParticipated ($db, $participantid, $surveyid){
     $result = false;
     
-    $query = $db->prepare ("SELECT 1 FROM {Responses} WHERE participantid = :pid AND surveyid = :sid");
+    $query = $db->prepare ("SELECT 1 FROM {Voted} WHERE participantid = :pid AND surveyid = :sid");
     $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
     $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
     $query->execute ();
@@ -61,26 +61,6 @@ function hasCode ($db, $participantid, $surveyid){
         }
     }
     return $result;
-}
-
-/**
- * Generates a ECDSA keypair.
- * 
- * @return pkey
- */
-function generateKeyPair (){
-    $curve_name = 'secp256k1';
-
-// Create a new EC key resource
-    return openssl_pkey_new([
-        'curve_name' => $curve_name,
-        'private_key_type' => OPENSSL_KEYTYPE_EC,
-    ]);
-}
-
-
-function getSignAlgo (){
-    return OPENSSL_ALGO_SHA256;
 }
 
 /* Serializa las peticiones de una misma persona: sin esto, dos

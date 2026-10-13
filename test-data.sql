@@ -11,7 +11,6 @@
  *   admin        / admin123       (administrador)
  *   profesora    / profesora123   (sin privilegios)
  *
- * Fichero generado; para regenerar las claves y firmas hay que volver a crearlo.
  */
 
 /* ---------- Usuarios ---------- */
@@ -100,106 +99,29 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
     (4, 2, 3, 'Convivencia'),
     (4, 2, 4, 'Idiomas');
 
-/* ---------- Participantes (claves ECDSA secp256k1 reales) ---------- */
-/* participant = sha256(correo). La clave privada esta cifrada con el correo. */
+/* ---------- Participantes ---------- */
+/* participant = sha256(correo). */
 /* 1: ana.responde@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (1, '3af36912d14dbd2ac556c341276bcda1442ce384943f343f56971b1adc140b36', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAi0Xq4rwMSdVgICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQITtcRsrQJ9lsEgYgkk2HgnMCF5vib
-lmIVHBif7puq/YiQ4HFoRR4xIWB0ddFovZN8lT2BL4jcBTkrGpMI2RpvkOAIjpQ8
-soyVLgP9zZd6WPlItp8Ak21WqLVcVBcdA/ElTWGmK7KAn7dhEh353U4p/THB8yGv
-W8P/GdKn9HNEydAQ/AsuZQEnrGiSeiYpmACOQnB4
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEwD0QBo7ZZcIAf0rakwV7vnkFmnFGZz7r
-2LB4PXpdzWFRtk4z69B/41RgOZdWsfDX//SHxI6z7I1t3/Q6KgfzrQ==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (1, '3af36912d14dbd2ac556c341276bcda1442ce384943f343f56971b1adc140b36');
 /* 2: bruno.responde@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (2, 'a114bd224c57e160838633384eab70fdf7c8732533074ee31298353fb4a523b5', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAgPsxiyvu/gBgICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQIeRBrRumCthEEgYiD1gI2hTpjxBri
-rZfE+5VRfcGoxL/smfLp4SzYy//MIDnOIYSeP2thtN965TZuY5xU2VssYQ9C6i6f
-FFGaaSDR9r8BmqHBRwJIN4rOPHc2Cf24uecIqxThzBYTHI9aINiADpGWJ3apmLTP
-Xl3oKz7CVK3440P4oYetuiDAa3fF06hDJIFNAGu8
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEB0T86Li/tg3aCUSfy1HiWv9FkBuFWkhJ
-30TN46U6aK3puy62/K8yIIuAfiS6ufCyiK0FuQhiIgk60f9iYvo4Sg==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (2, 'a114bd224c57e160838633384eab70fdf7c8732533074ee31298353fb4a523b5');
 /* 3: carla.responde@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (3, '1fc024ea26950c1ccb656df258ae853be07e2dee35227aa619ed9746fe2e5951', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAgbyKITiOM3nQICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQIJbJq+Nc52TQEgYjD6+7No51j/V2y
-9xQn0glf5dH7FTrAdfLXkHS7JPMV6YNJkEeZ+eszv3vZLBJEn4kCiMLe8rveNiV9
-ZsXLJJ/DHSYx7ry79vI2PmBCke22QLvI1WvWihKrtO65qV1Touj9e0DuE3MUplP6
-lE6UXd7AKTtA94ZM4J9GfVfHNDC5UfX3AxB/l0rg
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEjlzcUZ0Z6YOcQDIVk4Iu5Oe/k9EX89RX
-0HGAfm0QtAOc0X5X8lJUlJAWrzPHzPKhTRiHmrl2WBeTSWvxTWMXkQ==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (3, '1fc024ea26950c1ccb656df258ae853be07e2dee35227aa619ed9746fe2e5951');
 /* 4: diego.responde@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (4, '797ec5b2f22f6b96e8ab4f35afb6b9ff8381f6f2fba4cbcdefcafcedbd3953d7', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAiNQ7RjxbMr/wICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQI7R7oh2krwUsEgYgx5b5Dh3QBamtK
-3LzP+lRqbimoFnBesFSuqQ4DjbxTuDRuVmi1SlSxz6G67tUTzvvfZsJiz27cdnnl
-yC3GHv8uPPlzKlbn4/tp6DE0wWaqs+CHyshTMozwaWFDdnU0Orj5yJxzmevz1kUy
-pSulizqeYw/kJb9iW+F2D9LqVX1KQGItn9rz3MQo
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE2OiaKvl+xggFxfEXiU7/QwsvVWJND1oH
-KdwMqNH1KKfOIVHUd/n8BuOptg8B+Lm60A2bDggo2v2INobOSujMaw==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (4, '797ec5b2f22f6b96e8ab4f35afb6b9ff8381f6f2fba4cbcdefcafcedbd3953d7');
 /* 5: elena.responde@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (5, 'd00871aab65868e557c9af7f80deb016d924e8c9a15e61cc9c68da80c6c22f00', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAg0OO03A6D8WwICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQI6UwMj+owNm4EgYgBrheUimxvNa7E
-OfYcqFc4QCtDai5sM5QYQy9O5F7CcxRjkGZyTunNqcdxZeH+HeDWVfwsaKx2GrRT
-C9baZPxhn1OuoXuD+uZwt+kBVyh9prcvuJ2gDXjodAf6iI7K3UDuQF6jtvL+lPum
-nTIBjzA41hzZ9Kq5cMs8tUwjNAwxUsEg7pqBA5JJ
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEOS0Od5kMylRav0epcdxLFUhQFLrieRwL
-o808bgKkaA49+Iem6V+td7+R0h6gtEJZi645WRS9UethnsA+AaFBmQ==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (5, 'd00871aab65868e557c9af7f80deb016d924e8c9a15e61cc9c68da80c6c22f00');
 /* 6: fatima.pendiente@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (6, 'efc75544d7706a4eb8fd3fbf00c27a9b5b2ae0ed78749ccf91ebb4459f375217', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAiH3R2S4BFhlQICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQIq5miFyHdUPwEgYhjUsLgKkjIXIaJ
-c3vn3ORQ4T3O6O2aDR94wXqmgSACkmVdxd/lBZdkAveOdUds9QyMsAGcM4St2Eo9
-O4ctsWlsipRtqk9Fz3BRVQoDTPPKlXuLK3Thg0mNoWBYMbn2tu8L6QBVAPOV0d97
-QlJWXEA5nGdVUVJSyFlzhlm6zrvEMgJTO2n/J7fE
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEknPo63qzddn/xBQ+8NgzaB4yYEBMnySa
-ZGq+u51r2ZarS86eEKCWu/xNArsUAf+TKHjb8uu+HKJdHEMM5j7Rrg==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (6, 'efc75544d7706a4eb8fd3fbf00c27a9b5b2ae0ed78749ccf91ebb4459f375217');
 /* 7: gorka.pendiente@example.com */
-INSERT INTO Participants (participantid, participant, privatekey, publickey) VALUES
-    (7, 'c04daa0f58a6c51d50413411beaf3906af838843ff7fbd5ce27bd23df0f58083', '-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIHbME4GCSqGSIb3DQEFDTBBMCkGCSqGSIb3DQEFDDAcBAgBAgPiIWfItgICCAAw
-DAYIKoZIhvcNAgkFADAUBggqhkiG9w0DBwQIFTugU6IbLgcEgYgR8CVwhL3iuof8
-SNE1rBz1roQSxi1yivUiYN95wqgZiSrLDC6y+twGNpzDBxpYd5ClSNUSwXaUXm6j
-PHv88DF0dzFlZjaF2CmuODRTXBcyw1SghzN5IOIwjFUFKGuZzLOzQsPBUXvRsKHT
-UNRZPvyEqvPy1hXxiB47zPTgAkSGpFJOlcHE7vHp
------END ENCRYPTED PRIVATE KEY-----
-', '-----BEGIN PUBLIC KEY-----
-MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAErZoHZvEVSAoejNAOOevjK39k3HT41JXM
-aDJbAmbs+CjwYWFQ0wWo/lpy8NNmF6/aaNos10y8xC6TlMSeFskkeA==
------END PUBLIC KEY-----
-');
+INSERT INTO Participants (participantid, participant) VALUES
+    (7, 'c04daa0f58a6c51d50413411beaf3906af838843ff7fbd5ce27bd23df0f58083');
 
 /* ---------- Codigos de participacion ---------- */
 /* Los codigos de la consulta 2 siguen siendo validos. Enlaces de participacion
@@ -231,24 +153,28 @@ INSERT INTO Participation (participationid, surveyid, participationkey, particip
 INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
     (10, 2, '5d1347fb5f918494f3f5730381c39be19f7d115e84dcc9f907b79b9fb6c833b2', 'OEU3bWk4a0Z6RHgvRHEwT3l3QWZ1Q0FucS8zby9pQkx5eDZQVUM1bWwvZz0=', DATE_SUB(NOW(), INTERVAL 1 DAY));
 
-/* ---------- Respuestas firmadas de la consulta 1 ---------- */
-/* Verificables con: docker compose exec web php verify_responses.php 1 */
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (1, 1, '{"1":2,"2":{"1":1,"2":1},"3":1}', 'MEUCIQCsgdY9KcpDlv4dUh09TGjeNXGhpEMFz2O2I0vO/2IAZgIgBd1PKnUCzV7bRbcqrAj0tQGZg7X+gfnLKCzCnxpt+p8=', DATE_SUB(NOW(), INTERVAL 23 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (1, 2, '{"1":1,"2":{"2":1},"3":2}', 'MEYCIQC+CPm9p5YpanOwvEZIRoI/3fKDvd6kNlmFbkw9uVrg5gIhANlWhZOoR8b2npLPZzroRuq/MKT///Bz0eHS79aHc44t', DATE_SUB(NOW(), INTERVAL 22 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (1, 3, '{"1":2,"2":{"1":1,"3":1,"4":1},"3":-1}', 'MEUCIQCNeA+VNbFsXEwqGrK1771S4ceiJh6pOzAguRA75UDflQIgHt8KrQsBJuEc3yNPt7MF4VGuahzpQs8hOpZ4cTB+wvg=', DATE_SUB(NOW(), INTERVAL 21 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (1, 4, '{"1":3,"2":{"4":1},"3":1}', 'MEUCIBVRxOjmTFZOQTqM+LFAzujL97wMnukq162B8/g/DA8oAiEA5pQYtZbgduiqT56XIRkVl5YxuhK4d8gVAR11wbGeygQ=', DATE_SUB(NOW(), INTERVAL 20 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (1, 5, '{"1":2,"2":{"2":1,"4":1},"3":2}', 'MEUCICPbgx0U9avVeynUlpafLOt+sCC4qyL5XwC2IwGuHlQ4AiEAsn/uEL9NKrvRs/J4P0tyM8gGkXpnAGUwrNe3Zf2kxqk=', DATE_SUB(NOW(), INTERVAL 19 DAY));
+/* ---------- Respuestas de la consulta 1 ---------- */
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (1, '{"1":2,"2":{"1":1,"2":1},"3":1}', DATE_SUB(NOW(), INTERVAL 23 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (1, '{"1":1,"2":{"2":1},"3":2}', DATE_SUB(NOW(), INTERVAL 22 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (1, '{"1":2,"2":{"1":1,"3":1,"4":1},"3":-1}', DATE_SUB(NOW(), INTERVAL 21 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (1, '{"1":3,"2":{"4":1},"3":1}', DATE_SUB(NOW(), INTERVAL 20 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (1, '{"1":2,"2":{"2":1,"4":1},"3":2}', DATE_SUB(NOW(), INTERVAL 19 DAY));
 
-/* ---------- Respuestas firmadas de la consulta 2 (abierta, con resultados parciales) ---------- */
-/* Verificables con: docker compose exec web php verify_responses.php 2 */
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (2, 1, '{"1":1,"2":{"2":1,"3":1}}', 'MEQCIClOwJ2vX/3m9QS3RG1n/+egkF1sNsavEUr6SFrqUVTsAiAu5OEY3CWmDmkM4MkKkU4m4vpZPy8dUqwyw8E1K2vAqQ==', DATE_SUB(NOW(), INTERVAL 2 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (2, 2, '{"1":3,"2":[]}', 'MEUCIDdGvAr0ALQErUe2uCT3XxAYXHwWGXIQ2oOgyiGCS9geAiEA/eZZheTV2bCxK+qcQD8pHmeEchQB6oeBJ2UoUx6qtSQ=', DATE_SUB(NOW(), INTERVAL 1 DAY));
-INSERT INTO Responses (surveyid, participantid, response, responsesign, responsedate) VALUES
-    (2, 3, '{"1":1,"2":{"4":1}}', 'MEUCIB4TKIdjw8H1OkUw3SqyRaWq5FdFcBv5ElbV3ROzo7I3AiEA+XaR8WaoIR9/hKVc/Kr/GHVMqVYoCkcwhJyj4aukrJk=', DATE_SUB(NOW(), INTERVAL 1 DAY));
+/* ---------- Respuestas de la consulta 2 (abierta, con resultados parciales) ---------- */
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (2, '{"1":1,"2":{"2":1,"3":1}}', DATE_SUB(NOW(), INTERVAL 2 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (2, '{"1":3,"2":[]}', DATE_SUB(NOW(), INTERVAL 1 DAY));
+INSERT INTO Responses (surveyid, response, responsedate) VALUES
+    (2, '{"1":1,"2":{"4":1}}', DATE_SUB(NOW(), INTERVAL 1 DAY));
+
+/* ---------- Quien ha votado ---------- */
+/* Sin relacion con las filas de Responses: solo impide votar dos veces. */
+INSERT INTO Voted (surveyid, participantid) VALUES
+    (1, 1), (1, 2), (1, 3), (1, 4), (1, 5),
+    (2, 1), (2, 2), (2, 3);

@@ -74,8 +74,6 @@ CREATE TABLE Participants (
 	participantid INT UNSIGNED auto_increment NOT NULL,
 	participant CHAR(64) NOT NULL, /*sha256 of the email address*/
 	dnihashed CHAR(64) NULL, /*sha256 of the DNI; NULL in rows older than the column*/
-	privatekey TEXT NOT NULL,
-	publickey TEXT NOT NULL,
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
 /*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
@@ -105,9 +103,7 @@ CREATE TABLE StressTest (
 CREATE TABLE Responses (
 	responseid INT UNSIGNED auto_increment NOT NULL,
 	surveyid INT UNSIGNED NOT NULL,
-	participantid INT UNSIGNED NOT NULL,
 	response TEXT NOT NULL, /*array to JSON*/
-	responsesign TEXT NOT NULL, /*ECDSA response signature*/
 	responsedate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp,
 	CONSTRAINT Responses_PK PRIMARY KEY (responseid),
 	/*Don't allow to delete/modify an ended survey*/
@@ -115,6 +111,16 @@ CREATE TABLE Responses (
 );
 /*CREATE INDEX Responses_participant_IDX USING BTREE ON Responses (participant);
 CREATE INDEX Responses_survey_date_IDX USING BTREE ON Responses (surveyid, responsedate);*/
+
+/*Quién ha votado en cada consulta. No hay ninguna referencia entre esta tabla
+y Responses, y no lleva ni fecha ni autoincremental: no se puede saber qué
+respuesta es de quién.*/
+CREATE TABLE Voted (
+	surveyid INT UNSIGNED NOT NULL,
+	participantid INT UNSIGNED NOT NULL,
+	CONSTRAINT Voted_PK PRIMARY KEY (surveyid,participantid),
+	CONSTRAINT Voted_Participants_FK FOREIGN KEY (participantid) REFERENCES Participants(participantid) ON DELETE RESTRICT ON UPDATE RESTRICT
+);
 
 CREATE TABLE Results (
 	surveyid INT UNSIGNED NOT NULL,
@@ -130,7 +136,7 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 4);
+INSERT INTO Version values (1, 5);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
@@ -166,6 +172,24 @@ BEGIN
   SIGNAL SQLSTATE '45000' 
   SET MESSAGE_TEXT = 'Error: This table is immutable. Deletions are not allowed. (DELETES).';
 END$$
+
+CREATE TRIGGER Voted_no_update
+BEFORE UPDATE ON Voted
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' 
+  SET MESSAGE_TEXT = 'Error: This table is immutable. Modifications are not allowed. (UPDATES).';
+END$$
+
+
+CREATE TRIGGER Voted_no_delete
+BEFORE DELETE ON Voted
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' 
+  SET MESSAGE_TEXT = 'Error: This table is immutable. Deletions are not allowed. (DELETES).';
+END$$
+
 
 
 
