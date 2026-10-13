@@ -356,7 +356,7 @@ abstract class RegistrationView extends View
                 return null;
             try {
                 $created = false;
-                $participantid = $this->findOrCreateParticipant($db, $email, $hashdni, $hashemail, $created);
+                $participantid = $this->findOrCreateParticipant($db, $hashdni, $hashemail, $created);
                 return $participantid === null ? null : $then($participantid, $created);
             } finally {
                 unlockParticipant($db, $hashemail);
@@ -367,23 +367,15 @@ abstract class RegistrationView extends View
     }
 
     /**
-     * If the DNI and email are not in Parciciants table the method generates a ECDSA key pair,
-     * encrypts private key using the email and stores the hashed email address
-     * (participant), the hashed DNI (dnihashed) and the key pair in Participants table.
+     * If the DNI and email are not in Parciciants table the method stores the hashed
+     * email address (participant) and the hashed DNI (dnihashed) in Participants table.
      */
-    private function insertParticipant($db, $email, $hashdni, $hashemail)
+    private function insertParticipant($db, $hashdni, $hashemail)
     {
-        $keypair = generateKeyPair();
-
-        openssl_pkey_export($keypair, $privatekey, $email);
-        $public_key_details = openssl_pkey_get_details($keypair);
-        $publickey = $public_key_details['key'];
-        $query = $db->prepare("INSERT into {Participants} (participant, dnihashed, privatekey, publickey) " .
-            "values (:part, :dni, :priv, :pub)");
+        $query = $db->prepare("INSERT into {Participants} (participant, dnihashed) " .
+            "values (:part, :dni)");
         $query->bindParam(":part", $hashemail, PDO::PARAM_STR);
         $query->bindParam(":dni", $hashdni, PDO::PARAM_STR);
-        $query->bindParam(":priv", $privatekey, PDO::PARAM_STR);
-        $query->bindParam(":pub", $publickey, PDO::PARAM_STR);
         $query->execute();
         return $db->lastInsertId();
     }
@@ -474,7 +466,7 @@ abstract class RegistrationView extends View
        la crea. Se llama con los bloqueos del DNI y del correo cogidos.
        Devuelve su id, o null (con el motivo ya mostrado) si el DNI o el
        correo ya están asociados a otro. $created indica si se ha creado. */
-    private function findOrCreateParticipant($db, $email, $hashdni, $hashemail, &$created = false)
+    private function findOrCreateParticipant($db, $hashdni, $hashemail, &$created = false)
     {
         $created = false;
         $participants = $db->prepare("SELECT participantid, participant, dnihashed From {Participants} " .
@@ -487,8 +479,7 @@ abstract class RegistrationView extends View
         $participantid = -1;
         foreach ($rows as $row) {
             /* Las filas anteriores a los documentos no tienen DNI y la tabla
-               es inmutable: no se les puede asociar uno, y su clave privada
-               está cifrada con el correo. */
+               es inmutable: no se les puede asociar uno. */
             if ($row['dnihashed'] === null) {
                 echo ("<p><strong>La dirección de correo indicada ya se usó antes de que se " .
                     "pidieran los documentos y no se puede asociar a ellos. Hay que usar otra " .
@@ -508,7 +499,7 @@ abstract class RegistrationView extends View
         }
         if ($participantid == -1) {
             try {
-                $participantid = $this->insertParticipant($db, $email, $hashdni, $hashemail);
+                $participantid = $this->insertParticipant($db, $hashdni, $hashemail);
             } catch (PDOException $e) {
                 /* Dos peticiones simultáneas con el mismo correo y distinto
                    DNI: el bloqueo es por DNI, las para el índice único. */

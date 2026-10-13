@@ -10,7 +10,6 @@ require_once 'utils/token.php';
 require_once 'utils/crypt.php';
 require_once 'include/fileparams.php';
 require_once 'utils/showsurvey.php';
-require_once 'utils/host.php';
 
 class Participate extends View {
     public const ACTION = "Enviar";
@@ -20,39 +19,14 @@ class Participate extends View {
     //This const should be remove in non alpha versions.
     private const TESTID = 0;
 
-    private const COOKIE_KEY ="lacookie";
     /* Formularios de participación abiertos en la sesión, y campo del
        formulario que dice cuál de ellos se envía. */
     private const PARTICIPATIONS = "participations";
     private const FORM_FIELD = "participation";
     private const PARTICIPATIONS_MAX = 20;
-    private $key = "";
     private string $email = "";
     private int $surveyid = -1;
 
-    /**
-     * Sends a cookie with a 256bit random key used to encrypt the private key for
-     * signing the responses on submit.
-     */
-    function doInit (){
-        startSession ();
-        /* Una sola clave para todas las pestañas: si cada enlace abierto
-           generase la suya, los formularios abiertos antes ya no podrían
-           descifrar su clave de firma. */
-        $current = isset ($_COOKIE[self::COOKIE_KEY]) && is_string ($_COOKIE[self::COOKIE_KEY]) ?
-            base64_decode ($_COOKIE[self::COOKIE_KEY], true) : false;
-        $this->key = ($current !== false && strlen ($current) == 32) ? $current : random_bytes (32);
-        /* Sin dominio: cookie solo para este host. HTTP_HOST puede llevar el
-           puerto (localhost:8080) y el navegador rechaza ese dominio.
-           Secure solo con HTTPS: servido por HTTP, el navegador descarta
-           una cookie Secure y luego no se podría firmar la respuesta. */
-        setcookie (self::COOKIE_KEY, base64_encode ($this->key), [
-            'expires' => time () + 1800, //Half an hour
-            'secure' => isHttps (),
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    }
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;
     }
@@ -117,20 +91,15 @@ class Participate extends View {
                     echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
                     return;
                 }
-                $formid = $this->saveParticipation ($this->surveyid, self::TESTID, null);
+                $formid = $this->saveParticipation ($this->surveyid, self::TESTID);
                 $this->showSurvey ($db, $this->surveyid, $formid);
                 return;
             }
             
 
-            /*
-            Gets the private key for singing the responses, then it's encrypting
-            using the random key in the cookie. If the key can't be obtined using the
-            email the security is compromised
-            */
             $hashemail = hash ('sha256', $this->email);
 
-            $participants = $db->prepare ("SELECT participantid, privatekey " .
+            $participants = $db->prepare ("SELECT participantid " .
                 "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
 
             $participants->bindParam (":part", $hashemail, PDO::PARAM_STR);
@@ -141,7 +110,6 @@ class Participate extends View {
             }
             $participant = $participants->fetch ();
             $participantid = $participant["participantid"];
-            $privatekeycryp = $participant['privatekey'];
             $participants->closeCursor ();
             if (hasParticipated ($db, $participantid, $this->surveyid)){
                 ?>
@@ -149,19 +117,8 @@ class Participate extends View {
                 <?php
                 return;
             }
-            
-            $key = openssl_pkey_get_private ($privatekeycryp, $this->email);
-            if ($key === false){
-                ?>
-                <strong><p>La solicitud de participación tiene un problema de seguridad.</p>
-                <p>Contacte con la administración del sitio.</p></strong>
-                <?php
-                return;
-            }
-            openssl_pkey_export($key, $priv);
 
-            $formid = $this->saveParticipation ($this->surveyid, $participantid,
-                encrypt ($priv, $this->key));
+            $formid = $this->saveParticipation ($this->surveyid, $participantid);
             $this->showSurvey ($db, $this->surveyid, $formid);
 
         }
@@ -183,14 +140,13 @@ class Participate extends View {
        Va en el propio formulario, no suelto en la sesión: con dos enlaces
        abiertos a la vez, las respuestas de uno acababan en la consulta
        del otro. */
-    private function saveParticipation ($surveyid, $participantid, $privkey): string {
+    private function saveParticipation ($surveyid, $participantid): string {
         if (!isset ($_SESSION[self::PARTICIPATIONS]) || !is_array ($_SESSION[self::PARTICIPATIONS]))
             $_SESSION[self::PARTICIPATIONS] = array ();
         $formid = bin2hex (random_bytes (16));
         $_SESSION[self::PARTICIPATIONS][$formid] = [
             'surveyid' => $surveyid,
             'participantid' => $participantid,
-            'privkey' => $privkey,
         ];
         $_SESSION[self::PARTICIPATIONS] = array_slice ($_SESSION[self::PARTICIPATIONS],
             -self::PARTICIPATIONS_MAX, null, true);
@@ -233,8 +189,8 @@ class Participate extends View {
      * - Question 3 is single and optional, and no option has been selected.
      * - Question 4 is multiple and optional, and no options have been selected.
      * 
-     * This JSON string is signed with the participant's private key so it can be
-     * validated with its public key.
+     * The response is stored with no reference to the participant: the Voted
+     * table only records that the participant has voted in the survey.
      */
     private function insertResponse (){
         if (!checkToken ()){
@@ -248,25 +204,6 @@ class Participate extends View {
         }
         $surveyid = $participation['surveyid'];
         $participantid = $participation['participantid'];
-
-        
-        if ($participantid == self::TESTID){
-            $privkey = false;
-        }
-        else {
-            if (!isset ($_COOKIE[self::COOKIE_KEY]) || $participation['privkey'] === null){
-                echo ("<p><strong>Error recuperando las cookies para firmar las respuestas.</strong></p>");
-                return;
-            }
-            try {
-                $privkey = decrypt ($participation['privkey'], base64_decode ($_COOKIE[self::COOKIE_KEY]));
-            }
-            catch (Exception $e){
-                echo ("<p><strong>Error cryptográfico al firmar las respuestas.</strong></p>");
-                logMessage (LOGGER_ERROR, "Signing response: {$e}");
-                return;
-            }
-        }
 
         try {
             $responsearray = array (); 
@@ -321,7 +258,6 @@ class Participate extends View {
                 logMessage (LOGGER_ERROR, "Error {$err} in json_encode");
                 return;
             }
-            $responsesign = $this->signResponse ($db, $responsejson, $privkey, $participantid);
             $db->beginTransaction ();
             try {
                 if (!$this->isActive ($db, $surveyid)){
@@ -343,13 +279,17 @@ class Participate extends View {
                             "dirección de correo indicada.</strong></p>");
                         return;
                     }
+                    $voted = $db->prepare ("INSERT INTO {Voted} (surveyid, participantid) " .
+                        "values (:sid, :pid)");
+                    $voted->bindParam (":sid", $surveyid, PDO::PARAM_INT);
+                    $voted->bindParam (":pid", $participantid, PDO::PARAM_INT);
+                    $voted->execute ();
                 }
-                $query = $db->prepare ("INSERT INTO {Responses} (surveyid, participantid, response, " .
-                    " responsesign) values (:sid, :pid, :res, :ress)");
+                /* La respuesta no lleva nada de quien la envía. */
+                $query = $db->prepare ("INSERT INTO {Responses} (surveyid, response) " .
+                    "values (:sid, :res)");
                 $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-                $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
                 $query->bindParam (":res", $responsejson, PDO::PARAM_STR);
-                $query->bindParam (":ress", $responsesign, PDO::PARAM_STR);
                 $query->execute ();
                 $db->commit ();
             }
@@ -368,53 +308,6 @@ class Participate extends View {
             logMessage (LOGGER_ERROR, "{$e} inserting responses.");
             return;
         }
-    }
-
-    /**
-     * Signs the response with the participants private key.
-     * 
-     * @param PDO $db PDO database object
-     * @param string $response The response in JSON string.
-     * @param string $key The participants private key
-     * @param int $participantid
-     * 
-     * @return string The response signature.
-     * 
-     * @throws Exception An exception with the error.
-     */
-    private function signResponse ($db, $response, #[\SensitiveParameter] $key, $participantid){
-        if ($key === false){
-            return "no sign";
-        }
-        $signkey = openssl_pkey_get_private ($key);
-        if (!openssl_sign ($response, $sign, $signkey, getSignAlgo ())){
-            throw new Exception("Error in signing " . openssl_error_string());
-            return "";
-        }
-        $query = $db->prepare ("SELECT publickey FROM {Participants} WHERE participantid = :pid");
-        $query->bindParam (":pid", $participantid);
-        $query->execute ();
-        if ($query->rowCount () == 0){
-            throw new Exception("Can't find participant for signing: {$participantid}");
-            return "";
-        }
-        $row = $query->fetch ();
-        $pubkey = openssl_pkey_get_public ($row['publickey']);
-        if ($pubkey === false){
-            throw new Exception("Error getting participant keypair: {$participantid}");
-            return "";
-        }
-        $query->closeCursor ();
-        $res = openssl_verify ($response, $sign, $pubkey, getSignAlgo ());
-        if ($res == 0){
-            throw new Exception("Bad signature signing response");
-            return "";
-        }
-        else if ($res == -1 || $res == false){
-            throw new Exception("Error signing response " . openssl_error_string());
-            return "";
-        }
-        return base64_encode ($sign);
     }
 
     /**
