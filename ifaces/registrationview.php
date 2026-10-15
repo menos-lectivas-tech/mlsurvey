@@ -202,8 +202,8 @@ abstract class RegistrationView extends View
                             "Régimen",
                             "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
                                 "antes de 2011.\n\n" .
-                                "Resto: funcionarios/as de carrera que ingresaron a partir de " .
-                                "2011 e interinos/as.\n\n" .
+                                "Resto: Interinos y funcionarios/as de carrera que ingresaron a partir de " .
+                                "2011.\n\n" .
                                 "Según el régimen se pide un documento distinto."
                         ); ?>
                     </legend>
@@ -253,10 +253,10 @@ abstract class RegistrationView extends View
                                 Comunidad de Madrid necesitamos dos documentos:</p>
                             <ol>
                                 <li>Tu Extracto Individual de Formación, que acredita la condición
-                                    docente.</li>
+                                    docente en la Comunidad de Madrid.</li>
                                 <li>Tu Informe de Vida Laboral o, si estás en Clases Pasivas, tu
                                     certificado de afiliación a MUFACE, que acredita el servicio
-                                    activo.</li>
+                                    activo en un centro público.</li>
                             </ol>
                             <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
                                 para comprobar su autenticidad, que el NIF coincide en ambos y que
@@ -280,8 +280,8 @@ abstract class RegistrationView extends View
                                 <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
                                     servicio se aloja en la Unión Europea.</li>
                                 <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                    oposición, limitación y portabilidad, escribiendo a [correo de
-                                    derechos]. También puedes reclamar ante la Agencia Española de
+                                    oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org. 
+                                    También puedes reclamar ante la Agencia Española de
                                     Protección de Datos (<a href="https://www.aepd.es" target="_blank"
                                         rel="noopener noreferrer">aepd.es</a>).</li>
                             </ul>
