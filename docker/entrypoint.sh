@@ -62,6 +62,9 @@ define('CONFIG', [
 "altcha_enabled" => getenv('ALTCHA_ENABLED') === 'false' ? false : true,
 "altcha_hmac_key" => getenv('ALTCHA_HMAC_KEY') ?: '',
 
+// Clave del HMAC del correo y el DNI de las participantes: obligatoria y fija.
+"participant_hmac_key" => getenv('PARTICIPANT_HMAC_KEY') ?: '',
+
 // Firma del extracto de formacion: autoridades de confianza y NIF de los
 // sellos admitidos (separados por comas).
 "pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',

@@ -107,7 +107,7 @@ class Resend extends GetCode
             if (!$this->checkDomain($db, $email)) {
                 return;
             }
-            $hashemail = hash('sha256', $email);
+            $hashemail = participantHash($email);
             if (!$this->lockEmail($db, $hashemail))
                 return;
             try {

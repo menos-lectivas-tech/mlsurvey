@@ -97,7 +97,7 @@ class Participate extends View {
             }
             
 
-            $hashemail = hash ('sha256', $this->email);
+            $hashemail = participantHash ($this->email);
 
             $participants = $db->prepare ("SELECT participantid " .
                 "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");

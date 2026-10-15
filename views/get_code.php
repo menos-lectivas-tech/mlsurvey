@@ -155,7 +155,7 @@ class GetCode extends RegistrationView
             if (!$this->checkDomain($db, $email)) {
                 return;
             }
-            $hashemail = hash('sha256', $email);
+            $hashemail = participantHash($email);
             /* Primer paso con una dirección que aún no está registrada: antes
                de enviarle el enlace tiene que acreditarse con los documentos. */
             if (!$withdocs && $this->getParticipantId($db, $hashemail) === null) {

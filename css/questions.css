@@ -239,6 +239,54 @@
     background: var(--ml-surface-2);
 }
 
+/* Información sobre el tratamiento de los documentos: se abre en un diálogo
+   desde el enlace que hay antes de la casilla de consentimiento. */
+.ml-participate-legal-link {
+    margin: 0 0 8px;
+}
+
+.ml-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ml-accent-text);
+    font: inherit;
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.ml-link:hover,
+.ml-link:focus-visible {
+    text-decoration-thickness: 2px;
+}
+
+.ml-dialog.ml-legal-dialog {
+    width: min(640px, calc(100vw - 32px));
+}
+
+/* El texto es largo: se desplaza dentro del diálogo y el botón de cerrar
+   queda siempre a la vista. */
+.ml-legal-body {
+    max-height: min(60vh, 32em);
+    overflow-y: auto;
+    padding-right: 4px;
+    color: var(--ml-text-soft);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+}
+
+.ml-legal-body h5 {
+    margin: 12px 0 8px;
+    color: var(--ml-text);
+}
+
+.ml-legal-body p,
+.ml-legal-body ol,
+.ml-legal-body ul {
+    margin: 0 0 8px;
+}
+
 .ml-participate-card .ml-participate-consent {
     font-weight: 400;
     margin-bottom: 14px;
