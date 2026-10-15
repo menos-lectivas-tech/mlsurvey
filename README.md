@@ -65,6 +65,9 @@ and restric permissions as it contains sensible information.
 Every configuration item has a description, you only need to notice:
 * `site_url` is mandatory: it is the public URL of the site and the participation
   links sent by email are built from it.
+* `participant_hmac_key` is mandatory: the key of the HMAC that hashes the email
+  addresses and DNIs of the participants. Generate it once (`openssl rand -hex 32`)
+  and keep it: with another key no registered participant is recognized.
 * If you have a working Sendmail in your system you only need to set:
 ```php
 "email_method" => "Sendmail",
@@ -191,6 +194,7 @@ the database to be ready before serving requests.
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
+| `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
 | `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
 | `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
 | `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |

@@ -11,6 +11,7 @@ use PHPMailer\PHPMailer\Exception;
 require_once 'vendor/autoload.php'; //For PHPMailer as installed via composer.
 require_once 'utils/dbutils.php';
 require_once 'utils/host.php';
+require_once 'utils/logger.php';
 
 class MLMailer extends PHPMailer {
     public const NO_METHOD = 0;
@@ -97,6 +98,7 @@ class MLMailer extends PHPMailer {
      */
     public function sendCode ($recipient, $pid, $code, $surveyname){
         $theurl = rtrim (getURL (), "/") . "/participate?pid=" . $pid . "&auth=" . $code;
+        logMessage (LOGGER_DEBUG, "Participation URL for survey {$surveyname}: {$theurl}");
         $this->setFrom ($this->m_from);
         $this->addAddress ($recipient);
         $this->Subject = "Dirección para opinar en la consulta {$surveyname}";

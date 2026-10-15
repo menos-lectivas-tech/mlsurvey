@@ -100,28 +100,29 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
     (4, 2, 4, 'Idiomas');
 
 /* ---------- Participantes ---------- */
-/* participant = sha256(correo). */
+/* participant = HMAC-SHA256(sha256(correo)) con PARTICIPANT_HMAC_KEY=cambiame
+   (.env.dev): con otra clave estas participantes no se reconocen. */
 /* 1: ana.responde@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (1, '3af36912d14dbd2ac556c341276bcda1442ce384943f343f56971b1adc140b36');
+    (1, '249fc229b9083641750a676f067b9e127e5d80e150378610acf0bb10972b413e');
 /* 2: bruno.responde@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (2, 'a114bd224c57e160838633384eab70fdf7c8732533074ee31298353fb4a523b5');
+    (2, '99dd08e1f032b098c83c52fd43714986ad0d2c12f5ef625f479121a91ccd6962');
 /* 3: carla.responde@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (3, '1fc024ea26950c1ccb656df258ae853be07e2dee35227aa619ed9746fe2e5951');
+    (3, '25390aef55fd59e1f6abd2e506320bfa88b2c3dbb760475578565e043599c78b');
 /* 4: diego.responde@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (4, '797ec5b2f22f6b96e8ab4f35afb6b9ff8381f6f2fba4cbcdefcafcedbd3953d7');
+    (4, 'a1dae50f5c3f3258dc7ed6155aff5ee931e3f79a741051e652e9c28985f1dd6e');
 /* 5: elena.responde@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (5, 'd00871aab65868e557c9af7f80deb016d924e8c9a15e61cc9c68da80c6c22f00');
+    (5, '0d63fc50c60e6e932cbf4704a231cb07017452e8a488dc235177d370d8dfdb4b');
 /* 6: fatima.pendiente@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (6, 'efc75544d7706a4eb8fd3fbf00c27a9b5b2ae0ed78749ccf91ebb4459f375217');
+    (6, '06fcf008f8460d3dd591566c2dab8fbbd2a9e488b6dba612a3ac1c48986a9f71');
 /* 7: gorka.pendiente@example.com */
 INSERT INTO Participants (participantid, participant) VALUES
-    (7, 'c04daa0f58a6c51d50413411beaf3906af838843ff7fbd5ce27bd23df0f58083');
+    (7, 'd6e04c9db9ed1abfd7cb7cc5c07a51759fe357af715550d97af07c2168b41faf');
 
 /* ---------- Codigos de participacion ---------- */
 /* Los codigos de la consulta 2 siguen siendo validos. Enlaces de participacion

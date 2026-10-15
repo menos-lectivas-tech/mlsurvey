@@ -1,6 +1,7 @@
 <?php
 require_once "utils/dbutils.php";
 require_once "utils/logger.php";
+require_once "utils/crypt.php";
 
 function versionTableExists ():bool {
   $db = dbConn ();
@@ -27,7 +28,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 6;
+$maxversion = 7;
 
 try {
   if (!versionTableExists ()){
@@ -83,6 +84,26 @@ try {
   }
   if ($version < 6){
     $db->exec("DROP TRIGGER Participants_no_delete");
+  }
+  if ($version < 7){
+    /* El correo y el DNI pasan de SHA-256 a HMAC con participant_hmac_key:
+       se recalculan los hashes guardados. La participante 0 no tiene correo. */
+    $db->beginTransaction ();
+    $rows = $db->query ("SELECT participantid, participant, dnihashed FROM {Participants}
+      WHERE participantid <> 0")->fetchAll ();
+    $query = $db->prepare ("UPDATE {Participants} SET participant = :part, dnihashed = :dni
+      WHERE participantid = :pid");
+    foreach ($rows as $row){
+      $part = participantHmac ($row["participant"]);
+      $dni = $row["dnihashed"] === null ? null : participantHmac ($row["dnihashed"]);
+      $query->bindValue (":part", $part, PDO::PARAM_STR);
+      $query->bindValue (":dni", $dni, $dni === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+      $query->bindValue (":pid", $row["participantid"], PDO::PARAM_INT);
+      $query->execute ();
+    }
+    $query = $db->prepare ("UPDATE {Version} SET versioncode = 7 WHERE versionid = 1");
+    $query->execute ();
+    $db->commit ();
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");

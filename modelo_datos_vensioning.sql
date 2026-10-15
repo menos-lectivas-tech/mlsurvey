@@ -80,7 +80,7 @@ PARTITION BY SYSTEM_TIME;
 CREATE TABLE Participants (
 	participantid INT UNSIGNED auto_increment NOT NULL,
 	participant CHAR(64) NOT NULL,
-	dnihashed CHAR(64) NULL, /*sha256 of the DNI; NULL in rows older than the column*/
+	dnihashed CHAR(64) NULL, /*HMAC (participant_hmac_key) of the DNI; NULL in rows older than the column*/
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
 /*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
@@ -142,7 +142,7 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 6);
+INSERT INTO Version values (1, 7);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update

@@ -46,6 +46,14 @@ const CONFIG = [
 "altcha_hmac_key" => '',
 
 /**
+ * Key of the HMAC that hashes the email addresses and DNIs of the participants.
+ * It is mandatory: generate it once (e.g. with "openssl rand -hex 32") and keep it,
+ * changing or losing it makes every registered participant unrecognizable.
+ */
+
+"participant_hmac_key" => '',
+
+/**
  * Signed training record PDF (extracto de formación) asked for participating.
  * pdf_ca_file: PEM file with the certification authorities trusted for the
  * signature. Only these are trusted, not the system ones.

@@ -1,6 +1,7 @@
 <?php
 require_once "utils/dbutils.php";
 require_once "utils/logger.php";
+require_once "utils/crypt.php";
 require_once 'vendor/autoload.php';
 
 use Zoon\BounceHandler\BounceHandler;
@@ -8,7 +9,7 @@ use Zoon\BounceHandler\BounceHandler;
 function deleteParticipation($address)
 {
     $db = dbConn();
-    $hashemail = hash('sha256', $address);
+    $hashemail = participantHash($address);
     $query = $db->prepare("SELECT participantid FROM {Participants} WHERE participant = :p
             LIMIT 1");
     $query->bindParam(":p", $hashemail, PDO::PARAM_STR);

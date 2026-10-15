@@ -73,7 +73,7 @@ class Register extends RegistrationView
                 return;
             }
             if (!$withdocs) {
-                if ($this->getParticipantId($db, hash('sha256', $email)) !== null) {
+                if ($this->getParticipantId($db, participantHash($email)) !== null) {
                     $this->alreadyRegistered();
                     return;
                 }
