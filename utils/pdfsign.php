@@ -3,9 +3,8 @@
  * Functions for checking the PDFs asked for participating and getting the
  * holder's DNI from them: the digitally signed training record (extracto de
  * formación) and either the digitally signed MUFACE membership certificate
- * (Clases Pasivas) or the Social Security work history report, informe de
- * vida laboral (the rest: career civil servants who joined from 2011 on and
- * interim ones).
+ * (career civil servants) or the Social Security work history report, informe
+ * de vida laboral (interim ones).
  *
  * Needs the openssl and pdftotext (poppler-utils) commands.
  */

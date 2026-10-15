@@ -25,8 +25,8 @@ abstract class RegistrationView extends View
     private const ACTION = "Solicitar";
     /* Segundo paso: envío de los documentos de quien aún no está registrado. */
     private const ACTION_DOCS = "Documentos";
-    private const KIND_PASSIVE = "pasivas";
-    private const KIND_OTHER = "resto";
+    private const KIND_INTERIM = "interino";
+    private const KIND_CAREER = "carrera";
     /* Páginas en las que se descarga cada documento. */
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
@@ -39,21 +39,21 @@ abstract class RegistrationView extends View
         if (isset (Config::PARAMS["pdf_max_age_days"]))
             $this->maxage = Config::PARAMS["pdf_max_age_days"];
         $this->docs = [
-            self::KIND_PASSIVE => [
-                'label' => "Clases Pasivas",
-                'name' => "Certificado de afiliación a MUFACE",
-                'url' => self::URL_MUFACE,
-                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
-                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
-                    "expedido en los últimos {$this->maxage} días.",
-            ],
-            self::KIND_OTHER => [
-                'label' => "Resto",
+            self::KIND_INTERIM => [
+                'label' => "Interinos",
                 'name' => "Informe de vida laboral",
                 'url' => self::URL_VIDA_LABORAL,
                 'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
                     "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
                     "{$this->maxage} días.",
+            ],
+            self::KIND_CAREER => [
+                'label' => "Funcionarios de carrera",
+                'name' => "Certificado de afiliación a MUFACE",
+                'url' => self::URL_MUFACE,
+                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
+                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
+                    "expedido en los últimos {$this->maxage} días.",
             ],
         ];
     }
@@ -182,7 +182,7 @@ abstract class RegistrationView extends View
     {
         /* Documento que acredita cada régimen: al cambiar de régimen se
            cambian el título, el enlace y la explicación del segundo fichero. */
-        $doc = $this->docs[self::KIND_OTHER];
+        $doc = $this->docs[self::KIND_INTERIM];
         ?>
         <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?></h3>
@@ -197,21 +197,19 @@ abstract class RegistrationView extends View
                 <?php } ?>
                 <input type="hidden" name="email" value="<?= h($email); ?>">
                 <fieldset class="ml-participate-kind">
-                    <legend>Mi régimen es
+                    <legend>Soy
                         <?= $this->infoButton(
-                            "Régimen",
-                            "Clases Pasivas: funcionarios/as de carrera que ingresaron " .
-                                "antes de 2011.\n\n" .
-                                "Resto: Interinos y funcionarios/as de carrera que ingresaron a partir de " .
-                                "2011.\n\n" .
-                                "Según el régimen se pide un documento distinto."
+                            "Situación",
+                            "Interinos: se pide el informe de vida laboral.\n\n" .
+                                "Funcionarios/as de carrera: se pide el certificado de " .
+                                "afiliación a MUFACE."
                         ); ?>
                     </legend>
                     <?php foreach ($this->docs as $kind => $d) { ?>
                         <label><input type="radio" name="tipo" value="<?= $kind; ?>" required
                                 data-name="<?= h($d['name']); ?>" data-url="<?= h($d['url']); ?>"
                                 data-info="<?= h($d['info']); ?>"
-                                <?= $kind === self::KIND_OTHER ? "checked" : ""; ?>>
+                                <?= $kind === self::KIND_INTERIM ? "checked" : ""; ?>>
                             <?= h($d['label']); ?></label>
                     <?php } ?>
                 </fieldset>
@@ -254,7 +252,7 @@ abstract class RegistrationView extends View
                             <ol>
                                 <li>Tu Extracto Individual de Formación, que acredita la condición
                                     docente en la Comunidad de Madrid.</li>
-                                <li>Tu Informe de Vida Laboral o, si estás en Clases Pasivas, tu
+                                <li>Tu Informe de Vida Laboral o, si eres funcionario/a de carrera, tu
                                     certificado de afiliación a MUFACE, que acredita el servicio
                                     activo en un centro público.</li>
                             </ol>
@@ -476,7 +474,7 @@ abstract class RegistrationView extends View
     }
 
     /* Comprueba la firma del extracto de formación y el documento subido
-       según el régimen elegido (certificado de MUFACE firmado o
+       según lo elegido (certificado de MUFACE firmado o
        informe de vida laboral), y que los dos son de la misma persona.
        Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
        si no vale. Los ficheros se quedan en el temporal de la subida: no se
@@ -484,11 +482,11 @@ abstract class RegistrationView extends View
     private function getDni(): ?string
     {
         $kind = $_REQUEST['tipo'] ?? null;
-        if ($kind !== self::KIND_PASSIVE && $kind !== self::KIND_OTHER) {
-            echo ("<p><strong>Hay que indicar si perteneces a Clases Pasivas o al resto.</strong></p>");
+        if ($kind !== self::KIND_INTERIM && $kind !== self::KIND_CAREER) {
+            echo ("<p><strong>Hay que indicar si eres interino/a o funcionario/a de carrera.</strong></p>");
             return null;
         }
-        $docname = $kind === self::KIND_PASSIVE ? "certificado de afiliación a MUFACE" :
+        $docname = $kind === self::KIND_CAREER ? "certificado de afiliación a MUFACE" :
             "informe de vida laboral";
         $extracto = $this->getUpload('extracto', "extracto de formación");
         if ($extracto === null)
@@ -502,7 +500,7 @@ abstract class RegistrationView extends View
             checkExtractoSignature($extracto);
             $dni = getPdfDni($extracto);
             $checking = $docname;
-            if ($kind === self::KIND_PASSIVE) {
+            if ($kind === self::KIND_CAREER) {
                 checkMufaceSignature($document);
                 $documentdni = getMufaceDni($document);
             } else

@@ -37,7 +37,7 @@ class GetCode extends RegistrationView
      * - If it's a GET with survey info, shows the form asking for the email address.
      * - If it's the submit of that form and the address is already registered, sends the
      * email and shows the result (success or failure). If it isn't registered, shows a
-     * second form asking for the pension scheme (Clases Pasivas or the rest), the signed
+     * second form asking whether they are interim or career civil servants, the signed
      * training record PDF and the PDF that proves it.
      * The DNI is not asked for: it is read from the training record.
      * - If it's the submit of the second form, checks the PDFs, sends the email and shows
