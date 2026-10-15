@@ -101,7 +101,10 @@ services:
       ALTCHA_ENABLED: ${ALTCHA_ENABLED:-true}
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       # Clave del HMAC del correo y el DNI de las participantes (ver .env.dev).
-      PARTICIPANT_HMAC_KEY: ${PARTICIPANT_HMAC_KEY:-}
+      # El valor por defecto es el de desarrollo, con el que estan calculados
+      # los hashes de test-data.sql. En produccion define una propia en .env
+      # (openssl rand -hex 32) y no la cambies nunca.
+      PARTICIPANT_HMAC_KEY: ${PARTICIPANT_HMAC_KEY:-6f7e874a8d9798107bc29aae835ffede3f922e03ad9c2d3f0631db3d87c6977e}
       # Firma del extracto de formacion: autoridades de confianza y NIF de
       # los sellos admitidos, separados por comas.
       PDF_CA_FILE: ${PDF_CA_FILE:-certs/extracto_ca.pem}
