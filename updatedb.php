@@ -88,6 +88,7 @@ try {
   if ($version < 7){
     /* El correo y el DNI pasan de SHA-256 a HMAC con participant_hmac_key:
        se recalculan los hashes guardados. La participante 0 no tiene correo. */
+    $db->exec("DROP TRIGGER Participants_no_update");
     $db->beginTransaction ();
     $rows = $db->query ("SELECT participantid, participant, dnihashed FROM {Participants}
       WHERE participantid <> 0")->fetchAll ();
@@ -104,6 +105,13 @@ try {
     $query = $db->prepare ("UPDATE {Version} SET versioncode = 7 WHERE versionid = 1");
     $query->execute ();
     $db->commit ();
+    $db->exec ("CREATE TRIGGER Participants_no_update
+                BEFORE UPDATE ON Participants
+                FOR EACH ROW
+                BEGIN
+                  SIGNAL SQLSTATE '45000' 
+                SET MESSAGE_TEXT = 'Error: This table is immutable. Modifications are not allowed. (UPDATES).';
+              END");
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");
