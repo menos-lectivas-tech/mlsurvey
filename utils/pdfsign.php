@@ -103,9 +103,11 @@ function pdfReadFile (string $path): string {
  * @param array $signerids serialNumber (NIF) of the certificates allowed to sign.
  * @param string $issuer Who issues the document, for the error message.
  *
+ * @return array An array with signature validity in format "YYMMddhhmmssZ".
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
-function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer){
+function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer) 
+    : array|false {
     $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
     if (empty ($signatures))
         throw new PdfSignException ("El PDF no está firmado digitalmente o se ha modificado " .
@@ -115,6 +117,7 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
         throw new Exception ("CA file {$cafile} is not readable");
 
     $reason = "";
+    $validity = array ();
     foreach ($signatures as [$content, $signature]){
         $contentfile = tempnam (sys_get_temp_dir (), "mlc");
         $sigfile = tempnam (sys_get_temp_dir (), "mls");
@@ -136,9 +139,13 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
                 continue;
             }
             $signer = openssl_x509_parse ((string) file_get_contents ($signerfile));
+            $validity["from"] = $signer['validFrom'];
+            $validity["to"] = $signer['validTo'];
+            if (empty($signerids))
+                return $validity;
             $id = $signer === false ? null : ($signer["subject"]["serialNumber"] ?? null);
             if (is_string ($id) && in_array ($id, $signerids, true))
-                return;
+                return $validity;
             $reason = "Signer not allowed: " . ($signer === false ? "?" : $signer["name"]);
         }
         finally {
@@ -367,4 +374,84 @@ function getVidaLaboralDni (string $path): string {
     logMessage (LOGGER_WARN, "Work history report rejected: not working for a public employer.");
     throw new PdfSignException ("En el informe de vida laboral no consta una situación de alta " .
         "en vigor en la enseñanza pública.");
+}
+
+
+function checkHojaServiciosSignature(string $path)
+{
+    $validity = checkPdfSignature(
+        $path,
+        Config::PARAMS["muface_ca_file"] ?? "certs/muface_ca.pem",
+        [],
+        "una firma de representación válida"
+    );
+    if ($validity === false)
+        throw new PdfSignException("La firma digital de la Hoja de Servicios no es válida");
+    $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
+    $dtz = new DateTimeZone("UTC");
+    $from = DateTimeImmutable::createFromFormat("ymdHis\Z", $validity["from"], $dtz);
+    $now = new DateTimeImmutable("now", $dtz);
+    $di = new DateInterval("P{$maxage}D");
+    if ($from->add($di) < $now)
+        throw new PdfSignException("El documento tiene que haberse expedido en los últimos " .
+            "{$maxage} días.");
+}
+function getHojaServiciosNIF(string $path): string|false
+{
+    $text = preg_replace('/\s+/u', ' ', pdfText($path, true)) ?? "";
+    $hojaservicios = "certifica que la presente hoja de servicios está conforme con los datos " .
+        "que a día de hoy pueden consultarse en las bases de datos " . 
+        "de Gestión del Profesorado de la Comunidad de Madrid";
+    if (
+        stristr($text, $hojaservicios)
+        === false
+    ) {
+        logMessage(LOGGER_WARN, "Signed PDF rejected: it is not a Hoja de Servicios.");
+        throw new PdfSignException("El PDF no es una Hoja de Servicios.");
+    }
+
+    preg_match_all("/D\.N\.I\.\s*" . PDF_DNI . "/iu", $text, $ids);
+    $found = array_unique(array_map('strtoupper', $ids[1]));
+    if (count($found) != 1 || !pdfValidDni(reset($found))) {
+        logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
+        throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
+    }
+    return reset($found);
+}
+
+function checkCredencialSignature(string $path)
+{
+    $validity = checkPdfSignature(
+        $path,
+        Config::PARAMS["muface_ca_file"] ?? "certs/muface_ca.pem",
+        [],
+        "una firma de representación válida"
+    );
+    if ($validity === false)
+        throw new PdfSignException("La firma digital de la Hoja de Servicios no es válida");
+    $dtz = new DateTimeZone("UTC");
+    $from = DateTimeImmutable::createFromFormat("ymdHis\Z", $validity["from"], $dtz);
+    $init = new DateTimeImmutable("2026-09-01", $dtz);
+    if ($from >= $init)
+        throw new PdfSignException("El nombramiento tiene que ser del curso actual.");
+}
+
+function getCredencialNIF(string $path): string|false
+{
+    $text = preg_replace('/\s+/u', ' ', pdfText($path, true)) ?? "";
+    if (
+        stristr($text, "Este documento acredita a su poseedor su intención de asumir funciones docentes")
+        === false
+    ) {
+        logMessage(LOGGER_WARN, "Signed PDF rejected: it is not a Credencial.");
+        throw new PdfSignException("El PDF no es una Credencial.");
+    }
+
+    preg_match_all("/con número de documento\s*" . PDF_DNI . "/iu", $text, $ids);
+    $found = array_unique(array_map('strtoupper', $ids[1]));
+    if (count($found) != 1 || !pdfValidDni(reset($found))) {
+        logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
+        throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
+    }
+    return reset($found);
 }
