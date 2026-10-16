@@ -1,3 +1,8 @@
+# 1.3
+- For security reasons DB storage of personal data changes from hash to hmac. The key is defined in config.php.
+- Changes for allowing "hojas de servicio" and "credenciales" for validating participants.
+
+
 # 1.2
 - Votes are no longer linked to participants: the new `Voted` table records who has voted
   in each survey and `Responses` drops `participantid` and the per participant signature

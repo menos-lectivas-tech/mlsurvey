@@ -27,33 +27,52 @@ abstract class RegistrationView extends View
     private const ACTION_DOCS = "Documentos";
     private const KIND_INTERIM = "interino";
     private const KIND_CAREER = "carrera";
+    private const KIND_HOJASERVICIOS = "hojaserv";
+    private const KIND_CREDENCIAL = "credencial";
     /* Páginas en las que se descarga cada documento. */
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
     private const URL_VIDA_LABORAL = "https://portal.seg-social.gob.es/wps/portal/importass/importass/Categorias/Vida+laboral+e+informes/Informes+sobre+tu+situacion+laboral/Informe+de+tu+vida+laboral";
 
-    private array $docs = array ();
+    private array $docs = array();
 
     function __construct()
     {
-        if (isset (Config::PARAMS["pdf_max_age_days"]))
+        if (isset(Config::PARAMS["pdf_max_age_days"]))
             $this->maxage = Config::PARAMS["pdf_max_age_days"];
         $this->docs = [
+            self::KIND_HOJASERVICIOS => [
+                'label' => "Hoja de servicios",
+                'name' => "Hoja de servicios firmada electrónicamente.",
+                'url' => "",
+                'info' => "Una hoja de servicios firmada electrónicamente " .
+                    "en los últimos {$this->maxage} días.",
+                "needscert" => false,
+            ],
+            self::KIND_CREDENCIAL => [
+                'label' => "Credencial docente",
+                'name' => "Credencial de nombramiento para puesto docente.",
+                'url' => "",
+                'info' => "Debe estar firmada electrónicamente y corresponder al curso actual.",
+                "needscert" => false,
+            ],
             self::KIND_INTERIM => [
-                'label' => "Interinos",
+                'label' => "Certificado formación +  Vida laboral",
                 'name' => "Informe de vida laboral",
                 'url' => self::URL_VIDA_LABORAL,
                 'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
                     "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
                     "{$this->maxage} días.",
+                "needscert" => true,
             ],
             self::KIND_CAREER => [
-                'label' => "Funcionarios de carrera",
+                'label' => "Certificado formación + Certificado MUFACE",
                 'name' => "Certificado de afiliación a MUFACE",
                 'url' => self::URL_MUFACE,
                 'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
                     "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
                     "expedido en los últimos {$this->maxage} días.",
+                "needscert" => true,
             ],
         ];
     }
@@ -64,7 +83,7 @@ abstract class RegistrationView extends View
         <link href="css/button3.css" rel="stylesheet" />
         <link href="css/questions.css" rel="stylesheet" />
         <?= altchaStyleHTML(); ?>
-        <?php
+    <?php
     }
 
     /**
@@ -137,7 +156,7 @@ abstract class RegistrationView extends View
     {
         $domains = Config::$alloweddomains == "" ? "cualquiera" :
             str_replace(" ", ", ", Config::$alloweddomains);
-        ?>
+    ?>
         <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?>
                 <?= $this->infoButton($texts['infotitle'], $texts['info']); ?>
@@ -161,8 +180,7 @@ abstract class RegistrationView extends View
                     <small><?= h($texts['emailhint']); ?></small>
                 </div>
                 <div class="ml-participate-row">
-                    <input type="email" name="email" id="email" required
-                        >
+                    <input type="email" name="email" id="email" required>
                     <?= altchaWidgetHTML(); ?>
                     <button type="submit" class="button-3 ml-participate-btn"
                         name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">
@@ -170,7 +188,7 @@ abstract class RegistrationView extends View
                 </div>
             </form>
         </section>
-        <?php
+    <?php
         $this->showInfoScript();
     }
 
@@ -182,13 +200,15 @@ abstract class RegistrationView extends View
     {
         /* Documento que acredita cada régimen: al cambiar de régimen se
            cambian el título, el enlace y la explicación del segundo fichero. */
-        $doc = $this->docs[self::KIND_INTERIM];
-        ?>
+        $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
+        $doc = $this->docs[self::KIND_HOJASERVICIOS];
+    ?>
         <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?></h3>
             <p>La dirección <strong><?= h($email); ?></strong> <?= h($texts['intro']); ?>
                 La dirección queda asociada a tus documentos: tendrás que usar siempre la misma.
-                <a href="<?= h($texts['back']); ?>">Usar otra dirección</a></p>
+                <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
+            </p>
             <form id="getcodedocs" name="getcodedocs" method="POST"
                 action="<?= h($texts['action']); ?>" enctype="multipart/form-data">
                 <?= setTokenHTML(); ?>
@@ -196,41 +216,48 @@ abstract class RegistrationView extends View
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                 <?php } ?>
                 <input type="hidden" name="email" value="<?= h($email); ?>">
-                <fieldset class="ml-participate-kind">
-                    <legend>Soy
-                        <?= $this->infoButton(
-                            "Situación",
-                            "Interinos: se pide el informe de vida laboral.\n\n" .
-                                "Funcionarios/as de carrera: se pide el certificado de " .
-                                "afiliación a MUFACE."
-                        ); ?>
-                    </legend>
+                <label for="tipo">Documentación probatoria:</label>
+                <?= $this->infoButton(
+                    "Documentación solicitada.",
+                    "La documentación se solicita únicamente para verificar que eres docente " .
+                        "de la pública, no se guarda en ninguna parte y no se utiliza para nada más.\n\n" .
+                        "Si tienes una hoja de servicios de menos de {$maxage} días o una " .
+                        "credencial correspondiente a este curso, utilízala.\n" .
+                        "En otro caso podrás verificar tu condición aportando dos documentos:\n" .
+                        "* Certificado de formación\n" .
+                        "* Vida laboral o certificado de MUFACE.\n\n" .
+                        "Los documentos han de tener una firma electrónica válida para ser " .
+                        "aceptados"
+                ); ?>
+                <select name="tipo" id="tipo">
                     <?php foreach ($this->docs as $kind => $d) { ?>
-                        <label><input type="radio" name="tipo" value="<?= $kind; ?>" required
-                                data-name="<?= h($d['name']); ?>" data-url="<?= h($d['url']); ?>"
-                                data-info="<?= h($d['info']); ?>"
-                                <?= $kind === self::KIND_INTERIM ? "checked" : ""; ?>>
-                            <?= h($d['label']); ?></label>
+                        <option value="<?= $kind; ?>" <?= $kind == self::KIND_HOJASERVICIOS ?
+                                                            "selected" : "" ?> data-name="<?= h($d['name']); ?>" data-url="<?= h($d['url']); ?>"
+                            data-info="<?= h($d['info']); ?>" data-cert="<?= h($d["needscert"]) ?>">
+                            <?= $d["label"] ?></option>
                     <?php } ?>
-                </fieldset>
-                <div class="ml-participate-doc">
-                    <label for="extracto">Extracto de formación</label>
-                    <?= $this->infoButton(
-                        "Extracto de formación",
-                        "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
-                            "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
-                    ); ?>
-                    <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                            rel="noopener noreferrer">aquí</a></small>
-                </div>
-                <div class="ml-participate-row">
-                    <input type="file" name="extracto" id="extracto" required
-                        accept="application/pdf,.pdf">
+                </select>
+
+                <div id="extractodiv">
+                    <div class="ml-participate-doc">
+                        <label for="extracto">Extracto de formación</label>
+                        <?= $this->infoButton(
+                            "Extracto de formación",
+                            "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
+                                "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
+                        ); ?>
+                        <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                                rel="noopener noreferrer">aquí</a></small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="file" name="extracto" id="extracto" required
+                            accept="application/pdf,.pdf">
+                    </div>
                 </div>
                 <div class="ml-participate-doc">
                     <label for="documento" id="documento-name"><?= h($doc['name']); ?></label>
                     <?= $this->infoButton($doc['name'], $doc['info'], "documento-info"); ?>
-                    <small>Obtener <a href="<?= h($doc['url']); ?>" id="documento-url"
+                    <small id="documento-url">Obtener <a href="<?= h($doc['url']); ?>"
                             target="_blank" rel="noopener noreferrer">aquí</a></small>
                 </div>
                 <div class="ml-participate-row">
@@ -240,7 +267,8 @@ abstract class RegistrationView extends View
                 <p class="ml-participate-legal-link">Antes de enviarlos, lee
                     <button type="button" class="ml-link" id="ml-legal-open"
                         aria-haspopup="dialog">cómo tratamos tus documentos y la información
-                        sobre protección de datos</button>.</p>
+                        sobre protección de datos</button>.
+                </p>
                 <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
                     aria-labelledby="ml-legal-title">
                     <div class="ml-dialog__form">
@@ -248,13 +276,20 @@ abstract class RegistrationView extends View
                             condición de docente de la enseñanza pública</h2>
                         <div class="ml-legal-body" tabindex="0">
                             <p>Para comprobar que eres docente en activo en un centro público de la
-                                Comunidad de Madrid necesitamos dos documentos:</p>
+                                Comunidad de Madrid necesitamos algún documento probatorio que
+                                esté firmado digitalmente:</p>
                             <ol>
-                                <li>Tu Extracto Individual de Formación, que acredita la condición
-                                    docente en la Comunidad de Madrid.</li>
-                                <li>Tu Informe de Vida Laboral o, si eres funcionario/a de carrera, tu
-                                    certificado de afiliación a MUFACE, que acredita el servicio
-                                    activo en un centro público.</li>
+                                <li>Tu Hoja de servicios actualizada, que acredita que eres 
+                                    docente de la pública.</li>
+                                <li>Tu credencial de docente.</li>
+                                <li>Si no tienes ningúno de los anteriores puedes descargar tu
+                                    extracto de formación para aportarlo junto con alguno de los siguientes:
+                                </li>
+                                <ol>
+                                    <li>Si no eres funcionario/a de carrera, tu Informe de Vida Laboral</li>
+                                    <li>Si eres funcionario/a de carrera, tu
+                                        certificado de afiliación a MUFACE</li>
+                                </ol>
                             </ol>
                             <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
                                 para comprobar su autenticidad, que el NIF coincide en ambos y que
@@ -278,7 +313,7 @@ abstract class RegistrationView extends View
                                 <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
                                     servicio se aloja en la Unión Europea.</li>
                                 <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                    oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org. 
+                                    oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
                                     También puedes reclamar ante la Agencia Española de
                                     Protección de Datos (<a href="https://www.aepd.es" target="_blank"
                                         rel="noopener noreferrer">aepd.es</a>).</li>
@@ -312,24 +347,51 @@ abstract class RegistrationView extends View
                 var info = document.getElementById("documento-info");
 
                 /* El segundo documento depende del régimen elegido. */
-                function showDocument(clear) {
-                    var kind = form.querySelector('input[name="tipo"]:checked');
+                function displayElement(element, type) {
+                    if (type == "")
+                        element.style.display = "none";
+                    else
+                        element.style.display = type;
+                }
+
+                function showDocument(kind, clear) {
+                    //var kind = form.querySelector('input[name="tipo"]:checked');
                     if (!kind)
                         return;
-                    document.getElementById("documento-name").textContent = kind.dataset.name;
-                    document.getElementById("documento-url").href = kind.dataset.url;
-                    info.dataset.title = kind.dataset.name;
-                    info.setAttribute("aria-label", "Más información: " + kind.dataset.name);
-                    info.dataset.info = kind.dataset.info;
+                    data = kind[0].dataset;
+                    document.getElementById("documento-name").textContent = data.name;
+                    theurl = document.getElementById("documento-url");
+                    if (data.url != "") {
+                        displayElement(theurl, "block");
+                        theurl.href = data.url;
+                    } else {
+                        displayElement(theurl, "");
+                    }
+                    certdiv = document.getElementById("extractodiv");
+                    certfile = document.getElementById("extracto");
+                    if (data.cert == "1") {
+                        displayElement(certdiv, "block");
+                        certfile.required = true;
+                    } else {
+                        displayElement(certdiv, "none");
+                        certfile.required = false;
+                    }
+                    info.dataset.title = data.name;
+                    info.setAttribute("aria-label", "Más información: " + data.name);
+                    info.dataset.info = data.info;
                     /* El fichero elegido era el del otro régimen. */
                     if (clear)
                         file.value = "";
                 }
-                form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
+                var doctype = form.querySelector('select[name="tipo"]');
+                doctype.addEventListener("change", function() {
+                    showDocument(doctype.selectedOptions, true);
+                });
+                /*form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
                     radio.addEventListener("change", function() {
                         showDocument(true);
                     });
-                });
+                });*/
                 /* La información de protección de datos se muestra en un diálogo. */
                 var legal = document.getElementById("ml-legal");
                 document.getElementById("ml-legal-open").addEventListener("click", function() {
@@ -345,20 +407,20 @@ abstract class RegistrationView extends View
                         legal.removeAttribute("open");
                 });
                 /* Al recargar, el navegador puede conservar el régimen marcado. */
-                showDocument(false);
+                showDocument(doctype.selectedOptions, false);
                 window.addEventListener("pageshow", function() {
-                    showDocument(false);
+                    showDocument(doctype.selectedOptions, false);
                 });
             })();
         </script>
-        <?php
+    <?php
         $this->showInfoScript();
     }
 
     /* Los iconos de información abren su explicación en un diálogo. */
     private function showInfoScript()
     {
-        ?>
+    ?>
         <script>
             document.querySelectorAll(".ml-participate-card .ml-info").forEach(function(button) {
                 button.addEventListener("click", function() {
@@ -370,7 +432,7 @@ abstract class RegistrationView extends View
                 });
             });
         </script>
-        <?php
+<?php
     }
 
     /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
@@ -482,44 +544,68 @@ abstract class RegistrationView extends View
     private function getDni(): ?string
     {
         $kind = $_REQUEST['tipo'] ?? null;
-        if ($kind !== self::KIND_INTERIM && $kind !== self::KIND_CAREER) {
-            echo ("<p><strong>Hay que indicar si eres interino/a o funcionario/a de carrera.</strong></p>");
+        if (!in_array ($kind, array_keys($this->docs), true)) {
+            echo ("<p><strong>Hay que indicar la documentación con la que te validas..</strong></p>");
             return null;
         }
-        $docname = $kind === self::KIND_CAREER ? "certificado de afiliación a MUFACE" :
-            "informe de vida laboral";
-        $extracto = $this->getUpload('extracto', "extracto de formación");
-        if ($extracto === null)
-            return null;
+        $thedoc = $this->docs[$kind];
+        $docname = $thedoc["name"];
+        $extracto = null;
+        if ($thedoc["needscert"]){
+            $extracto = $this->getUpload('extracto', "extracto de formación");
+            if ($extracto === null)
+                return null;
+        }
+        
         $document = $this->getUpload('documento', $docname);
         if ($document === null)
             return null;
-        /* Para que el mensaje de error diga de qué fichero habla. */
-        $checking = "extracto de formación";
-        try {
-            checkExtractoSignature($extracto);
-            $dni = getPdfDni($extracto);
-            $checking = $docname;
-            if ($kind === self::KIND_CAREER) {
-                checkMufaceSignature($document);
-                $documentdni = getMufaceDni($document);
-            } else
-                $documentdni = getVidaLaboralDni($document);
-        } catch (PdfSignException $e) {
-            echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
-            return null;
+        
+        $dni = "";
+        if ($thedoc["needscert"]){
+            /* Para que el mensaje de error diga de qué fichero habla. */
+            $checking = "extracto de formación";
+            try {
+                checkExtractoSignature($extracto);
+                $dni = getPdfDni($extracto);
+                $checking = $docname;
+                if ($kind === self::KIND_CAREER) {
+                    checkMufaceSignature($document);
+                    $documentdni = getMufaceDni($document);
+                } else
+                    $documentdni = getVidaLaboralDni($document);
+            } catch (PdfSignException $e) {
+                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
+                return null;
+            }
+            if (!hash_equals($dni, $documentdni)) {
+                echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
+                    "formación.</strong></p>");
+                logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
+                return null;
+            }
         }
-        if (!hash_equals($dni, $documentdni)) {
-            echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
-                "formación.</strong></p>");
-            logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
-            return null;
+        else {
+            try {
+                $checking = $docname;
+                if ($kind == self::KIND_HOJASERVICIOS){
+                    checkHojaServiciosSignature($document);
+                    $dni = getHojaServiciosNIF($document);
+                }
+                else if ($kind == self::KIND_CREDENCIAL){
+                    checkCredencialSignature($document);
+                    $dni = getCredencialNIF($document);
+                }
+            } catch (PdfSignException $e) {
+                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
+                return null;
+            }
         }
-        return $dni;
+        return $dni === "" ? null : $dni;
     }
 
     /* Id de la participante registrada con esa dirección, o null si no hay. */
-    protected function getParticipantId($db, $hashemail): ?int
+    protected function getParticipantId(PDO $db, string $hashemail): ?int
     {
         $participants = $db->prepare("SELECT participantid
             FROM {Participants}
@@ -560,7 +646,7 @@ abstract class RegistrationView extends View
                 return null;
             }
             if ($row['participant'] !== $hashemail) {
-                echo ("<p><strong>Los documentos adjuntados ya se han usado con otra dirección " .
+                echo ("<p><strong>El DNI de los documentos adjuntados ya se ha usado con otra dirección " .
                     "de correo. Hay que usar siempre la misma dirección.</strong></p>");
                 return null;
             }
