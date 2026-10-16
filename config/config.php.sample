@@ -67,25 +67,28 @@ const CONFIG = [
 
 /**
  * Second PDF asked for participating: the digitally signed MUFACE membership
- * certificate (Clases Pasivas) or the work history report, informe de vida
- * laboral (the rest: career civil servants who joined from 2011 on and
+ * certificate (Clases Pasivas) or the digitally signed appointment,
+ * nombramiento (the rest: career civil servants who joined from 2011 on and
  * interim ones).
  * muface_ca_file: PEM file with the certification authorities trusted for the
  * signature of the MUFACE certificate. Only these are trusted, not the system
  * ones.
  * muface_signer_ids: serialNumber (NIF) of the certificates allowed to sign
  * it. Q2861001B is the MUFACE electronic seal.
- * pdf_max_age_days: how old this second PDF can be, counting from its issue
- * date. It doesn't apply to the training record.
- * pdf_public_employers: the work history report must have an open (no end
- * date) row whose contribution account code or employer name contains one of
- * these texts.
+ * pdf_max_age_days: how old the MUFACE certificate can be, counting from its
+ * issue date. The appointment must be of the current school year.
+ * nombramiento_ca_file: PEM file with the certification authorities trusted
+ * for the signature of the appointment.
+ * nombramiento_signer_orgs: organizationIdentifier of the organizations whose
+ * employees can sign it (it is signed with the employee's own certificate).
+ * VATES-S7800001E is the Comunidad de Madrid.
  */
 
 "muface_ca_file" => 'certs/muface_ca.pem',
 "muface_signer_ids" => ['Q2861001B'],
 "pdf_max_age_days" => 30,
-"pdf_public_employers" => ['COMUNIDAD DE MADRID CONSEJERIA DE EDUCACI', 'COMUNIDAD MADRID A.TERRITORIALES'],
+"nombramiento_ca_file" => 'certs/nombramiento_ca.pem',
+"nombramiento_signer_orgs" => ['VATES-S7800001E'],
 
 /**
  * For enabling stress test bypasses

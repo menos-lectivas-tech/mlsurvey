@@ -32,7 +32,6 @@ abstract class RegistrationView extends View
     /* Páginas en las que se descarga cada documento. */
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
-    private const URL_VIDA_LABORAL = "https://portal.seg-social.gob.es/wps/portal/importass/importass/Categorias/Vida+laboral+e+informes/Informes+sobre+tu+situacion+laboral/Informe+de+tu+vida+laboral";
 
     private array $docs = array();
 
@@ -57,12 +56,12 @@ abstract class RegistrationView extends View
                 "needscert" => false,
             ],
             self::KIND_INTERIM => [
-                'label' => "Certificado formación +  Vida laboral",
-                'name' => "Informe de vida laboral",
-                'url' => self::URL_VIDA_LABORAL,
-                'info' => "Se descarga en el portal de la Seguridad Social.\n\n" .
-                    "Adjunta el PDF tal como lo descargaste y expedido en los últimos " .
-                    "{$this->maxage} días.",
+                'label' => "Certificado formación + Nombramiento",
+                'name' => "Nombramiento",
+                'url' => "",
+                'info' => "Acuerdo de nombramiento y toma de posesión firmado electrónicamente " .
+                    "por la Comunidad de Madrid.\n\n" .
+                    "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual.",
                 "needscert" => true,
             ],
             self::KIND_CAREER => [
@@ -225,7 +224,7 @@ abstract class RegistrationView extends View
                         "credencial correspondiente a este curso, utilízala.\n" .
                         "En otro caso podrás verificar tu condición aportando dos documentos:\n" .
                         "* Certificado de formación\n" .
-                        "* Vida laboral o certificado de MUFACE.\n\n" .
+                        "* Nombramiento o certificado de MUFACE.\n\n" .
                         "Los documentos han de tener una firma electrónica válida para ser " .
                         "aceptados"
                 ); ?>
@@ -286,7 +285,7 @@ abstract class RegistrationView extends View
                                     extracto de formación para aportarlo junto con alguno de los siguientes:
                                 </li>
                                 <ol>
-                                    <li>Si no eres funcionario/a de carrera, tu Informe de Vida Laboral</li>
+                                    <li>Si no eres funcionario/a de carrera, tu nombramiento del curso actual</li>
                                     <li>Si eres funcionario/a de carrera, tu
                                         certificado de afiliación a MUFACE</li>
                                 </ol>
@@ -301,7 +300,7 @@ abstract class RegistrationView extends View
                                 esa clave no es posible conocerlo. Solo sirve para impedir que una misma
                                 persona tenga más de una cuenta.</p>
                             <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                información de la necesaria, como tu domicilio, tu historial laboral o,
+                                información de la necesaria, como tu domicilio, tu puesto de trabajo o,
                                 en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
                                 ni la conservamos.</p>
                             <h5>Información básica sobre protección de datos</h5>
@@ -536,8 +535,8 @@ abstract class RegistrationView extends View
     }
 
     /* Comprueba la firma del extracto de formación y el documento subido
-       según lo elegido (certificado de MUFACE firmado o
-       informe de vida laboral), y que los dos son de la misma persona.
+       según lo elegido (certificado de MUFACE o nombramiento, los dos
+       firmados), y que los dos son de la misma persona.
        Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
        si no vale. Los ficheros se quedan en el temporal de la subida: no se
        guardan. */
@@ -572,8 +571,10 @@ abstract class RegistrationView extends View
                 if ($kind === self::KIND_CAREER) {
                     checkMufaceSignature($document);
                     $documentdni = getMufaceDni($document);
-                } else
-                    $documentdni = getVidaLaboralDni($document);
+                } else {
+                    checkNombramientoSignature($document);
+                    $documentdni = getNombramientoDni($document);
+                }
             } catch (PdfSignException $e) {
                 echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
                 return null;

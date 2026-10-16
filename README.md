@@ -5,10 +5,9 @@ With this project we are trying to develop an online voting system based on the 
   digitally signed training record (_extracto de formación_) and a PDF that proves they are
   civil servants. Those in the _Clases Pasivas_ pension scheme upload the digitally signed
   MUFACE membership certificate and the rest (career civil servants who joined from 2011 on
-  and interim ones) the Social Security work history report (_informe de vida
-  laboral_), which must show they are currently working for a public employer. The signatures
-  are checked, the DNI is read from the training record and the one in the other PDF must be
-  the same. Note that the work history report is not digitally signed, so it could be forged.
+  and interim ones) the digitally signed appointment (_nombramiento_) of the current school
+  year. The signatures are checked, the DNI is read from the training record and the one in
+  the other PDF must be the same.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -84,10 +83,13 @@ Every configuration item has a description, you only need to notice:
 * `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
   membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
   electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate or the work history report can be
-  (30 days by default) and
-  `pdf_public_employers` the employers accepted in the work history report: it must have an open
-  row whose contribution account code or employer name contains one of these texts.
+* `pdf_max_age_days` is how old the MUFACE certificate can be (30 days by default).
+* `nombramiento_ca_file` and `nombramiento_signer_orgs` set who is trusted for signing the
+  appointment: the certification authorities in `certs/nombramiento_ca.pem` and the
+  `organizationIdentifier` of the signer's certificate, Comunidad de Madrid (`VATES-S7800001E`)
+  by default. It is signed with the personal certificate of a public employee. Its body is a
+  scanned image, so the DNI and the date are read from the PDF title, which the signature
+  covers too.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -199,8 +201,9 @@ the database to be ready before serving requests.
 | `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
 | `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
 | `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate or the work history report can be, counting from its issue date. |
-| `PDF_PUBLIC_EMPLOYERS` | `COMUNIDAD DE MADRID CONSEJERIA DE EDUCACI,COMUNIDAD MADRID A.TERRITORIALES` | Comma separated texts: the work history report must have an open row whose contribution account code or employer name contains one of them. |
+| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate can be, counting from its issue date. |
+| `NOMBRAMIENTO_CA_FILE` | `certs/nombramiento_ca.pem` | PEM file with the certification authorities trusted for the signature of the appointment. |
+| `NOMBRAMIENTO_SIGNER_ORGS` | `VATES-S7800001E` | Comma separated `organizationIdentifier` of the organizations whose employees can sign the appointment. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

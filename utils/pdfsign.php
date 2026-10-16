@@ -3,10 +3,10 @@
  * Functions for checking the PDFs asked for participating and getting the
  * holder's DNI from them: the digitally signed training record (extracto de
  * formación) and either the digitally signed MUFACE membership certificate
- * (career civil servants) or the Social Security work history report, informe
- * de vida laboral (interim ones).
+ * (career civil servants) or the digitally signed appointment, nombramiento
+ * (interim ones).
  *
- * Needs the openssl and pdftotext (poppler-utils) commands.
+ * Needs the openssl, pdftotext and pdfinfo (poppler-utils) commands.
  */
 require_once 'include/config.php';
 require_once 'utils/logger.php';
@@ -16,7 +16,6 @@ const PDF_MAX_SIZE = 5 * 1024 * 1024;
 const PDF_CMD_TIMEOUT = 20;
 const PDF_TITLE = "EXTRACTO INDIVIDUAL DE RECONOCIMIENTO DE ACTIVIDADES";
 const PDF_MUFACE_TITLE = "CERTIFICADO DE AFILIACIÓN A MUFACE";
-const PDF_VIDA_LABORAL_TITLE = "INFORME DE VIDA LABORAL";
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
 const PDF_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
     "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -100,13 +99,17 @@ function pdfReadFile (string $path): string {
  *
  * @param string $path PDF file.
  * @param string $cafile PEM file with the trusted certification authorities.
- * @param array $signerids serialNumber (NIF) of the certificates allowed to sign.
+ * @param array $signerids Values of $signerfield allowed: by default the
+ *     serialNumber (NIF) of the certificates allowed to sign.
  * @param string $issuer Who issues the document, for the error message.
+ * @param string $signerfield Field of the signer's subject that must be one
+ *     of $signerids.
  *
  * @return array An array with signature validity in format "YYMMddhhmmssZ".
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
-function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer) 
+function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer,
+        string $signerfield = "serialNumber")
     : array|false {
     $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
     if (empty ($signatures))
@@ -127,7 +130,8 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
             file_put_contents ($sigfile, $signature);
             /* -no_check_time: el extracto vale varios años, más que el
                certificado del sello con el que se firmó, y la vigencia del
-               certificado de MUFACE se comprueba con su fecha de expedición.
+               certificado de MUFACE y del nombramiento se comprueba con su
+               fecha.
                -no-CApath: solo valen las autoridades de $cafile, no las del
                sistema. */
             [$code, , $err] = pdfRunCommand (["openssl", "cms", "-verify", "-binary",
@@ -143,7 +147,7 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
             $validity["to"] = $signer['validTo'];
             if (empty($signerids))
                 return $validity;
-            $id = $signer === false ? null : ($signer["subject"]["serialNumber"] ?? null);
+            $id = $signer === false ? null : ($signer["subject"][$signerfield] ?? null);
             if (is_string ($id) && in_array ($id, $signerids, true))
                 return $validity;
             $reason = "Signer not allowed: " . ($signer === false ? "?" : $signer["name"]);
@@ -300,82 +304,74 @@ function getMufaceDni (string $path): string {
 }
 
 /**
- * Returns the rows of the table of a work history report (text with layout).
- * Each one is ["employer" => account code and name, "active" => bool].
+ * Checks the signature of an appointment (nombramiento): it is signed with the
+ * personal certificate of the public employee that signs it, so instead of
+ * the signer's NIF the organizationIdentifier of the organization the
+ * certificate belongs to is checked (nombramiento_ca_file and
+ * nombramiento_signer_orgs in config.php).
+ *
+ * @throws PdfSignException if the file is not a properly signed PDF.
  */
-function pdfVidaLaboralRows (string $text): array {
-    $rows = [];
-    $current = null;
-    $date = '\d\d\.\d\d\.\d{4}';
-    foreach (preg_split ('/\R/u', $text) as $line){
-        /* RÉGIMEN, cuenta de cotización, EMPRESA, FECHA ALTA, FECHA DE EFECTO
-           y FECHA DE BAJA, que es --- mientras se sigue de alta. */
-        if (preg_match ('/^\s*\S.*?\s(\d{9,12}|-{5,})\s+(\S.*?)\s+' . $date . '\s+' . $date .
-                '\s+(' . $date . '|-{3})\s/u', $line, $m)){
-            $rows[] = ["employer" => $m[1] . " " . $m[2], "active" => $m[3] == "---"];
-            $current = count ($rows) - 1;
-        }
-        /* El nombre de la empresa puede seguir en la línea de debajo. */
-        else if ($current !== null && trim ($line) != "" && !preg_match ('/' . $date . '/', $line))
-            $rows[$current]["employer"] .= " " . trim ($line);
-        else
-            $current = null;
-    }
-    return $rows;
+function checkNombramientoSignature (string $path){
+    checkPdfSignature ($path, Config::PARAMS["nombramiento_ca_file"] ?? "certs/nombramiento_ca.pem",
+        Config::PARAMS["nombramiento_signer_orgs"] ?? ["VATES-S7800001E"], "la Comunidad de Madrid",
+        "organizationIdentifier");
 }
 
 /**
- * Checks that a PDF is a recent work history report (informe de vida
- * laboral) in which the holder is currently working for one of the public
- * employers in pdf_public_employers (config.php), and gets the holder's
- * DNI/NIE from it.
+ * Checks that a PDF is an appointment (acuerdo de nombramiento) of the
+ * current school year and gets the holder's DNI/NIE from it. The signature
+ * must have been checked before with checkNombramientoSignature.
  *
- * This report is not digitally signed: it can only be checked at the Social
- * Security site with its CEA code, so its contents are trusted as they come.
+ * The body of the appointment is a scanned image: the only text with the data
+ * is the PDF title, "<name> <DNI with a leading zero> <form> <kind> <yyyy mm dd>",
+ * which is covered by the signature too.
  *
  * @param string $path PDF file.
  *
  * @return string The DNI/NIE, in upper case.
  *
- * @throws PdfSignException if the PDF is not a valid report or has no DNI.
+ * @throws PdfSignException if the PDF is not a valid appointment or has no DNI.
  */
-function getVidaLaboralDni (string $path): string {
-    pdfReadFile ($path);
-    $layout = pdfText ($path, true);
-    $text = preg_replace ('/\s+/u', ' ', $layout) ?? "";
+function getNombramientoDni (string $path): string {
+    $text = preg_replace ('/\s+/u', ' ', pdfText ($path)) ?? "";
+    [$code, $info, $err] = pdfRunCommand (["pdfinfo", "-enc", "UTF-8", $path]);
+    if ($code != 0)
+        throw new Exception ("pdfinfo failed ({$code}): " . trim ($err));
 
-    if (stripos ($text, PDF_VIDA_LABORAL_TITLE) === false ||
-            stripos ($text, "Tesorería General de la Seguridad Social") === false ||
-            !preg_match ('/al día (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $date)){
-        logMessage (LOGGER_WARN, "PDF rejected: it is not a work history report.");
-        throw new PdfSignException ("El PDF no es un informe de vida laboral.");
+    if (stripos ($text, "gestiona.comunidad.madrid/csv") === false ||
+            !preg_match ('/^Title:\s*(?:__tmp_img__)?\S.*?\s0?([0-9]{8}|[XYZ][0-9]{7})([A-Z]?)\s+\S+\s+\S+\s+' .
+                '(\d{4}) (\d\d) (\d\d)\s*$/mu', $info, $m)){
+        logMessage (LOGGER_WARN, "Signed PDF rejected: it is not an appointment.");
+        throw new PdfSignException ("El PDF no es un nombramiento.");
     }
-    /* El DNI viene con un cero delante: 012345678Z. */
-    preg_match_all ('/(?:D\.N\.I\.|N\.I\.E\.)\s*0?' . PDF_DNI . '/iu', $text, $ids);
-    $found = array_unique (array_map ('strtoupper', $ids[1]));
-    if (count ($found) != 1 || !pdfValidDni (reset ($found))){
-        logMessage (LOGGER_WARN, "Work history report rejected: no single valid DNI in it.");
-        throw new PdfSignException ("No se ha podido leer el DNI en el informe de vida laboral.");
+    /* El DNI viene sin letra: 047036495. */
+    $dni = $m[1];
+    if ($m[2] == ""){
+        $number = (int) (strtr ($dni[0], "XYZ", "012") . substr ($dni, 1));
+        $dni .= "TRWAGMYFPDXBNJZSQVHLCKE"[$number % 23];
     }
-    /* Una situación de alta solo dice algo si el informe es reciente. */
-    pdfCheckIssueDate ($date[1], $date[2], $date[3]);
+    else
+        $dni .= $m[2];
+    if (!pdfValidDni ($dni)){
+        logMessage (LOGGER_WARN, "Appointment rejected: no valid DNI in it.");
+        throw new PdfSignException ("No se ha podido leer el DNI en el nombramiento.");
+    }
 
-    $employers = Config::PARAMS["pdf_public_employers"] ??
-        ["COMUNIDAD DE MADRID CONSEJERIA DE EDUCACI", "COMUNIDAD MADRID A.TERRITORIALES"];
-    foreach (pdfVidaLaboralRows ($layout) as $row){
-        if (!$row["active"])
-            continue;
-        $employer = strtoupper (preg_replace ('/\s+/u', ' ', $row["employer"]) ?? "");
-        foreach ($employers as $name){
-            if (trim ($name) != "" && strpos ($employer, strtoupper (trim ($name))) !== false)
-                return reset ($found);
-        }
+    /* La fecha del nombramiento tiene que ser del curso actual, que empieza
+       el 1 de septiembre. */
+    if (!checkdate ((int) $m[4], (int) $m[5], (int) $m[3]))
+        throw new PdfSignException ("No se ha podido leer la fecha del nombramiento.");
+    $date = (new DateTimeImmutable ("today"))->setDate ((int) $m[3], (int) $m[4], (int) $m[5]);
+    $today = new DateTimeImmutable ("today");
+    $year = (int) $today->format ("Y") - ((int) $today->format ("n") < 9 ? 1 : 0);
+    $start = $today->setDate ($year, 9, 1);
+    if ($date < $start || $date >= $start->modify ("+1 year")){
+        logMessage (LOGGER_WARN, "Appointment rejected: dated {$date->format ('Y-m-d')}.");
+        throw new PdfSignException ("El nombramiento tiene que ser del curso actual.");
     }
-    logMessage (LOGGER_WARN, "Work history report rejected: not working for a public employer.");
-    throw new PdfSignException ("En el informe de vida laboral no consta una situación de alta " .
-        "en vigor en la enseñanza pública.");
+    return $dni;
 }
-
 
 function checkHojaServiciosSignature(string $path)
 {

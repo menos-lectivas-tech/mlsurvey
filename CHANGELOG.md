@@ -1,6 +1,9 @@
 # 1.3
 - For security reasons DB storage of personal data changes from hash to hmac. The key is defined in config.php.
 - Changes for allowing "hojas de servicio" and "credenciales" for validating participants.
+- The work history report (informe de vida laboral) is replaced by the digitally signed
+  appointment (nombramiento) of the current school year. `pdf_public_employers` is no longer
+  used; new `nombramiento_ca_file` and `nombramiento_signer_orgs` settings.
 
 
 # 1.2
