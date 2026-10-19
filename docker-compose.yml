@@ -109,14 +109,16 @@ services:
       # los sellos admitidos, separados por comas.
       PDF_CA_FILE: ${PDF_CA_FILE:-certs/extracto_ca.pem}
       PDF_SIGNER_IDS: ${PDF_SIGNER_IDS:-S7800001E}
-      # Documento que acredita el régimen (Clases Pasivas o resto): sello de MUFACE admitido,
-      # antiguedad maxima del PDF y organismos cuyos empleados pueden firmar
-      # el nombramiento (listas separadas por comas).
+      # Documento que acredita el régimen (Clases Pasivas o resto): sello de MUFACE admitido
+      # (separados por comas), antiguedad maxima del PDF y autoridades de
+      # confianza y expresion regular de los organismos que pueden firmar el
+      # nombramiento, la hoja de servicios y la credencial (sin definir: la
+      # Comunidad de Madrid y los organismos publicos de Madrid).
       MUFACE_CA_FILE: ${MUFACE_CA_FILE:-certs/muface_ca.pem}
       MUFACE_SIGNER_IDS: ${MUFACE_SIGNER_IDS:-Q2861001B}
       PDF_MAX_AGE_DAYS: ${PDF_MAX_AGE_DAYS:-30}
       NOMBRAMIENTO_CA_FILE: ${NOMBRAMIENTO_CA_FILE:-certs/nombramiento_ca.pem}
-      NOMBRAMIENTO_SIGNER_ORGS: ${NOMBRAMIENTO_SIGNER_ORGS:-VATES-S7800001E}
+      NOMBRAMIENTO_SIGNER_ORGS: ${NOMBRAMIENTO_SIGNER_ORGS:-}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}

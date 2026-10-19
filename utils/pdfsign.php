@@ -17,6 +17,10 @@ const PDF_CMD_TIMEOUT = 20;
 const PDF_TITLE = "EXTRACTO INDIVIDUAL DE RECONOCIMIENTO DE ACTIVIDADES";
 const PDF_MUFACE_TITLE = "CERTIFICADO DE AFILIACIÓN A MUFACE";
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
+/* Firmantes del nombramiento, la hoja de servicios y la credencial: la Comunidad de
+   Madrid (S7800001E) y los organismos públicos de Madrid, como los centros (NIF Q con
+   código provincial 28 o 78 a 88). */
+const PDF_EMPLEADO_ORGS = '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/';
 const PDF_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
     "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -110,8 +114,9 @@ function pdfReadFile (string $path): string {
  *
  * @param string $path PDF file.
  * @param string $cafile PEM file with the trusted certification authorities.
- * @param array $signerids Values of $signerfield allowed: by default the
- *     serialNumber (NIF) of the certificates allowed to sign.
+ * @param array|string $signerids Values of $signerfield allowed (by default
+ *     the serialNumber (NIF) of the certificates allowed to sign), or a
+ *     regular expression they must match.
  * @param string $issuer Who issues the document, for the error message.
  * @param string $signerfield Field of the signer's subject that must be one
  *     of $signerids.
@@ -121,7 +126,7 @@ function pdfReadFile (string $path): string {
  *     (DateTimeImmutable) or null if the PDF does not say it.
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
-function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer,
+function checkPdfSignature (string $path, string $cafile, array|string $signerids, string $issuer,
         string $signerfield = "serialNumber")
     : array {
     $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
@@ -160,7 +165,8 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
             $validity["to"] = $signer['validTo'];
             $validity["signed"] = $signed;
             $id = $signer === false ? null : ($signer["subject"][$signerfield] ?? null);
-            if (is_string ($id) && in_array ($id, $signerids, true))
+            if (is_string ($id) && (is_string ($signerids) ? preg_match ($signerids, $id) === 1 :
+                    in_array ($id, $signerids, true)))
                 return $validity;
             $reason = "Signer not allowed: " . ($signer === false ? "?" : $signer["name"]);
         }
@@ -346,18 +352,30 @@ function getMufaceDni (string $path): string {
 }
 
 /**
- * Checks the signature of an appointment (nombramiento): it is signed with the
- * personal certificate of the public employee that signs it, so instead of
- * the signer's NIF the organizationIdentifier of the organization the
- * certificate belongs to is checked (nombramiento_ca_file and
- * nombramiento_signer_orgs in config.php).
+ * Checks the signature of the appointment (nombramiento), the service record
+ * (hoja de servicios) and the teaching credential: they are signed with the
+ * personal certificate of a public employee or with the representative
+ * certificate of the school, so instead of the signer's NIF the
+ * organizationIdentifier of the organization the certificate belongs to is
+ * checked (nombramiento_ca_file and nombramiento_signer_orgs in config.php).
+ *
+ * @return array What checkPdfSignature returns.
+ *
+ * @throws PdfSignException if the file is not a properly signed PDF.
+ */
+function checkEmpleadoSignature (string $path): array {
+    return checkPdfSignature ($path, Config::PARAMS["nombramiento_ca_file"] ?? "certs/nombramiento_ca.pem",
+        Config::PARAMS["nombramiento_signer_orgs"] ?? PDF_EMPLEADO_ORGS, "la Comunidad de Madrid",
+        "organizationIdentifier");
+}
+
+/**
+ * Checks the signature of an appointment (nombramiento).
  *
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
 function checkNombramientoSignature (string $path){
-    checkPdfSignature ($path, Config::PARAMS["nombramiento_ca_file"] ?? "certs/nombramiento_ca.pem",
-        Config::PARAMS["nombramiento_signer_orgs"] ?? ["VATES-S7800001E"], "la Comunidad de Madrid",
-        "organizationIdentifier");
+    checkEmpleadoSignature ($path);
 }
 
 /**
@@ -418,31 +436,9 @@ function getNombramientoDni (string $path): string {
     return $dni;
 }
 
-/**
- * Checks the signature of a document signed at the school, the service record
- * (hoja de servicios) or the teaching credential: like the appointment, it is
- * signed with a personal certificate, so the organizationIdentifier of the
- * organization the certificate belongs to is checked (centro_ca_file and
- * centro_signer_orgs in config.php).
- *
- * @return array What checkPdfSignature returns.
- *
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkCentroSignature(string $path): array
-{
-    return checkPdfSignature(
-        $path,
-        Config::PARAMS["centro_ca_file"] ?? "certs/muface_ca.pem",
-        Config::PARAMS["centro_signer_orgs"] ?? ["VATES-S7800001E"],
-        "la Comunidad de Madrid",
-        "organizationIdentifier"
-    );
-}
-
 function checkHojaServiciosSignature(string $path)
 {
-    $validity = checkCentroSignature($path);
+    $validity = checkEmpleadoSignature($path);
     pdfCheckSignedThisCourse($validity, "la Hoja de Servicios");
     $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
     if ($validity["signed"] < (new DateTimeImmutable("today"))->modify("-{$maxage} days"))
@@ -474,7 +470,7 @@ function getHojaServiciosNIF(string $path): string|false
 
 function checkCredencialSignature(string $path)
 {
-    $validity = checkCentroSignature($path);
+    $validity = checkEmpleadoSignature($path);
     pdfCheckSignedThisCourse($validity, "la Credencial");
 }
 

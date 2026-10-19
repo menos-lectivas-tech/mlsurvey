@@ -6,9 +6,12 @@
   used; new `nombramiento_ca_file` and `nombramiento_signer_orgs` settings. The appointment
   is enough on its own: it no longer needs the training record (extracto de formación).
 - The appointment must be of the current school year and already in force. The service
-  record and the teaching credential must be signed in the current school year, and their
-  signer must belong to one of the new `centro_signer_orgs` (`centro_ca_file` for the
-  trusted CAs): before, any certificate issued by those CAs was accepted.
+  record and the teaching credential must be signed in the current school year. The three
+  of them are checked against the CAs of `nombramiento_ca_file` (`certs/nombramiento_ca.pem`
+  trusts both the Camerfirma and the FNMT certificates), and the `organizationIdentifier` of
+  the signer must match the `nombramiento_signer_orgs` regular expression: the Comunidad de
+  Madrid and the public bodies of Madrid, as the schools, by default. Before, any certificate
+  issued by the FNMT CAs of `muface_ca.pem` was accepted.
 - The documents form is now a three step wizard: situation (interim or career/trainee civil
   servant), the document to use among those valid for it, and the upload of its files.
 
