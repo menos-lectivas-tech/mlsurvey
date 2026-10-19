@@ -29,6 +29,9 @@ class MLMailer extends PHPMailer {
         self::ENCRYPTION_SMTPS => "SSL",
         self::ENCRYPTION_STARTTLS => "STARTTLS"
     ];
+    /* Se añade al final de todos los mensajes. */
+    private const UNSUBSCRIBE = "\n\n--\nSi quieres darte de baja, envía un correo a " .
+        "datos@huelga14o.org con el asunto BAJA.";
     private $m_from = "";
     public function configure (){
         $method = Config::PARAMS["email_method"];
@@ -77,7 +80,7 @@ class MLMailer extends PHPMailer {
         }
         $this->Subject = "Mensaje de prueba de MLSurvey";
         //This could be better in an external file or something
-        $this->Body = "Es un mensaje de prueba de mlsurvey";
+        $this->Body = "Es un mensaje de prueba de mlsurvey" . self::UNSUBSCRIBE;
 
         if (!$this->send ()){
             throw new Exception("Error {$this->ErrorInfo} sending test email.");
@@ -102,7 +105,8 @@ class MLMailer extends PHPMailer {
         $this->setFrom ($this->m_from);
         $this->addAddress ($recipient);
         $this->Subject = "Dirección para opinar en la consulta {$surveyname}";
-        $this->Body = "La dirección para opinar en la consulta {$surveyname} es:\n{$theurl}";
+        $this->Body = "La dirección para opinar en la consulta {$surveyname} es:\n{$theurl}" .
+            self::UNSUBSCRIBE;
         if (!$this->send ()){
             throw new Exception("Error {$this->ErrorInfo} sending code email.");
         }
@@ -124,7 +128,7 @@ class MLMailer extends PHPMailer {
         $this->Subject = "Registro completado en {$sitename}";
         $this->Body = "Te has registrado correctamente en {$sitename} con esta dirección de correo.\n\n" .
             "A partir de ahora, para participar en una consulta solo tendrás que indicar " .
-            "esta dirección. Las consultas activas están en:\n{$theurl}";
+            "esta dirección. Las consultas activas están en:\n{$theurl}" . self::UNSUBSCRIBE;
         if (!$this->send ()){
             throw new Exception("Error {$this->ErrorInfo} sending registration email.");
         }
