@@ -8,6 +8,7 @@
 require_once 'ifaces/registrationview.php';
 require_once 'utils/dbutils.php';
 require_once 'include/mlmailer.php';
+require_once 'utils/crypt.php';
 
 class Register extends RegistrationView
 {
@@ -20,84 +21,85 @@ class Register extends RegistrationView
     }
 
     /**
-     * Depending on the request parameters the class takes different actions:
-     * - If it's not a submit, shows the form asking for the email address.
-     * - If it's the submit of that form and the address is already registered, says so.
-     * If it isn't, shows the form asking for the pension scheme and the two PDFs.
-     * - If it's the submit of the second form, checks the PDFs, stores the participant
-     * in Participants table and sends an email confirming the registration.
+     * The page is the documents wizard itself: the email address is asked for in
+     * its last step, together with the PDFs.
+     * - If it's not a submit, shows the wizard.
+     * - If it's the submit of the wizard, checks the address and the PDFs, stores
+     * the participant in Participants table and sends an email confirming the
+     * registration. If something is wrong, shows the reason and the wizard again
+     * with what was chosen.
      */
     public function show()
     {
-        if ($this->isSubmit()) {
-            if ($this->checkSubmit())
-                $this->register($this->isDocsSubmit());
+        if ($this->isDocsSubmit()) {
+            if ($this->checkSubmit() && $this->register())
+                return;
+            $this->showWizard(true);
             return;
         }
-        $this->showEmailForm(null, [
+        $this->showWizard(false);
+    }
+
+    /* $retry: se vuelve a mostrar tras un envío que no ha valido, con lo
+       que se eligió. Los ficheros no se pueden conservar. */
+    private function showWizard(bool $retry)
+    {
+        $selected = [];
+        if ($retry) {
+            foreach (['regimen', 'tipo', 'email'] as $field)
+                if (isset($_REQUEST[$field]) && is_string($_REQUEST[$field]))
+                    $selected[$field] = trim($_REQUEST[$field]);
+        }
+        $this->showDocsForm(null, null, [
             'action' => self::PAGE,
             'title' => "Regístrate",
-            'infotitle' => "Cómo registrarse",
-            'info' => "Indica tu dirección de correo.\n\n" .
-                "A continuación te preguntaremos tu situación y te pediremos uno o dos documentos " .
-                "firmados electrónicamente. Si son válidos quedarás registrado/a y recibirás " .
-                "un mensaje de confirmación.\n" .
-                "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
-                "que son de la misma persona. Con el DNI que figura en ellos se evita " .
-                "que una misma persona se registre dos veces. Los ficheros no se guardan.\n\n" .
-                "Una vez registrado/a, para participar en una consulta solo tendrás que " .
-                "indicar tu dirección de correo.",
+            'intro' => "Acredita que eres docente de la enseñanza pública en tres pasos. " .
+                "Al final indicarás tu dirección de correo y te enviaremos la confirmación " .
+                "del registro. Una vez registrado/a, para participar en una consulta solo " .
+                "tendrás que indicar esa dirección.",
             'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
                 "los enlaces para participar y ya no podrás registrarte con otra.",
             'emailhint' => "Revísala bien: ahí recibirás la confirmación.",
-            'button' => "Registrarme",
-        ]);
+        ], $selected);
     }
 
     /**
-     * Called with $withdocs false from the email form and true from the documents one.
-     * In the first case only checks the email address and shows the documents form.
-     * In the second one the documents are checked and the participant is inserted in
-     * Participants table by RegistrationView::registerWithDocs, and the confirmation
-     * email is sent.
+     * Checks the address and the documents and registers the participant: the
+     * address must be valid, of an allowed domain and not registered yet; then
+     * the documents are checked and the participant is inserted in Participants
+     * table by RegistrationView::registerWithDocs, and the confirmation email is
+     * sent.
+     *
+     * @return bool true if it's done (registered, or the address already was), false
+     * (with the reason already shown) if the wizard should be shown again.
      */
-    private function register(bool $withdocs)
+    private function register(): bool
     {
-        if ($withdocs && !$this->checkConsent("registrarse"))
-            return;
+        if (!$this->checkConsent("registrarse"))
+            return false;
         $email = $this->getEmail();
         if ($email === null)
-            return;
+            return false;
         try {
             $db = dbConn();
-            if (!$this->checkDomain($db, $email)) {
-                return;
-            }
-            if (!$withdocs) {
-                if ($this->getParticipantId($db, participantHash($email)) !== null) {
-                    $this->alreadyRegistered();
-                    return;
-                }
-                $this->showDocsForm(null, $email, [
-                    'action' => self::PAGE,
-                    'back' => self::PAGE,
-                    'title' => "Acredita que eres docente",
-                    'intro' => "aún no está registrada. Sigue estos pasos para acreditarte y te " .
-                        "enviaremos a esa dirección la confirmación del registro.",
-                ]);
-                return;
+            if (!$this->checkDomain($db, $email))
+                return false;
+            /* Antes de mirar los documentos: no hace falta procesarlos. */
+            if ($this->getParticipantId($db, participantHash($email)) !== null) {
+                $this->alreadyRegistered();
+                return true;
             }
             $created = $this->registerWithDocs($db, $email, fn($participantid, $created) => $created);
             if ($created === null)
-                return;
+                return false;
             if (!$created) {
                 $this->alreadyRegistered();
-                return;
+                return true;
             }
         } catch (Exception $e) {
             echo ("<p><strong>Error al registrar la dirección de correo.</strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} when registering participant");
-            return;
+            return false;
         }
         /* El registro ya está hecho y la tabla no admite borrados: si falla
            el correo no se puede deshacer, así que solo se avisa. */
@@ -113,6 +115,7 @@ class Register extends RegistrationView
             logMessage(LOGGER_ERROR, "Error {$e} sending registration email");
         }
         $this->showSurveysLink();
+        return true;
     }
 
     private function alreadyRegistered()

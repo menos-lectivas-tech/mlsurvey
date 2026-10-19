@@ -581,6 +581,17 @@ a.scrollup i {
 }
 
 /* Formulario de acceso: una tarjeta centrada en vez de campos sueltos. */
+/* Título y explicación de la administración sobre el formulario de acceso. */
+.ml-admin-intro {
+    max-width: 380px;
+    margin: 0 auto 16px;
+    text-align: center;
+}
+
+.ml-admin-intro p {
+    color: var(--ml-text-soft);
+}
+
 #loginbox {
     max-width: 380px;
     margin: 8px auto 40px;
@@ -681,7 +692,8 @@ a.scrollup i {
     flex: none;
 }
 
-.ml-theme-btn {
+.ml-theme-btn,
+.ml-nav-icon {
     display: grid;
     place-items: center;
     width: 38px;
@@ -696,13 +708,16 @@ a.scrollup i {
                 border-color var(--ml-transition);
 }
 
-.ml-theme-btn:hover {
+.ml-theme-btn:hover,
+.ml-nav-icon:hover,
+.ml-nav-icon:focus {
     background: var(--ml-surface-2);
     color: var(--ml-text);
     border-color: var(--ml-border-strong);
 }
 
-.ml-theme-btn svg {
+.ml-theme-btn svg,
+.ml-nav-icon svg {
     width: 18px;
     height: 18px;
 }
@@ -892,8 +907,27 @@ a.scrollup i {
     border: 0;
 }
 
-/* El menú se pega a la derecha, justo antes del selector de tema. */
-header .navbar-collapse {
+/* Iconos del menú (Administración): a la derecha del menú, pegados al
+   selector de tema. Comparten su aspecto, más arriba. */
+.ml-nav-icon {
+    flex: none;
+    /* El hueco del contenedor es de 16px: quedan 4px hasta la paleta. */
+    margin-right: -12px;
+}
+
+.ml-nav-icon.is-active,
+.ml-nav-icon.is-active:hover,
+.ml-nav-icon.is-active:focus {
+    color: var(--ml-accent-contrast);
+    background: var(--ml-accent);
+    border-color: var(--ml-accent);
+    box-shadow: var(--ml-shadow-accent);
+}
+
+/* El menú se pega a la derecha, justo antes de sus iconos y del selector
+   de tema. Con el selector de Bootstrap (.container > .navbar-collapse)
+   empatado o por encima, el margen se anulaba. */
+header .navbar .container > .navbar-collapse {
     margin-left: auto;
 }
 
@@ -906,7 +940,7 @@ footer .widget address {
 }
 
 @media (max-width: 767px) {
-    header .navbar-collapse {
+    header .navbar .container > .navbar-collapse {
         margin-left: 0;
     }
 
@@ -919,7 +953,8 @@ footer .widget address {
         flex: 1 1 auto;
     }
 
-    .ml-theme {
+    .ml-theme,
+    .ml-nav-icon {
         order: 1;
     }
 
