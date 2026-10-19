@@ -64,23 +64,6 @@ abstract class RegistrationView extends View
                 'needscert' => false,
                 'wait' => false,
             ],
-            self::KIND_CAREER => [
-                'label' => "Extracto de formación + certificado de MUFACE",
-                'desc' => "Los dos se descargan al momento con certificado digital o Cl@ve.",
-                'links' => [
-                    "Extracto de formación" => self::URL_EXTRACTO,
-                    "Certificado de MUFACE" => self::URL_MUFACE,
-                ],
-                'regimes' => [self::REGIME_CAREER],
-                'name' => "Certificado de afiliación a MUFACE",
-                'where' => "Se descarga en la sede electrónica de MUFACE.",
-                'url' => self::URL_MUFACE,
-                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
-                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
-                    "expedido en los últimos {$this->maxage} días.",
-                'needscert' => true,
-                'wait' => false,
-            ],
             self::KIND_CREDENCIAL => [
                 'label' => "Credencial docente",
                 'desc' => $centro,
@@ -104,6 +87,23 @@ abstract class RegistrationView extends View
                     "en los últimos {$this->maxage} días.",
                 'needscert' => false,
                 'wait' => true,
+            ],
+            self::KIND_CAREER => [
+                'label' => "Extracto de formación + certificado de MUFACE",
+                'desc' => "Los dos se descargan al momento con certificado digital o Cl@ve.",
+                'links' => [
+                    "Extracto de formación" => self::URL_EXTRACTO,
+                    "Certificado de MUFACE" => self::URL_MUFACE,
+                ],
+                'regimes' => [self::REGIME_CAREER],
+                'name' => "Certificado de afiliación a MUFACE",
+                'where' => "Se descarga en la sede electrónica de MUFACE.",
+                'url' => self::URL_MUFACE,
+                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
+                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
+                    "expedido en los últimos {$this->maxage} días.",
+                'needscert' => true,
+                'wait' => false,
             ],
         ];
     }
