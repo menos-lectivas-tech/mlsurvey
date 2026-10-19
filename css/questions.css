@@ -493,6 +493,11 @@
     max-width: 420px;
 }
 
+/* En el asistente el correo va con los ficheros: el mismo espacio debajo. */
+.ml-wizard .ml-participate-row input[type="email"] {
+    margin-bottom: 14px;
+}
+
 .button-3.ml-participate-btn {
     min-height: 46px;
     padding: 10px 26px;
@@ -553,6 +558,11 @@
     .ml-participate-row input[type="email"] {
         flex: none;
         max-width: none;
+    }
+
+    /* En columna, la base de 260px sería la altura: un hueco bajo cada fichero. */
+    .ml-participate-row input[type="file"] {
+        flex: none;
     }
 
     /* En el móvil solo se lee el nombre del paso actual. */

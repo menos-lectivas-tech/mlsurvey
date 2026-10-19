@@ -48,8 +48,8 @@ abstract class RegistrationView extends View
            fichero que se adjunta en el tercero. needscert indica si va
            acompañado del extracto de formación y wait si hay que pedirlo
            (y puede tardar) en lugar de descargarlo al momento. */
-        $centro = "Se solicita en la secretaría de tu centro. Si aún no la tienes, " .
-            "pídela cuanto antes: puede tardar unos días en llegarte.";
+        $centro = "Si aún no la tienes, pídela cuanto antes en la secretaría: puede " .
+            "tardar unos días en llegarte.";
         $this->docs = [
             self::KIND_INTERIM => [
                 'label' => "Nombramiento",
@@ -185,8 +185,6 @@ abstract class RegistrationView extends View
        $surveyid es null si el formulario no es de una consulta. */
     protected function showEmailForm($surveyid, array $texts)
     {
-        $domains = Config::$alloweddomains == "" ? "cualquiera" :
-            str_replace(" ", ", ", Config::$alloweddomains);
     ?>
         <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?>
@@ -201,13 +199,7 @@ abstract class RegistrationView extends View
                 <?php } ?>
                 <div class="ml-participate-doc">
                     <label for="email">Dirección de correo</label>
-                    <?= $this->infoButton(
-                        "Dirección de correo",
-                        "Dominios autorizados: {$domains}.\n\n" .
-                            "La dirección queda asociada a tus documentos: en esta y en " .
-                            "próximas consultas tendrás que usar siempre la misma.\n\n" .
-                            $texts['emailinfo']
-                    ); ?>
+                    <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
                     <small><?= h($texts['emailhint']); ?></small>
                 </div>
                 <div class="ml-participate-row">
@@ -223,6 +215,17 @@ abstract class RegistrationView extends View
         $this->showInfoScript();
     }
 
+    /* Explicación del campo de la dirección de correo, con los dominios
+       autorizados; $extra la completa con lo propio de cada vista. */
+    private function emailInfo(string $extra): string
+    {
+        $domains = Config::$alloweddomains == "" ? "cualquiera" :
+            str_replace(" ", ", ", Config::$alloweddomains);
+        return "Dominios autorizados: {$domains}.\n\n" .
+            "La dirección queda asociada a tus documentos: en esta y en " .
+            "próximas consultas tendrás que usar siempre la misma.\n\n" . $extra;
+    }
+
     /* Segundo paso, solo para direcciones que aún no están registradas: un
        asistente en tres pasos que pide la situación (interino/a o de
        carrera), el documento con el que se acredita y, por último, los
@@ -230,9 +233,15 @@ abstract class RegistrationView extends View
        el envío final, con el tipo de documento en «tipo». La dirección ya
        comprobada en el primer paso viaja en el formulario y se vuelve a
        comprobar al recibirlo.
-       Textos de $texts: action, back, title e intro. */
-    protected function showDocsForm($surveyid, $email, array $texts)
+       Con $email null el asistente es la página entera (registro): la
+       dirección se pide en el último paso, junto a los ficheros.
+       Textos de $texts: action, title e intro; back con $email, y
+       emailinfo y emailhint sin él.
+       $selected (regimen, tipo, email) es lo elegido en un envío anterior
+       que no ha valido: se vuelve al último paso con ello marcado. */
+    protected function showDocsForm($surveyid, ?string $email, array $texts, array $selected = [])
     {
+        $askemail = $email === null;
         $regimes = [
             self::REGIME_INTERIM => [
                 'label' => "Interino/a",
@@ -243,14 +252,18 @@ abstract class RegistrationView extends View
                 'desc' => "Has aprobado la oposición, aunque estés todavía en el curso de prácticas.",
             ],
         ];
-        $steps = [1 => "Tu situación", 2 => "Documento", 3 => "Adjuntar"];
+        $steps = [1 => "Tu situación", 2 => "Documento", 3 => $askemail ? "Correo y documentos" : "Adjuntar"];
     ?>
         <section class="ml-participate-card ml-wizard">
             <h3><?= h($texts['title']); ?></h3>
-            <p>La dirección <strong><?= h($email); ?></strong> <?= h($texts['intro']); ?>
-                La dirección queda asociada a tus documentos: tendrás que usar siempre la misma.
-                <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
-            </p>
+            <?php if ($askemail) { ?>
+                <p><?= h($texts['intro']); ?></p>
+            <?php } else { ?>
+                <p>La dirección <strong><?= h($email); ?></strong> <?= h($texts['intro']); ?>
+                    La dirección queda asociada a tus documentos: tendrás que usar siempre la misma.
+                    <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
+                </p>
+            <?php } ?>
             <ol class="ml-wizard-progress" id="ml-wizard-progress">
                 <?php foreach ($steps as $n => $name) { ?>
                     <li data-step="<?= $n; ?>"><span class="ml-wizard-progress__num"><?= $n; ?></span>
@@ -263,7 +276,9 @@ abstract class RegistrationView extends View
                 <?php if ($surveyid !== null) { ?>
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                 <?php } ?>
-                <input type="hidden" name="email" value="<?= h($email); ?>">
+                <?php if (!$askemail) { ?>
+                    <input type="hidden" name="email" value="<?= h($email); ?>">
+                <?php } ?>
 
                 <fieldset class="ml-wizard-step" data-step="1">
                     <legend class="ml-wizard-title" tabindex="-1">¿Cuál es tu situación?</legend>
@@ -272,7 +287,8 @@ abstract class RegistrationView extends View
                     <div class="ml-choices">
                         <?php foreach ($regimes as $regime => $r) { ?>
                             <label class="ml-choice">
-                                <input type="radio" name="regimen" value="<?= $regime; ?>">
+                                <input type="radio" name="regimen" value="<?= $regime; ?>"
+                                    <?= ($selected['regimen'] ?? null) === $regime ? "checked" : ""; ?>>
                                 <span class="ml-choice__body">
                                     <span class="ml-choice__title"><?= h($r['label']); ?></span>
                                     <span class="ml-choice__desc"><?= h($r['desc']); ?></span>
@@ -301,11 +317,12 @@ abstract class RegistrationView extends View
                                         data-where="<?= h($d['where']); ?>"
                                         data-url="<?= h($d['url']); ?>"
                                         data-info="<?= h($d['info']); ?>"
-                                        data-cert="<?= $d['needscert'] ? "1" : "0"; ?>">
+                                        data-cert="<?= $d['needscert'] ? "1" : "0"; ?>"
+                                        <?= ($selected['tipo'] ?? null) === $kind ? "checked" : ""; ?>>
                                     <span class="ml-choice__body">
                                         <span class="ml-choice__title"><?= h($d['label']); ?>
                                             <?php if ($d['wait']) { ?>
-                                                <span class="ml-tag ml-tag--wait">Puede tardar</span>
+                                                <span class="ml-tag ml-tag--wait">Se solicita en el centro</span>
                                             <?php } else { ?>
                                                 <span class="ml-tag ml-tag--now">Al momento</span>
                                             <?php } ?>
@@ -332,11 +349,23 @@ abstract class RegistrationView extends View
                 </fieldset>
 
                 <div class="ml-wizard-step" data-step="3" hidden>
-                    <h4 class="ml-wizard-title" tabindex="-1">Adjunta tus documentos</h4>
+                    <h4 class="ml-wizard-title" tabindex="-1"><?= $askemail ?
+                        "Indica tu correo y adjunta tus documentos" : "Adjunta tus documentos"; ?></h4>
                     <p class="ml-wizard-help">Vas a acreditarte con:
                         <strong id="ml-wizard-chosen"></strong>.
                         <button type="button" class="ml-link" data-back>Cambiar</button>
                     </p>
+                    <?php if ($askemail) { ?>
+                        <div class="ml-participate-doc">
+                            <label for="email">Dirección de correo</label>
+                            <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
+                            <small><?= h($texts['emailhint']); ?></small>
+                        </div>
+                        <div class="ml-participate-row">
+                            <input type="email" name="email" id="email" required autocomplete="email"
+                                value="<?= h($selected['email'] ?? ""); ?>">
+                        </div>
+                    <?php } ?>
                     <div id="extractodiv">
                         <div class="ml-participate-doc">
                             <label for="extracto">Extracto de formación</label>

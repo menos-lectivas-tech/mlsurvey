@@ -12,6 +12,7 @@ require_once 'utils/html.php';
 require_once "include/config.php";
 require_once "include/fileparams.php";
 include_once 'include/menuarray.php';
+require_once 'include/icons.php';
 
 Config::getSystemConfig();
 startSession();
@@ -132,6 +133,9 @@ $view->doInit();
 								<?php
 								foreach ($menuarray as $key => $menuitem) {
 									//var_dump($menuitem);
+									/* Las entradas con icono van aparte, a la derecha del menú. */
+									if (isset($menuitem[ML_MENU_ICON]))
+										continue;
 									$entry = "<li ";
 									if ($menuitem[ML_MENU_GROUP] == $view->getMenuGroup())
 										$entry .= "class='active' ";
@@ -142,6 +146,21 @@ $view->doInit();
 								?>
 							</ul>
 						</div>
+						<?php
+						/* Fuera del menú plegable: el icono se ve también en el móvil. */
+						foreach ($menuarray as $menuitem) {
+							if (!isset($menuitem[ML_MENU_ICON]))
+								continue;
+							$active = $menuitem[ML_MENU_GROUP] == $view->getMenuGroup();
+						?>
+							<a class="ml-nav-icon<?= $active ? " is-active" : ""; ?>"
+								href="<?= h($menuitem[ML_MENU_LOCATION]); ?>"
+								title="<?= h($menuitem[ML_MENU_ENTRY]); ?>"
+								<?= $active ? 'aria-current="page"' : ""; ?>>
+								<?= mlIcon($menuitem[ML_MENU_ICON]); ?>
+								<span class="sr-only"><?= h($menuitem[ML_MENU_ENTRY]); ?></span>
+							</a>
+						<?php } ?>
 					<?php endif; ?>
 					<?php include 'include/themeswitcher.php'; ?>
 				</div>

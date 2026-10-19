@@ -27,6 +27,15 @@ class Admin extends View {
             $this->adminContent ();
         }
         else{
+            ?>
+            <div class="ml-admin-intro">
+                <h2>Panel de administración</h2>
+                <p>Esta sección es solo para las personas que administran el sitio:
+                    crean y gestionan las consultas y las usuarias.</p>
+                <p>Si quieres participar en una consulta no necesitas entrar aquí: ve a
+                    <a href="surveys">Consultas activas</a>.</p>
+            </div>
+            <?php
             $login = new Login;
             $login->setOnSuccess ('admin');
             $login->show ();
@@ -40,14 +49,14 @@ class Admin extends View {
         echo ('<div class="col-md-8">');
         if (isAdmin ()){
             ?>
-            <h2>Admin content</h2>
+            <h2>Panel de administración</h2>
             <ul>
             <li><a href="user_manage">Gestionar usuarias</a></li>
             <?php
         }
         else {
             ?>
-            <h2>User content</h2>
+            <h2>Panel de administración</h2>
             <ul>
             <?php
         }?>
