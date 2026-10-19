@@ -91,6 +91,19 @@ const CONFIG = [
 "nombramiento_signer_orgs" => ['VATES-S7800001E'],
 
 /**
+ * Documents signed at the school: the service record (hoja de servicios) and
+ * the teaching credential. Both must be of the current school year and the
+ * service record not older than pdf_max_age_days.
+ * centro_ca_file: PEM file with the certification authorities trusted for
+ * their signature.
+ * centro_signer_orgs: organizationIdentifier of the organizations whose
+ * employees can sign them (they are signed with a personal certificate).
+ */
+
+"centro_ca_file" => 'certs/muface_ca.pem',
+"centro_signer_orgs" => ['VATES-S7800001E'],
+
+/**
  * For enabling stress test bypasses
  */
 

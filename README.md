@@ -1,13 +1,13 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
-* Identify participants by two PDFs, so each person can vote only once: the
-  digitally signed training record (_extracto de formación_) and a PDF that proves they are
-  civil servants. Those in the _Clases Pasivas_ pension scheme upload the digitally signed
-  MUFACE membership certificate and the rest (career civil servants who joined from 2011 on
-  and interim ones) the digitally signed appointment (_nombramiento_) of the current school
-  year. The signatures are checked, the DNI is read from the training record and the one in
-  the other PDF must be the same.
+* Identify participants by digitally signed PDFs, so each person can vote only once. Interim
+  teachers upload the appointment (_nombramiento_) of the current school year on its own.
+  Career civil servants upload the training record (_extracto de formación_) together with
+  the MUFACE membership certificate: the DNI is read from the training record and the one in
+  the certificate must be the same. Both can also use the teaching credential (_credencial
+  docente_) or the service record (_hoja de servicios_) on their own.
+  The signatures are checked.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function

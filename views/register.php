@@ -39,10 +39,11 @@ class Register extends RegistrationView
             'title' => "Regístrate",
             'infotitle' => "Cómo registrarse",
             'info' => "Indica tu dirección de correo.\n\n" .
-                "A continuación se te pedirán dos documentos. Si son válidos quedarás " .
-                "registrado/a y recibirás un mensaje de confirmación.\n" .
-                "Los documentos solo se usan para comprobar que son válidos y que son " .
-                "de la misma persona. Con el DNI que figura en el extracto se evita " .
+                "A continuación te preguntaremos tu situación y te pediremos uno o dos documentos " .
+                "firmados electrónicamente. Si son válidos quedarás registrado/a y recibirás " .
+                "un mensaje de confirmación.\n" .
+                "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
+                "que son de la misma persona. Con el DNI que figura en ellos se evita " .
                 "que una misma persona se registre dos veces. Los ficheros no se guardan.\n\n" .
                 "Una vez registrado/a, para participar en una consulta solo tendrás que " .
                 "indicar tu dirección de correo.",
@@ -81,7 +82,7 @@ class Register extends RegistrationView
                     'action' => self::PAGE,
                     'back' => self::PAGE,
                     'title' => "Acredita que eres docente",
-                    'intro' => "aún no está registrada. Adjunta dos documentos y te " .
+                    'intro' => "aún no está registrada. Sigue estos pasos para acreditarte y te " .
                         "enviaremos a esa dirección la confirmación del registro.",
                 ]);
                 return;

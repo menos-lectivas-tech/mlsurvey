@@ -29,6 +29,9 @@ abstract class RegistrationView extends View
     private const KIND_CAREER = "carrera";
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
+    /* Situación que se elige en el primer paso del asistente de documentos. */
+    private const REGIME_INTERIM = "interino";
+    private const REGIME_CAREER = "carrera";
     /* Páginas en las que se descarga cada documento. */
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
@@ -39,39 +42,68 @@ abstract class RegistrationView extends View
     {
         if (isset(Config::PARAMS["pdf_max_age_days"]))
             $this->maxage = Config::PARAMS["pdf_max_age_days"];
+        /* Documentos con los que se puede acreditar cada situación, en el
+           orden en que se ofrecen. label y desc son los de la tarjeta del
+           segundo paso del asistente; name, info, where y url los del
+           fichero que se adjunta en el tercero. needscert indica si va
+           acompañado del extracto de formación y wait si hay que pedirlo
+           (y puede tardar) en lugar de descargarlo al momento. */
+        $centro = "Se solicita en la secretaría de tu centro. Si aún no la tienes, " .
+            "pídela cuanto antes: puede tardar unos días en llegarte.";
         $this->docs = [
-            self::KIND_HOJASERVICIOS => [
-                'label' => "Hoja de servicios",
-                'name' => "Hoja de servicios firmada electrónicamente.",
-                'url' => "",
-                'info' => "Una hoja de servicios firmada electrónicamente " .
-                    "en los últimos {$this->maxage} días.",
-                "needscert" => false,
-            ],
-            self::KIND_CREDENCIAL => [
-                'label' => "Credencial docente",
-                'name' => "Credencial de nombramiento para puesto docente.",
-                'url' => "",
-                'info' => "Debe estar firmada electrónicamente y corresponder al curso actual.",
-                "needscert" => false,
-            ],
             self::KIND_INTERIM => [
-                'label' => "Certificado formación + Nombramiento",
+                'label' => "Nombramiento",
+                'desc' => "Lo recibiste por correo electrónico al principio de curso.",
+                'regimes' => [self::REGIME_INTERIM],
                 'name' => "Nombramiento",
+                'where' => "El PDF que recibiste por correo electrónico al principio de curso.",
                 'url' => "",
                 'info' => "Acuerdo de nombramiento y toma de posesión firmado electrónicamente " .
                     "por la Comunidad de Madrid.\n\n" .
-                    "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual.",
-                "needscert" => true,
+                    "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual y estar en vigor.",
+                'needscert' => false,
+                'wait' => false,
             ],
             self::KIND_CAREER => [
-                'label' => "Certificado formación + Certificado MUFACE",
+                'label' => "Extracto de formación + certificado de MUFACE",
+                'desc' => "Los dos se descargan al momento con certificado digital o Cl@ve.",
+                'links' => [
+                    "Extracto de formación" => self::URL_EXTRACTO,
+                    "Certificado de MUFACE" => self::URL_MUFACE,
+                ],
+                'regimes' => [self::REGIME_CAREER],
                 'name' => "Certificado de afiliación a MUFACE",
+                'where' => "Se descarga en la sede electrónica de MUFACE.",
                 'url' => self::URL_MUFACE,
                 'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
                     "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
                     "expedido en los últimos {$this->maxage} días.",
-                "needscert" => true,
+                'needscert' => true,
+                'wait' => false,
+            ],
+            self::KIND_CREDENCIAL => [
+                'label' => "Credencial docente",
+                'desc' => $centro,
+                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
+                'name' => "Credencial docente",
+                'where' => "La que te dieron en la secretaría de tu centro.",
+                'url' => "",
+                'info' => "Credencial de nombramiento para puesto docente.\n\n" .
+                    "Debe estar firmada electrónicamente y corresponder al curso actual.",
+                'needscert' => false,
+                'wait' => true,
+            ],
+            self::KIND_HOJASERVICIOS => [
+                'label' => "Hoja de servicios",
+                'desc' => $centro,
+                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
+                'name' => "Hoja de servicios",
+                'where' => "La que te dieron en la secretaría de tu centro.",
+                'url' => "",
+                'info' => "Una hoja de servicios del curso actual firmada electrónicamente " .
+                    "en los últimos {$this->maxage} días.",
+                'needscert' => false,
+                'wait' => true,
             ],
         ];
     }
@@ -191,23 +223,40 @@ abstract class RegistrationView extends View
         $this->showInfoScript();
     }
 
-    /* Segundo paso, solo para direcciones que aún no están registradas:
-       régimen y los dos documentos. La dirección ya comprobada en el primer
-       paso viaja en el formulario y se vuelve a comprobar al recibirlo.
+    /* Segundo paso, solo para direcciones que aún no están registradas: un
+       asistente en tres pasos que pide la situación (interino/a o de
+       carrera), el documento con el que se acredita y, por último, los
+       ficheros. Los pasos se cambian en el navegador: al servidor solo llega
+       el envío final, con el tipo de documento en «tipo». La dirección ya
+       comprobada en el primer paso viaja en el formulario y se vuelve a
+       comprobar al recibirlo.
        Textos de $texts: action, back, title e intro. */
     protected function showDocsForm($surveyid, $email, array $texts)
     {
-        /* Documento que acredita cada régimen: al cambiar de régimen se
-           cambian el título, el enlace y la explicación del segundo fichero. */
-        $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
-        $doc = $this->docs[self::KIND_HOJASERVICIOS];
+        $regimes = [
+            self::REGIME_INTERIM => [
+                'label' => "Interino/a",
+                'desc' => "Tienes nombramiento como docente interino/a en este curso.",
+            ],
+            self::REGIME_CAREER => [
+                'label' => "Funcionario/a de carrera o en prácticas",
+                'desc' => "Has aprobado la oposición, aunque estés todavía en el curso de prácticas.",
+            ],
+        ];
+        $steps = [1 => "Tu situación", 2 => "Documento", 3 => "Adjuntar"];
     ?>
-        <section class="ml-participate-card">
+        <section class="ml-participate-card ml-wizard">
             <h3><?= h($texts['title']); ?></h3>
             <p>La dirección <strong><?= h($email); ?></strong> <?= h($texts['intro']); ?>
                 La dirección queda asociada a tus documentos: tendrás que usar siempre la misma.
                 <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
             </p>
+            <ol class="ml-wizard-progress" id="ml-wizard-progress">
+                <?php foreach ($steps as $n => $name) { ?>
+                    <li data-step="<?= $n; ?>"><span class="ml-wizard-progress__num"><?= $n; ?></span>
+                        <span class="ml-wizard-progress__name"><?= h($name); ?></span></li>
+                <?php } ?>
+            </ol>
             <form id="getcodedocs" name="getcodedocs" method="POST"
                 action="<?= h($texts['action']); ?>" enctype="multipart/form-data">
                 <?= setTokenHTML(); ?>
@@ -215,182 +264,286 @@ abstract class RegistrationView extends View
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                 <?php } ?>
                 <input type="hidden" name="email" value="<?= h($email); ?>">
-                <label for="tipo">Documentación probatoria:</label>
-                <?= $this->infoButton(
-                    "Documentación solicitada.",
-                    "La documentación se solicita únicamente para verificar que eres docente " .
-                        "de la pública, no se guarda en ninguna parte y no se utiliza para nada más.\n\n" .
-                        "Si tienes una hoja de servicios de menos de {$maxage} días o una " .
-                        "credencial correspondiente a este curso, utilízala.\n" .
-                        "En otro caso podrás verificar tu condición aportando dos documentos:\n" .
-                        "* Certificado de formación\n" .
-                        "* Nombramiento o certificado de MUFACE.\n\n" .
-                        "Los documentos han de tener una firma electrónica válida para ser " .
-                        "aceptados"
-                ); ?>
-                <select name="tipo" id="tipo">
-                    <?php foreach ($this->docs as $kind => $d) { ?>
-                        <option value="<?= $kind; ?>" <?= $kind == self::KIND_HOJASERVICIOS ?
-                                                            "selected" : "" ?> data-name="<?= h($d['name']); ?>" data-url="<?= h($d['url']); ?>"
-                            data-info="<?= h($d['info']); ?>" data-cert="<?= h($d["needscert"]) ?>">
-                            <?= $d["label"] ?></option>
-                    <?php } ?>
-                </select>
 
-                <div id="extractodiv">
+                <fieldset class="ml-wizard-step" data-step="1">
+                    <legend class="ml-wizard-title" tabindex="-1">¿Cuál es tu situación?</legend>
+                    <p class="ml-wizard-help">Según tu situación te propondremos los documentos con
+                        los que puedes acreditar que eres docente de la enseñanza pública.</p>
+                    <div class="ml-choices">
+                        <?php foreach ($regimes as $regime => $r) { ?>
+                            <label class="ml-choice">
+                                <input type="radio" name="regimen" value="<?= $regime; ?>">
+                                <span class="ml-choice__body">
+                                    <span class="ml-choice__title"><?= h($r['label']); ?></span>
+                                    <span class="ml-choice__desc"><?= h($r['desc']); ?></span>
+                                </span>
+                            </label>
+                        <?php } ?>
+                    </div>
+                    <div class="ml-wizard-nav">
+                        <button type="button" class="button-3 ml-participate-btn" data-next
+                            disabled>Continuar</button>
+                    </div>
+                </fieldset>
+
+                <fieldset class="ml-wizard-step" data-step="2" hidden>
+                    <legend class="ml-wizard-title" tabindex="-1">¿Con qué documento quieres
+                        acreditarte?</legend>
+                    <p class="ml-wizard-help">Elige el que tengas a mano. Tiene que estar firmado
+                        electrónicamente: adjunta el PDF tal como lo recibiste o descargaste.</p>
+                    <div class="ml-choices">
+                        <?php foreach ($this->docs as $kind => $d) { ?>
+                            <div class="ml-choice" data-regimes="<?= h(implode(" ", $d['regimes'])); ?>">
+                                <label class="ml-choice__label">
+                                    <input type="radio" name="tipo" value="<?= $kind; ?>"
+                                        data-label="<?= h($d['label']); ?>"
+                                        data-name="<?= h($d['name']); ?>"
+                                        data-where="<?= h($d['where']); ?>"
+                                        data-url="<?= h($d['url']); ?>"
+                                        data-info="<?= h($d['info']); ?>"
+                                        data-cert="<?= $d['needscert'] ? "1" : "0"; ?>">
+                                    <span class="ml-choice__body">
+                                        <span class="ml-choice__title"><?= h($d['label']); ?>
+                                            <?php if ($d['wait']) { ?>
+                                                <span class="ml-tag ml-tag--wait">Puede tardar</span>
+                                            <?php } else { ?>
+                                                <span class="ml-tag ml-tag--now">Al momento</span>
+                                            <?php } ?>
+                                        </span>
+                                        <span class="ml-choice__desc"><?= h($d['desc']); ?></span>
+                                    </span>
+                                </label>
+                                <?php if (!empty($d['links'])) { ?>
+                                    <p class="ml-choice__links">
+                                        <?php foreach ($d['links'] as $text => $url) { ?>
+                                            <a href="<?= h($url); ?>" target="_blank"
+                                                rel="noopener noreferrer">Obtener <?= h(lcfirst($text)); ?></a>
+                                        <?php } ?>
+                                    </p>
+                                <?php } ?>
+                            </div>
+                        <?php } ?>
+                    </div>
+                    <div class="ml-wizard-nav">
+                        <button type="button" class="button-3 is-secondary ml-wizard-back" data-back>Atrás</button>
+                        <button type="button" class="button-3 ml-participate-btn" data-next
+                            disabled>Continuar</button>
+                    </div>
+                </fieldset>
+
+                <div class="ml-wizard-step" data-step="3" hidden>
+                    <h4 class="ml-wizard-title" tabindex="-1">Adjunta tus documentos</h4>
+                    <p class="ml-wizard-help">Vas a acreditarte con:
+                        <strong id="ml-wizard-chosen"></strong>.
+                        <button type="button" class="ml-link" data-back>Cambiar</button>
+                    </p>
+                    <div id="extractodiv">
+                        <div class="ml-participate-doc">
+                            <label for="extracto">Extracto de formación</label>
+                            <?= $this->infoButton(
+                                "Extracto de formación",
+                                "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
+                                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
+                            ); ?>
+                            <small>Se descarga al momento en el portal de la Comunidad de Madrid:
+                                <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
+                                    rel="noopener noreferrer">obtener aquí</a>.</small>
+                        </div>
+                        <div class="ml-participate-row">
+                            <input type="file" name="extracto" id="extracto"
+                                accept="application/pdf,.pdf">
+                        </div>
+                    </div>
                     <div class="ml-participate-doc">
-                        <label for="extracto">Extracto de formación</label>
-                        <?= $this->infoButton(
-                            "Extracto de formación",
-                            "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
-                                "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
-                        ); ?>
-                        <small>Obtener <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                                rel="noopener noreferrer">aquí</a></small>
+                        <label for="documento" id="documento-name"></label>
+                        <?= $this->infoButton("", "", "documento-info"); ?>
+                        <small><span id="documento-where"></span>
+                            <a id="documento-url" href="#" target="_blank"
+                                rel="noopener noreferrer" hidden>Obtener aquí</a></small>
                     </div>
                     <div class="ml-participate-row">
-                        <input type="file" name="extracto" id="extracto" required
+                        <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
-                </div>
-                <div class="ml-participate-doc">
-                    <label for="documento" id="documento-name"><?= h($doc['name']); ?></label>
-                    <?= $this->infoButton($doc['name'], $doc['info'], "documento-info"); ?>
-                    <small id="documento-url">Obtener <a href="<?= h($doc['url']); ?>"
-                            target="_blank" rel="noopener noreferrer">aquí</a></small>
-                </div>
-                <div class="ml-participate-row">
-                    <input type="file" name="documento" id="documento" required
-                        accept="application/pdf,.pdf">
-                </div>
-                <p class="ml-participate-legal-link">Antes de enviarlos, lee
-                    <button type="button" class="ml-link" id="ml-legal-open"
-                        aria-haspopup="dialog">cómo tratamos tus documentos y la información
-                        sobre protección de datos</button>.
-                </p>
-                <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
-                    aria-labelledby="ml-legal-title">
-                    <div class="ml-dialog__form">
-                        <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
-                            condición de docente de la enseñanza pública</h2>
-                        <div class="ml-legal-body" tabindex="0">
-                            <p>Para comprobar que eres docente en activo en un centro público de la
-                                Comunidad de Madrid necesitamos algún documento probatorio que
-                                esté firmado digitalmente:</p>
-                            <ol>
-                                <li>Tu Hoja de servicios actualizada, que acredita que eres 
-                                    docente de la pública.</li>
-                                <li>Tu credencial de docente.</li>
-                                <li>Si no tienes ningúno de los anteriores puedes descargar tu
-                                    extracto de formación para aportarlo junto con alguno de los siguientes:
-                                </li>
-                                <ol>
-                                    <li>Si no eres funcionario/a de carrera, tu nombramiento del curso actual</li>
-                                    <li>Si eres funcionario/a de carrera, tu
-                                        certificado de afiliación a MUFACE</li>
-                                </ol>
-                            </ol>
-                            <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
-                                para comprobar su autenticidad, que el NIF coincide en ambos y que
-                                figuras en servicio activo en la Consejería de Educación. Se procesan en
-                                memoria y se eliminan en cuanto termina la comprobación. No guardamos los
-                                documentos ni ningún dato extraído de ellos.</p>
-                            <p>Lo único que conservamos es tu NIF transformado con una función
-                                criptográfica y una clave secreta que se custodia aparte, de modo que sin
-                                esa clave no es posible conocerlo. Solo sirve para impedir que una misma
-                                persona tenga más de una cuenta.</p>
-                            <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                información de la necesaria, como tu domicilio, tu puesto de trabajo o,
-                                en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
-                                ni la conservamos.</p>
-                            <h5>Información básica sobre protección de datos</h5>
-                            <ul>
-                                <li><strong>Finalidad:</strong> verificar tu condición de docente en
-                                    activo de la enseñanza pública y evitar cuentas duplicadas.</li>
-                                <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
-                                    en cualquier momento.</li>
-                                <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
-                                    servicio se aloja en la Unión Europea.</li>
-                                <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                    oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
-                                    También puedes reclamar ante la Agencia Española de
-                                    Protección de Datos (<a href="https://www.aepd.es" target="_blank"
-                                        rel="noopener noreferrer">aepd.es</a>).</li>
-                            </ul>
-                            <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
-                                ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
-                                con otros documentos.</p>
+                    <p class="ml-participate-legal-link">Antes de enviarlos, lee
+                        <button type="button" class="ml-link" id="ml-legal-open"
+                            aria-haspopup="dialog">cómo tratamos tus documentos y la información
+                            sobre protección de datos</button>.
+                    </p>
+                    <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
+                        aria-labelledby="ml-legal-title">
+                        <div class="ml-dialog__form">
+                            <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
+                                condición de docente de la enseñanza pública</h2>
+                            <div class="ml-legal-body" tabindex="0">
+                                <p>Para comprobar que eres docente en activo en un centro público de la
+                                    Comunidad de Madrid necesitamos algún documento probatorio que
+                                    esté firmado digitalmente:</p>
+                                <ul>
+                                    <li>Si eres interino/a: tu nombramiento del curso actual, tu
+                                        credencial docente o tu hoja de servicios actualizada.</li>
+                                    <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
+                                        formación junto con tu certificado de afiliación a MUFACE, tu
+                                        credencial docente o tu hoja de servicios actualizada.</li>
+                                </ul>
+                                <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
+                                    para comprobar su autenticidad, que el NIF coincide si son dos y que
+                                    figuras en servicio activo en la Consejería de Educación. Se procesan en
+                                    memoria y se eliminan en cuanto termina la comprobación. No guardamos los
+                                    documentos ni ningún dato extraído de ellos.</p>
+                                <p>Lo único que conservamos es tu NIF transformado con una función
+                                    criptográfica y una clave secreta que se custodia aparte, de modo que sin
+                                    esa clave no es posible conocerlo. Solo sirve para impedir que una misma
+                                    persona tenga más de una cuenta.</p>
+                                <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
+                                    información de la necesaria, como tu domicilio, tu puesto de trabajo o,
+                                    en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
+                                    ni la conservamos.</p>
+                                <h5>Información básica sobre protección de datos</h5>
+                                <ul>
+                                    <li><strong>Finalidad:</strong> verificar tu condición de docente en
+                                        activo de la enseñanza pública y evitar cuentas duplicadas.</li>
+                                    <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
+                                        en cualquier momento.</li>
+                                    <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
+                                        servicio se aloja en la Unión Europea.</li>
+                                    <li><strong>Derechos:</strong> acceso, rectificación, supresión,
+                                        oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
+                                        También puedes reclamar ante la Agencia Española de
+                                        Protección de Datos (<a href="https://www.aepd.es" target="_blank"
+                                            rel="noopener noreferrer">aepd.es</a>).</li>
+                                </ul>
+                                <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
+                                    ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
+                                    con otros documentos.</p>
+                            </div>
+                            <div class="ml-dialog__actions">
+                                <button type="button" class="button-3" id="ml-legal-close">
+                                    Cerrar</button>
+                            </div>
                         </div>
-                        <div class="ml-dialog__actions">
-                            <button type="button" class="button-3" id="ml-legal-close">
-                                Cerrar</button>
-                        </div>
+                    </dialog>
+                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                            value="1" id="acepto" required>
+                        He leído la información sobre el tratamiento de los documentos y
+                        consiento su tratamiento con la finalidad indicada.</label>
+                    <div class="ml-participate-row">
+                        <?= altchaWidgetHTML(); ?>
+                        <button type="submit" class="button-3 ml-participate-btn"
+                            name="<?= self::ACTION_DOCS; ?>" value="<?= self::ACTION_DOCS; ?>">
+                            Enviar documentos</button>
                     </div>
-                </dialog>
-                <label class="ml-participate-consent"><input type="checkbox" name="acepto"
-                        value="1" id="acepto" required>
-                    He leído la información sobre el tratamiento de los documentos y
-                    consiento su tratamiento con la finalidad indicada.</label>
-                <div class="ml-participate-row">
-                    <?= altchaWidgetHTML(); ?>
-                    <button type="submit" class="button-3 ml-participate-btn"
-                        name="<?= self::ACTION_DOCS; ?>" value="<?= self::ACTION_DOCS; ?>">
-                        Enviar documentos</button>
+                    <div class="ml-wizard-nav">
+                        <button type="button" class="button-3 is-secondary ml-wizard-back" data-back>Atrás</button>
+                    </div>
                 </div>
             </form>
         </section>
         <script>
             (function() {
                 var form = document.getElementById("getcodedocs");
+                var steps = form.querySelectorAll(".ml-wizard-step");
+                var progress = document.querySelectorAll("#ml-wizard-progress li");
+                var choices = form.querySelectorAll(".ml-choice[data-regimes]");
+                var extractodiv = document.getElementById("extractodiv");
+                var extracto = document.getElementById("extracto");
                 var file = document.getElementById("documento");
                 var info = document.getElementById("documento-info");
+                var url = document.getElementById("documento-url");
+                var current = 1;
 
-                /* El segundo documento depende del régimen elegido. */
-                function displayElement(element, type) {
-                    if (type == "")
-                        element.style.display = "none";
-                    else
-                        element.style.display = type;
+                function checked(name) {
+                    return form.querySelector('input[name="' + name + '"]:checked');
                 }
 
-                function showDocument(kind, clear) {
-                    //var kind = form.querySelector('input[name="tipo"]:checked');
+                /* Muestra el paso n. Al cambiar de paso a propósito el foco va a
+                   su título, para que el lector de pantalla lo anuncie. */
+                function go(n, focus) {
+                    current = n;
+                    steps.forEach(function(step) {
+                        step.hidden = step.dataset.step != n;
+                    });
+                    progress.forEach(function(li) {
+                        var s = +li.dataset.step;
+                        li.classList.toggle("is-done", s < n);
+                        if (s == n)
+                            li.setAttribute("aria-current", "step");
+                        else
+                            li.removeAttribute("aria-current");
+                    });
+                    if (focus) {
+                        var title = form.querySelector('.ml-wizard-step[data-step="' + n + '"] .ml-wizard-title');
+                        title.focus({ preventScroll: true });
+                        form.closest(".ml-wizard").scrollIntoView({ block: "start", behavior: "smooth" });
+                    }
+                }
+
+                /* En el segundo paso solo se ofrecen los documentos de la
+                   situación elegida; si el marcado no es de ella, se desmarca. */
+                function filterDocs() {
+                    var regime = checked("regimen");
+                    choices.forEach(function(choice) {
+                        var ok = regime && choice.dataset.regimes.split(" ").indexOf(regime.value) >= 0;
+                        choice.hidden = !ok;
+                        var radio = choice.querySelector('input[name="tipo"]');
+                        if (!ok && radio.checked)
+                            radio.checked = false;
+                    });
+                }
+
+                /* El tercer paso pide los ficheros del documento elegido. */
+                function showDocument(clear) {
+                    var kind = checked("tipo");
                     if (!kind)
                         return;
-                    data = kind[0].dataset;
+                    var data = kind.dataset;
+                    document.getElementById("ml-wizard-chosen").textContent = data.label;
                     document.getElementById("documento-name").textContent = data.name;
-                    theurl = document.getElementById("documento-url");
-                    if (data.url != "") {
-                        displayElement(theurl, "block");
-                        theurl.href = data.url;
-                    } else {
-                        displayElement(theurl, "");
-                    }
-                    certdiv = document.getElementById("extractodiv");
-                    certfile = document.getElementById("extracto");
-                    if (data.cert == "1") {
-                        displayElement(certdiv, "block");
-                        certfile.required = true;
-                    } else {
-                        displayElement(certdiv, "none");
-                        certfile.required = false;
-                    }
+                    document.getElementById("documento-where").textContent = data.where;
+                    url.hidden = data.url == "";
+                    url.href = data.url || "#";
+                    var cert = data.cert == "1";
+                    extractodiv.hidden = !cert;
+                    extracto.required = cert;
                     info.dataset.title = data.name;
                     info.setAttribute("aria-label", "Más información: " + data.name);
                     info.dataset.info = data.info;
-                    /* El fichero elegido era el del otro régimen. */
-                    if (clear)
+                    /* Los ficheros elegidos eran los de otro documento. */
+                    if (clear) {
                         file.value = "";
+                        extracto.value = "";
+                    }
                 }
-                var doctype = form.querySelector('select[name="tipo"]');
-                doctype.addEventListener("change", function() {
-                    showDocument(doctype.selectedOptions, true);
+
+                /* «Continuar» solo se activa cuando hay algo elegido en el paso. */
+                function updateButtons() {
+                    steps[0].querySelector("[data-next]").disabled = !checked("regimen");
+                    steps[1].querySelector("[data-next]").disabled = !checked("tipo");
+                }
+
+                form.querySelectorAll('input[name="regimen"]').forEach(function(radio) {
+                    radio.addEventListener("change", function() {
+                        filterDocs();
+                        updateButtons();
+                    });
                 });
-                /*form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
+                form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
                     radio.addEventListener("change", function() {
                         showDocument(true);
+                        updateButtons();
                     });
-                });*/
+                });
+                form.querySelectorAll("[data-next]").forEach(function(button) {
+                    button.addEventListener("click", function() {
+                        go(current + 1, true);
+                    });
+                });
+                form.querySelectorAll("[data-back]").forEach(function(button) {
+                    button.addEventListener("click", function() {
+                        go(current - 1, true);
+                    });
+                });
+
                 /* La información de protección de datos se muestra en un diálogo. */
                 var legal = document.getElementById("ml-legal");
                 document.getElementById("ml-legal-open").addEventListener("click", function() {
@@ -405,11 +558,17 @@ abstract class RegistrationView extends View
                     else
                         legal.removeAttribute("open");
                 });
-                /* Al recargar, el navegador puede conservar el régimen marcado. */
-                showDocument(doctype.selectedOptions, false);
-                window.addEventListener("pageshow", function() {
-                    showDocument(doctype.selectedOptions, false);
-                });
+
+                /* Al volver a la página el navegador puede conservar lo elegido:
+                   se continúa desde el último paso completado. */
+                function restore() {
+                    filterDocs();
+                    showDocument(false);
+                    updateButtons();
+                    go(checked("tipo") ? 3 : checked("regimen") ? 2 : 1, false);
+                }
+                restore();
+                window.addEventListener("pageshow", restore);
             })();
         </script>
     <?php
@@ -477,7 +636,7 @@ abstract class RegistrationView extends View
         $hashemail = participantHash($email);
 
         if (!lockParticipant($db, $hashdni)) {
-            echo ("<p><strong>Hay otra petición en curso con el DNI del extracto. " .
+            echo ("<p><strong>Hay otra petición en curso con el DNI de los documentos. " .
                 "Inténtalo de nuevo en unos segundos.</strong></p>");
             return null;
         }
@@ -534,12 +693,12 @@ abstract class RegistrationView extends View
         return $file['tmp_name'];
     }
 
-    /* Comprueba la firma del extracto de formación y el documento subido
-       según lo elegido (certificado de MUFACE o nombramiento, los dos
-       firmados), y que los dos son de la misma persona.
-       Devuelve el DNI leído del extracto, o null (con el motivo ya mostrado)
-       si no vale. Los ficheros se quedan en el temporal de la subida: no se
-       guardan. */
+    /* Comprueba la firma del documento subido según lo elegido. El
+       certificado de MUFACE va con el extracto de formación, y los dos
+       tienen que ser de la misma persona; el nombramiento, la credencial y
+       la hoja de servicios valen solos.
+       Devuelve el DNI leído, o null (con el motivo ya mostrado) si no vale.
+       Los ficheros se quedan en el temporal de la subida: no se guardan. */
     private function getDni(): ?string
     {
         $kind = $_REQUEST['tipo'] ?? null;
@@ -568,13 +727,8 @@ abstract class RegistrationView extends View
                 checkExtractoSignature($extracto);
                 $dni = getPdfDni($extracto);
                 $checking = $docname;
-                if ($kind === self::KIND_CAREER) {
-                    checkMufaceSignature($document);
-                    $documentdni = getMufaceDni($document);
-                } else {
-                    checkNombramientoSignature($document);
-                    $documentdni = getNombramientoDni($document);
-                }
+                checkMufaceSignature($document);
+                $documentdni = getMufaceDni($document);
             } catch (PdfSignException $e) {
                 echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
                 return null;
@@ -589,7 +743,11 @@ abstract class RegistrationView extends View
         else {
             try {
                 $checking = $docname;
-                if ($kind == self::KIND_HOJASERVICIOS){
+                if ($kind == self::KIND_INTERIM){
+                    checkNombramientoSignature($document);
+                    $dni = getNombramientoDni($document);
+                }
+                else if ($kind == self::KIND_HOJASERVICIOS){
                     checkHojaServiciosSignature($document);
                     $dni = getHojaServiciosNIF($document);
                 }

@@ -2,9 +2,9 @@
 /**
  * Functions for checking the PDFs asked for participating and getting the
  * holder's DNI from them: the digitally signed training record (extracto de
- * formación) and either the digitally signed MUFACE membership certificate
- * (career civil servants) or the digitally signed appointment, nombramiento
- * (interim ones).
+ * formación) with the digitally signed MUFACE membership certificate (career
+ * civil servants), or the digitally signed appointment, nombramiento (interim
+ * ones), the service record or the teaching credential on their own.
  *
  * Needs the openssl, pdftotext and pdfinfo (poppler-utils) commands.
  */
@@ -52,7 +52,7 @@ function pdfRunCommand (array $cmd): array {
 
 /**
  * Returns the signatures of a PDF that cover the whole file.
- * Each one is [signed bytes, DER signature].
+ * Each one is [signed bytes, DER signature, signing date or null].
  */
 function pdfWholeFileSignatures (string $pdf): array {
     $signatures = [];
@@ -72,8 +72,19 @@ function pdfWholeFileSignatures (string $pdf): array {
         $hex = substr ($hole, 1, -1);
         if ($hole[0] != '<' || substr ($hole, -1) != '>' || strlen ($hex) % 2 != 0 || !ctype_xdigit ($hex))
             continue;
+        /* La fecha de firma es la /M del diccionario de la firma, que queda
+           dentro de lo firmado: desde el "obj" que lo abre hasta el "endobj". */
+        $from = max (0, $len1 - 4096);
+        $open = strrpos (substr ($pdf, $from, $len1 - $from), " obj");
+        $close = strpos ($pdf, "endobj", $start2);
+        $dict = ($open === false ? "" : substr ($pdf, $from + $open, $len1 - $from - $open)) .
+            ($close === false ? "" : substr ($pdf, $start2, min ($close - $start2, 4096)));
+        $signed = null;
+        if (preg_match ('/\/M\s*\(D:(\d{4})(\d\d)(\d\d)/', $dict, $m) &&
+                checkdate ((int) $m[2], (int) $m[3], (int) $m[1]))
+            $signed = (new DateTimeImmutable ("today"))->setDate ((int) $m[1], (int) $m[2], (int) $m[3]);
         /* Los ceros de relleno del final no molestan al analizar el DER. */
-        $signatures[] = [substr ($pdf, 0, $len1) . substr ($pdf, $start2), hex2bin ($hex)];
+        $signatures[] = [substr ($pdf, 0, $len1) . substr ($pdf, $start2), hex2bin ($hex), $signed];
     }
     return $signatures;
 }
@@ -105,12 +116,14 @@ function pdfReadFile (string $path): string {
  * @param string $signerfield Field of the signer's subject that must be one
  *     of $signerids.
  *
- * @return array An array with signature validity in format "YYMMddhhmmssZ".
+ * @return array The validity of the signer's certificate, "from" and "to" in
+ *     format "YYMMddhhmmssZ", and "signed", the signing date
+ *     (DateTimeImmutable) or null if the PDF does not say it.
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
 function checkPdfSignature (string $path, string $cafile, array $signerids, string $issuer,
         string $signerfield = "serialNumber")
-    : array|false {
+    : array {
     $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
     if (empty ($signatures))
         throw new PdfSignException ("El PDF no está firmado digitalmente o se ha modificado " .
@@ -121,7 +134,7 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
 
     $reason = "";
     $validity = array ();
-    foreach ($signatures as [$content, $signature]){
+    foreach ($signatures as [$content, $signature, $signed]){
         $contentfile = tempnam (sys_get_temp_dir (), "mlc");
         $sigfile = tempnam (sys_get_temp_dir (), "mls");
         $signerfile = tempnam (sys_get_temp_dir (), "mlx");
@@ -145,8 +158,7 @@ function checkPdfSignature (string $path, string $cafile, array $signerids, stri
             $signer = openssl_x509_parse ((string) file_get_contents ($signerfile));
             $validity["from"] = $signer['validFrom'];
             $validity["to"] = $signer['validTo'];
-            if (empty($signerids))
-                return $validity;
+            $validity["signed"] = $signed;
             $id = $signer === false ? null : ($signer["subject"][$signerfield] ?? null);
             if (is_string ($id) && in_array ($id, $signerids, true))
                 return $validity;
@@ -241,6 +253,36 @@ function getPdfDni (string $path): string {
         throw new PdfSignException ("No se ha podido leer el DNI en el extracto de formación.");
     }
     return reset ($found);
+}
+
+/**
+ * Returns the first day of the current school year, which starts on
+ * September 1st.
+ */
+function pdfCourseStart (): DateTimeImmutable {
+    $today = new DateTimeImmutable ("today");
+    $year = (int) $today->format ("Y") - ((int) $today->format ("n") < 9 ? 1 : 0);
+    return $today->setDate ($year, 9, 1);
+}
+
+/**
+ * Checks that a document was signed in the current school year and not in
+ * the future.
+ *
+ * @param array $validity What checkPdfSignature returns.
+ * @param string $docname Name of the document, for the error messages.
+ *
+ * @throws PdfSignException if the signing date is unknown or out of range.
+ */
+function pdfCheckSignedThisCourse (array $validity, string $docname){
+    $signed = $validity["signed"] ?? null;
+    if ($signed === null)
+        throw new PdfSignException ("No se ha podido leer la fecha de firma de {$docname}.");
+    /* Un día de margen por si el servidor va en otra zona horaria. */
+    if ($signed < pdfCourseStart () || $signed > (new DateTimeImmutable ("today"))->modify ("+1 day")){
+        logMessage (LOGGER_WARN, "PDF rejected: signed on {$signed->format ('Y-m-d')}.");
+        throw new PdfSignException (ucfirst ($docname) . " tiene que ser del curso actual.");
+    }
 }
 
 /**
@@ -358,37 +400,52 @@ function getNombramientoDni (string $path): string {
         throw new PdfSignException ("No se ha podido leer el DNI en el nombramiento.");
     }
 
-    /* La fecha del nombramiento tiene que ser del curso actual, que empieza
-       el 1 de septiembre. */
+    /* El nombramiento tiene que ser del curso actual y estar en vigor hoy: ya
+       ha empezado y, como termina como muy tarde el 31 de agosto, sigue en
+       vigor si es de este curso. La fecha de fin que pone el acuerdo solo
+       está en la imagen escaneada. */
     if (!checkdate ((int) $m[4], (int) $m[5], (int) $m[3]))
         throw new PdfSignException ("No se ha podido leer la fecha del nombramiento.");
     $date = (new DateTimeImmutable ("today"))->setDate ((int) $m[3], (int) $m[4], (int) $m[5]);
-    $today = new DateTimeImmutable ("today");
-    $year = (int) $today->format ("Y") - ((int) $today->format ("n") < 9 ? 1 : 0);
-    $start = $today->setDate ($year, 9, 1);
-    if ($date < $start || $date >= $start->modify ("+1 year")){
+    if ($date < pdfCourseStart ()){
         logMessage (LOGGER_WARN, "Appointment rejected: dated {$date->format ('Y-m-d')}.");
         throw new PdfSignException ("El nombramiento tiene que ser del curso actual.");
+    }
+    if ($date > new DateTimeImmutable ("today")){
+        logMessage (LOGGER_WARN, "Appointment rejected: not in force until {$date->format ('Y-m-d')}.");
+        throw new PdfSignException ("El nombramiento todavía no está en vigor.");
     }
     return $dni;
 }
 
+/**
+ * Checks the signature of a document signed at the school, the service record
+ * (hoja de servicios) or the teaching credential: like the appointment, it is
+ * signed with a personal certificate, so the organizationIdentifier of the
+ * organization the certificate belongs to is checked (centro_ca_file and
+ * centro_signer_orgs in config.php).
+ *
+ * @return array What checkPdfSignature returns.
+ *
+ * @throws PdfSignException if the file is not a properly signed PDF.
+ */
+function checkCentroSignature(string $path): array
+{
+    return checkPdfSignature(
+        $path,
+        Config::PARAMS["centro_ca_file"] ?? "certs/muface_ca.pem",
+        Config::PARAMS["centro_signer_orgs"] ?? ["VATES-S7800001E"],
+        "la Comunidad de Madrid",
+        "organizationIdentifier"
+    );
+}
+
 function checkHojaServiciosSignature(string $path)
 {
-    $validity = checkPdfSignature(
-        $path,
-        Config::PARAMS["muface_ca_file"] ?? "certs/muface_ca.pem",
-        [],
-        "una firma de representación válida"
-    );
-    if ($validity === false)
-        throw new PdfSignException("La firma digital de la Hoja de Servicios no es válida");
+    $validity = checkCentroSignature($path);
+    pdfCheckSignedThisCourse($validity, "la Hoja de Servicios");
     $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
-    $dtz = new DateTimeZone("UTC");
-    $from = DateTimeImmutable::createFromFormat("ymdHis\Z", $validity["from"], $dtz);
-    $now = new DateTimeImmutable("now", $dtz);
-    $di = new DateInterval("P{$maxage}D");
-    if ($from->add($di) < $now)
+    if ($validity["signed"] < (new DateTimeImmutable("today"))->modify("-{$maxage} days"))
         throw new PdfSignException("El documento tiene que haberse expedido en los últimos " .
             "{$maxage} días.");
 }
@@ -417,19 +474,8 @@ function getHojaServiciosNIF(string $path): string|false
 
 function checkCredencialSignature(string $path)
 {
-    $validity = checkPdfSignature(
-        $path,
-        Config::PARAMS["muface_ca_file"] ?? "certs/muface_ca.pem",
-        [],
-        "una firma de representación válida"
-    );
-    if ($validity === false)
-        throw new PdfSignException("La firma digital de la Hoja de Servicios no es válida");
-    $dtz = new DateTimeZone("UTC");
-    $from = DateTimeImmutable::createFromFormat("ymdHis\Z", $validity["from"], $dtz);
-    $init = new DateTimeImmutable("2026-09-01", $dtz);
-    if ($from >= $init)
-        throw new PdfSignException("El nombramiento tiene que ser del curso actual.");
+    $validity = checkCentroSignature($path);
+    pdfCheckSignedThisCourse($validity, "la Credencial");
 }
 
 function getCredencialNIF(string $path): string|false

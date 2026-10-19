@@ -86,10 +86,11 @@ class GetCode extends RegistrationView
                 'info' => "Indica tu dirección de correo.\n\n" .
                     "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
                     "con un enlace personal para participar, que caduca en una hora.\n\n" .
-                    "SI ES LA PRIMERA VEZ, a continuación se te pedirán dos documentos. Si son " .
-                    "válidos recibirás el mensaje con el enlace.\n" .
-                    "Los documentos solo se usan para comprobar que son válidos y que son " .
-                    "de la misma persona. Con el DNI que figura en el extracto se evita " .
+                    "SI ES LA PRIMERA VEZ, a continuación te preguntaremos tu situación y te " .
+                    "pediremos uno o dos documentos firmados electrónicamente. Si son válidos " .
+                    "recibirás el mensaje con el enlace.\n" .
+                    "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
+                    "que son de la misma persona. Con el DNI que figura en ellos se evita " .
                     "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
                     "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
                     "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
@@ -164,8 +165,8 @@ class GetCode extends RegistrationView
                         'action' => self::PAGE,
                         'back' => self::PAGE . "?responseid=" . (int) $surveyid,
                         'title' => "Primera vez: acredita que eres docente",
-                        'intro' => "no ha participado antes. Adjunta dos documentos y te enviaremos " .
-                            "a esa dirección un enlace para participar.",
+                        'intro' => "no ha participado antes. Sigue estos pasos para acreditarte y te " .
+                            "enviaremos a esa dirección un enlace para participar.",
                     ]);
                 return;
             }
