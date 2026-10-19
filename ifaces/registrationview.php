@@ -90,7 +90,8 @@ abstract class RegistrationView extends View
             ],
             self::KIND_CAREER => [
                 'label' => "Extracto de formación + certificado de MUFACE",
-                'desc' => "Los dos se descargan al momento con certificado digital o Cl@ve.",
+                'desc' => ""Utiliza esta opción si no tienes los anteriores.   
+                     Los dos se descargan al momento con certificado digital o Cl@ve.",
                 'links' => [
                     "Extracto de formación" => self::URL_EXTRACTO,
                     "Certificado de MUFACE" => self::URL_MUFACE,
