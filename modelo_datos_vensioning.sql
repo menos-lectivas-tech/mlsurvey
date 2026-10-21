@@ -142,7 +142,14 @@ CREATE TABLE Version (
   versioncode INT NOT NULL
 );
 
-INSERT INTO Version values (1, 7);
+CREATE TABLE IF NOT EXISTS Unsubscriptions (
+	  unsubscribeid INT UNSIGNED auto_increment PRIMARY KEY,
+      participantid INT UNSIGNED,
+      confirmkey VARCHAR(256) NOT NULL,
+      confirmed INT UNSIGNED DEFAULT 0,
+      unregisterdate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp
+);
+INSERT INTO Version values (1, 8);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update
@@ -179,16 +186,6 @@ BEGIN
   SIGNAL SQLSTATE '45000' 
   SET MESSAGE_TEXT = 'Error: This table is immutable. Modifications are not allowed. (UPDATES).';
 END$$
-
-
-CREATE TRIGGER Voted_no_delete
-BEFORE DELETE ON Voted
-FOR EACH ROW
-BEGIN
-  SIGNAL SQLSTATE '45000' 
-  SET MESSAGE_TEXT = 'Error: This table is immutable. Deletions are not allowed. (DELETES).';
-END$$
-
 
 
 
