@@ -47,7 +47,8 @@ abstract class RegistrationView extends View
            segundo paso del asistente; name, info, where y url los del
            fichero que se adjunta en el tercero. needscert indica si va
            acompañado del extracto de formación y wait si hay que pedirlo
-           (y puede tardar) en lugar de descargarlo al momento. */
+           (y puede tardar) en lugar de descargarlo al momento; tag sustituye
+           a la etiqueta "Al momento" de los que no hay que pedir. */
         $centro = "Si aún no la tienes, pídela cuanto antes en la secretaría: puede " .
             "tardar unos días en llegarte.";
         $this->docs = [
@@ -63,6 +64,7 @@ abstract class RegistrationView extends View
                     "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual y estar en vigor.",
                 'needscert' => false,
                 'wait' => false,
+                'tag' => "En tu email",
             ],
             self::KIND_CREDENCIAL => [
                 'label' => "Credencial docente",
@@ -105,6 +107,7 @@ abstract class RegistrationView extends View
                     "expedido en los últimos {$this->maxage} días.",
                 'needscert' => true,
                 'wait' => false,
+                'tag' => "Se obtiene al momento (certificado)",
             ],
         ];
     }
@@ -325,7 +328,7 @@ abstract class RegistrationView extends View
                                             <?php if ($d['wait']) { ?>
                                                 <span class="ml-tag ml-tag--wait">Se solicita en el centro</span>
                                             <?php } else { ?>
-                                                <span class="ml-tag ml-tag--now">Al momento</span>
+                                                <span class="ml-tag ml-tag--now"><?= h($d['tag'] ?? "Al momento"); ?></span>
                                             <?php } ?>
                                         </span>
                                         <span class="ml-choice__desc"><?= h($d['desc']); ?></span>
