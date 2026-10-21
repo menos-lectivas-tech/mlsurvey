@@ -28,7 +28,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 7;
+$maxversion = 8;
 
 try {
   if (!versionTableExists ()){
@@ -83,12 +83,12 @@ try {
     $db->exec ("ALTER TABLE {Participants} DROP COLUMN IF EXISTS privatekey, DROP COLUMN IF EXISTS publickey");
   }
   if ($version < 6){
-    $db->exec("DROP TRIGGER Participants_no_delete");
+    $db->exec("DROP TRIGGER IF EXISTS Participants_no_delete");
   }
   if ($version < 7){
     /* El correo y el DNI pasan de SHA-256 a HMAC con participant_hmac_key:
        se recalculan los hashes guardados. La participante 0 no tiene correo. */
-    $db->exec("DROP TRIGGER Participants_no_update");
+    $db->exec("DROP TRIGGER IF EXISTS Participants_no_update");
     $db->beginTransaction ();
     $rows = $db->query ("SELECT participantid, participant, dnihashed FROM {Participants}
       WHERE participantid <> 0")->fetchAll ();
@@ -112,6 +112,17 @@ try {
                   SIGNAL SQLSTATE '45000' 
                 SET MESSAGE_TEXT = 'Error: This table is immutable. Modifications are not allowed. (UPDATES).';
               END");
+  }
+  if ($version < 8){
+    $db->exec ("DROP TRIGGER IF EXISTS Voted_no_delete");
+    $db->exec ("CREATE TABLE IF NOT EXISTS {Unsubscriptions} (
+      unsubscribeid INT UNSIGNED auto_increment PRIMARY KEY,
+      participantid INT UNSIGNED,
+      confirmkey VARCHAR(256) NOT NULL,
+      confirmed INT UNSIGNED DEFAULT 0,
+      unregisterdate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp)");
+    $db->exec("UPDATE {Version} SET versioncode = 8 WHERE versionid = 1");
+    
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");

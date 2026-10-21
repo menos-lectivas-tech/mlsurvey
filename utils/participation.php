@@ -27,6 +27,24 @@ function hasParticipated ($db, $participantid, $surveyid){
 }
 
 /**
+ * Checks if a participant has confirmed an unsubscription request.
+ * 
+ * @param PDO $db The PDO database object.
+ * @param int $participantid
+ * 
+ * @return bool True if confirmed. False otherway
+ */
+function checkUnsubscribe (PDO $db, int $participantid):bool {
+    $query = $db->prepare("SELECT 1 FROM {Unsubscriptions} WHERE
+        participantid = :pid AND confirmed > 0");
+    $query->bindParam(":pid", $participantid, PDO::PARAM_INT);
+    $query->execute();
+    $ret = ($query->rowCount() > 0);
+    $query->closeCursor();
+    return $ret;
+}
+
+/**
  * Checks if a participant has a valid code.
  * Does not work as Participation table has changed and does not have a participantid column
  * By now it's not posible to know if an email addres has a code, as all stored info is

@@ -229,7 +229,11 @@ class GetCode extends RegistrationView
             echo ("<p><strong>Ya se ha votado en esta consulta con la dirección de correo indicada.</strong></p>");
             return null;
         }
-
+        if (checkUnsubscribe($db, $participantid)) {
+            echo "<p><strong>No puedes participar en la consulta porque has confirmado
+                    la solicitud de baja del registro de participantes.</strong></p>";
+            return;
+        }
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite
            por hora se comprueba con esta etiqueta fija por email y consulta. */

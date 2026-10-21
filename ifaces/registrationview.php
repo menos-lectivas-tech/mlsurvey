@@ -268,7 +268,8 @@ abstract class RegistrationView extends View
             <ol class="ml-wizard-progress" id="ml-wizard-progress">
                 <?php foreach ($steps as $n => $name) { ?>
                     <li data-step="<?= $n; ?>"><span class="ml-wizard-progress__num"><?= $n; ?></span>
-                        <span class="ml-wizard-progress__name"><?= h($name); ?></span></li>
+                        <span class="ml-wizard-progress__name"><?= h($name); ?></span>
+                    </li>
                 <?php } ?>
             </ol>
             <form id="getcodedocs" name="getcodedocs" method="POST"
@@ -351,7 +352,7 @@ abstract class RegistrationView extends View
 
                 <div class="ml-wizard-step" data-step="3" hidden>
                     <h4 class="ml-wizard-title" tabindex="-1"><?= $askemail ?
-                        "Indica tu correo y adjunta tus documentos" : "Adjunta tus documentos"; ?></h4>
+                                                                    "Indica tu correo y adjunta tus documentos" : "Adjunta tus documentos"; ?></h4>
                     <p class="ml-wizard-help">Vas a acreditarte con:
                         <strong id="ml-wizard-chosen"></strong>.
                         <button type="button" class="ml-link" data-back>Cambiar</button>
@@ -469,6 +470,9 @@ abstract class RegistrationView extends View
                 </div>
             </form>
         </section>
+        <?php
+        $this->showUnregister();
+        ?>
         <script>
             (function() {
                 var form = document.getElementById("getcodedocs");
@@ -503,8 +507,13 @@ abstract class RegistrationView extends View
                     });
                     if (focus) {
                         var title = form.querySelector('.ml-wizard-step[data-step="' + n + '"] .ml-wizard-title');
-                        title.focus({ preventScroll: true });
-                        form.closest(".ml-wizard").scrollIntoView({ block: "start", behavior: "smooth" });
+                        title.focus({
+                            preventScroll: true
+                        });
+                        form.closest(".ml-wizard").scrollIntoView({
+                            block: "start",
+                            behavior: "smooth"
+                        });
                     }
                 }
 
@@ -566,11 +575,21 @@ abstract class RegistrationView extends View
                 form.querySelectorAll("[data-next]").forEach(function(button) {
                     button.addEventListener("click", function() {
                         go(current + 1, true);
+                        if (current > 1) {
+                            const unregister = document.getElementById("unregister");
+                            if (unregister != null)
+                                unregister.style.display = "none";
+                        }
                     });
                 });
                 form.querySelectorAll("[data-back]").forEach(function(button) {
                     button.addEventListener("click", function() {
                         go(current - 1, true);
+                        if (current == 1) {
+                            const unregister = document.getElementById("unregister");
+                            if (unregister != null)
+                                unregister.style.display = "block";
+                        }
                     });
                 });
 
@@ -620,7 +639,7 @@ abstract class RegistrationView extends View
                 });
             });
         </script>
-<?php
+    <?php
     }
 
     /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
@@ -732,25 +751,25 @@ abstract class RegistrationView extends View
     private function getDni(): ?string
     {
         $kind = $_REQUEST['tipo'] ?? null;
-        if (!in_array ($kind, array_keys($this->docs), true)) {
+        if (!in_array($kind, array_keys($this->docs), true)) {
             echo ("<p><strong>Hay que indicar la documentación con la que te validas..</strong></p>");
             return null;
         }
         $thedoc = $this->docs[$kind];
         $docname = $thedoc["name"];
         $extracto = null;
-        if ($thedoc["needscert"]){
+        if ($thedoc["needscert"]) {
             $extracto = $this->getUpload('extracto', "extracto de formación");
             if ($extracto === null)
                 return null;
         }
-        
+
         $document = $this->getUpload('documento', $docname);
         if ($document === null)
             return null;
-        
+
         $dni = "";
-        if ($thedoc["needscert"]){
+        if ($thedoc["needscert"]) {
             /* Para que el mensaje de error diga de qué fichero habla. */
             $checking = "extracto de formación";
             try {
@@ -769,19 +788,16 @@ abstract class RegistrationView extends View
                 logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
                 return null;
             }
-        }
-        else {
+        } else {
             try {
                 $checking = $docname;
-                if ($kind == self::KIND_INTERIM){
+                if ($kind == self::KIND_INTERIM) {
                     checkNombramientoSignature($document);
                     $dni = getNombramientoDni($document);
-                }
-                else if ($kind == self::KIND_HOJASERVICIOS){
+                } else if ($kind == self::KIND_HOJASERVICIOS) {
                     checkHojaServiciosSignature($document);
                     $dni = getHojaServiciosNIF($document);
-                }
-                else if ($kind == self::KIND_CREDENCIAL){
+                } else if ($kind == self::KIND_CREDENCIAL) {
                     checkCredencialSignature($document);
                     $dni = getCredencialNIF($document);
                 }
@@ -884,5 +900,36 @@ abstract class RegistrationView extends View
         }
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
+    }
+    private function showUnregister()
+    {
+    ?>
+        <section class="ml-participate-card" id="unregister">
+            <form name="unregisterform" method="POST" action="unsubscribe">
+                <?= setTokenHTML();?>
+                <h3>Date de baja</h3>
+                <p>Date de baja indicando tu dirección de correo.</p>
+                <p><strong>El proceso se puede alargar hasta 30 días para que no puedas repetir tu participación
+                        en ninguna consulta.</strong>
+                </p>
+                <p>
+                    Una vez solicitada la baja recibiras un mensaje de correo con un enlace para confirmarla.
+                    Para finalizar el proceso debes pulsar en ese enlace, de otra forma no causarás baja.
+                </p>
+                <div class="ml-participate-doc">
+                    <label for="email">Dirección de correo</label>
+                    
+                    <small>Debe coindidir con la que proporcionaste al registrarte.</small>
+                </div>
+                <div class="ml-participate-row">
+                    <input type="email" name="email" id="email" required>
+                    <?= altchaWidgetHTML(); ?>
+                    <button type="submit" class="button-3 ml-participate-btn"
+                        name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">
+                        <?= self::ACTION; ?></button>
+                </div>
+            </form>
+        </section>
+<?php
     }
 }

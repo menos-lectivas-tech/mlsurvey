@@ -1,3 +1,8 @@
+# 1.4
+- Minor change in survey_manage UX.
+- Add unsubscription functionality.
+- Minor fixes.
+
 # 1.3
 - For security reasons DB storage of personal data changes from hash to hmac. The key is defined in config.php.
 - Changes for allowing "hojas de servicio" and "credenciales" for validating participants.
