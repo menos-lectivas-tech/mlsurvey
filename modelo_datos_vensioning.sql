@@ -188,15 +188,5 @@ BEGIN
 END$$
 
 
-CREATE TRIGGER Voted_no_delete
-BEFORE DELETE ON Voted
-FOR EACH ROW
-BEGIN
-  SIGNAL SQLSTATE '45000' 
-  SET MESSAGE_TEXT = 'Error: This table is immutable. Deletions are not allowed. (DELETES).';
-END$$
-
-
-
 
 DELIMITER ;
