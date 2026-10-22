@@ -474,7 +474,8 @@ abstract class RegistrationView extends View
             </form>
         </section>
         <?php
-        $this->showUnregister();
+        if (empty ($selected))
+            $this->showUnregister();
         ?>
         <script>
             (function() {
