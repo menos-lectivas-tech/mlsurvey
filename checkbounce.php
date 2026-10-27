@@ -2,6 +2,7 @@
 require_once "utils/dbutils.php";
 require_once "utils/logger.php";
 require_once "utils/crypt.php";
+require_once "utils/participation.php";
 require_once 'vendor/autoload.php';
 
 use Zoon\BounceHandler\BounceHandler;
@@ -9,16 +10,9 @@ use Zoon\BounceHandler\BounceHandler;
 function deleteParticipation($address)
 {
     $db = dbConn();
-    $hashemail = participantHash($address);
-    $query = $db->prepare("SELECT participantid FROM {Participants} WHERE participant = :p
-            LIMIT 1");
-    $query->bindParam(":p", $hashemail, PDO::PARAM_STR);
-    $query->execute();
-    if ($query->rowCount() < 1)
+    $id = getParticipantId($db, participantHash($address));
+    if ($id === null)
         return;
-
-    $id = $query->fetch()["participantid"];
-    $query->closeCursor();
     logMessage(LOGGER_DEBUG, "Deleting participant {$id} as address does not exists");
     /*$query = $db->prepare("DELETE FROM {Participation} WHERE participant = :p");
     $query->bindParam(":p", $hashemail, PDO::PARAM_STR);

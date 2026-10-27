@@ -4,90 +4,60 @@
    Todo el color de la aplicación se define aquí como custom properties.
    Ningún componente debería volver a escribir un color literal.
 
-   El tema se compone de dos ejes independientes:
-     · modo   -> data-theme="light" | "dark"   (sin atributo = automático)
-     · acento -> data-accent="esmeralda" | "indigo" | "oceano" |
-                 "violeta" | "ambar" | "rosa"
-   Ambos se aplican sobre <html> y los gestiona js/theme.js.
+   Modo: data-theme="light" | "dark" (sin atributo = automático), sobre
+   <html> y gestionado por js/theme.js.
+   El acento es el verde de Menos Lectivas, con su amarillo como color de
+   realce.
    ===================================================================== */
 
 /* ------------------------------------------------------------------
-   1. Paletas de acento
-   Cada acento publica una escala neutra respecto al modo; más abajo
-   el modo claro y el oscuro deciden qué peldaño de la escala usan.
+   0. Tipografías (alojadas aquí, no en Google Fonts: así no se envía la
+   IP de quien participa a terceros). Inter y Plus Jakarta Sans, ambas
+   con licencia SIL Open Font License; solo el subconjunto latino.
    ------------------------------------------------------------------ */
-:root,
-:root[data-accent="esmeralda"] {
-    --a-300: #6ee7b7;
-    --a-400: #34d399;
-    --a-500: #10b981;
-    --a-600: #059669;
-    --a-700: #047857;
-    --a-rgb: 16 185 129;
-    --a-on: #ffffff;
-    --a-on-dark: #052e21;
-    --a-icon: brightness(0) invert(1);
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url("../fonts/inter-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+        U+2215, U+FEFF, U+FFFD;
 }
 
-:root[data-accent="indigo"] {
-    --a-300: #a5b4fc;
-    --a-400: #818cf8;
-    --a-500: #6366f1;
-    --a-600: #4f46e5;
-    --a-700: #4338ca;
-    --a-rgb: 99 102 241;
-    --a-on: #ffffff;
-    --a-on-dark: #1a1856;
-    --a-icon: brightness(0) invert(1);
+@font-face {
+    font-family: "Plus Jakarta Sans";
+    font-style: normal;
+    font-weight: 600 800;
+    font-display: swap;
+    src: url("../fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+        U+2215, U+FEFF, U+FFFD;
 }
 
-:root[data-accent="oceano"] {
-    --a-300: #7dd3fc;
-    --a-400: #38bdf8;
-    --a-500: #0ea5e9;
-    --a-600: #0284c7;
-    --a-700: #0369a1;
-    --a-rgb: 14 165 233;
+/* ------------------------------------------------------------------
+   1. Acento
+   Escala neutra respecto al modo; más abajo el modo claro y el oscuro
+   deciden qué peldaño de la escala usan.
+   --a-highlight es el color de realce (pestaña activa, filete de la
+   cabecera, títulos en modo oscuro).
+   ------------------------------------------------------------------ */
+/* Verde y amarillo de menoslectivas.org. El verde de la web (#54B435) no
+   da contraste con texto blanco: los fondos usan los peldaños 600 y 700. */
+:root {
+    --a-300: #9bdc83;
+    --a-400: #6ec552;
+    --a-500: #54b435;
+    --a-600: #2d7f2d;
+    --a-700: #246824;
+    --a-rgb: 84 180 53;
     --a-on: #ffffff;
-    --a-on-dark: #05304a;
+    --a-on-dark: #0c1406;
     --a-icon: brightness(0) invert(1);
-}
-
-:root[data-accent="violeta"] {
-    --a-300: #c4b5fd;
-    --a-400: #a78bfa;
-    --a-500: #8b5cf6;
-    --a-600: #7c3aed;
-    --a-700: #6d28d9;
-    --a-rgb: 139 92 246;
-    --a-on: #ffffff;
-    --a-on-dark: #2b1065;
-    --a-icon: brightness(0) invert(1);
-}
-
-:root[data-accent="ambar"] {
-    --a-300: #fcd34d;
-    --a-400: #fbbf24;
-    --a-500: #f59e0b;
-    --a-600: #d97706;
-    --a-700: #b45309;
-    --a-rgb: 245 158 11;
-    /* El ámbar no da contraste suficiente con texto blanco. */
-    --a-on: #2a1a02;
-    --a-on-dark: #2a1a02;
-    --a-icon: brightness(0);
-}
-
-:root[data-accent="rosa"] {
-    --a-300: #fda4af;
-    --a-400: #fb7185;
-    --a-500: #f43f5e;
-    --a-600: #e11d48;
-    --a-700: #be123c;
-    --a-rgb: 244 63 94;
-    --a-on: #ffffff;
-    --a-on-dark: #4c0519;
-    --a-icon: brightness(0) invert(1);
+    --a-highlight: #fbcc49;
+    --a-on-highlight: #2a2108;
 }
 
 /* ------------------------------------------------------------------
@@ -137,13 +107,23 @@
     --ml-warning: #b45309;
     --ml-warning-soft: rgb(180 83 9 / 0.12);
 
-    /* Cromo de página */
-    --ml-header-bg: rgb(255 255 255 / 0.85);
-    --ml-header-border: #e1e6ec;
-    --ml-footer-bg: #141b24;
-    --ml-footer-text: #b7c1cd;
-    --ml-footer-heading: #ffffff;
-    --ml-footer-border: rgb(255 255 255 / 0.10);
+    /* Realce y títulos */
+    --ml-highlight: var(--a-highlight, var(--a-300));
+    --ml-highlight-contrast: var(--a-on-highlight, #111111);
+    --ml-heading: var(--a-700);
+
+    /* Cromo de página: cabecera del color de acento, como en la web de
+       Menos Lectivas, con un filete del color de realce. */
+    --ml-header-bg: var(--a-600);
+    --ml-header-border: var(--ml-highlight);
+    --ml-header-text: #ffffff;
+    --ml-header-text-soft: rgb(255 255 255 / 0.86);
+    --ml-header-hover: rgb(255 255 255 / 0.14);
+    --ml-header-control-border: rgb(255 255 255 / 0.40);
+    --ml-footer-bg: #f9f9f9;
+    --ml-footer-text: #4b5563;
+    --ml-footer-heading: var(--a-700);
+    --ml-footer-border: #e6e6e6;
 
     /* Sombras */
     --ml-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
@@ -151,14 +131,15 @@
     --ml-shadow-lg: 0 8px 12px rgb(16 24 40 / 0.06), 0 18px 40px rgb(16 24 40 / 0.14);
     --ml-shadow-accent: 0 2px 10px rgb(var(--a-rgb) / 0.35);
 
-    /* Radios */
-    --ml-radius-sm: 6px;
-    --ml-radius: 10px;
-    --ml-radius-lg: 16px;
+    /* Radios: esquinas poco redondeadas, como los botones de la web. */
+    --ml-radius-sm: 4px;
+    --ml-radius: 8px;
+    --ml-radius-lg: 12px;
     --ml-radius-full: 999px;
 
     /* Tipografía */
     --ml-font: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --ml-font-heading: "Plus Jakarta Sans", var(--ml-font);
     --ml-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
     --ml-transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -208,11 +189,11 @@
         --ml-warning: #fbbf24;
         --ml-warning-soft: rgb(251 191 36 / 0.16);
 
-        --ml-header-bg: rgb(22 28 36 / 0.85);
-        --ml-header-border: #283140;
+        --ml-heading: var(--ml-highlight);
+        --ml-header-bg: color-mix(in srgb, var(--a-700) 55%, #0d1117);
         --ml-footer-bg: #0a0e14;
         --ml-footer-text: #8c9aab;
-        --ml-footer-heading: #e7edf4;
+        --ml-footer-heading: var(--ml-highlight);
         --ml-footer-border: rgb(255 255 255 / 0.08);
 
         --ml-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.40);
@@ -260,11 +241,11 @@
     --ml-warning: #fbbf24;
     --ml-warning-soft: rgb(251 191 36 / 0.16);
 
-    --ml-header-bg: rgb(22 28 36 / 0.85);
-    --ml-header-border: #283140;
+    --ml-heading: var(--ml-highlight);
+    --ml-header-bg: color-mix(in srgb, var(--a-700) 55%, #0d1117);
     --ml-footer-bg: #0a0e14;
     --ml-footer-text: #8c9aab;
-    --ml-footer-heading: #e7edf4;
+    --ml-footer-heading: var(--ml-highlight);
     --ml-footer-border: rgb(255 255 255 / 0.08);
 
     --ml-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.40);

@@ -97,20 +97,11 @@ class Participate extends View {
             }
             
 
-            $hashemail = participantHash ($this->email);
-
-            $participants = $db->prepare ("SELECT participantid " .
-                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
-
-            $participants->bindParam (":part", $hashemail, PDO::PARAM_STR);
-            $participants->execute ();
-            if ($participants->rowCount () == 0){
+            $participantid = getParticipantId ($db, participantHash ($this->email));
+            if ($participantid === null){
                 $this->securityError ();
                 return;
             }
-            $participant = $participants->fetch ();
-            $participantid = $participant["participantid"];
-            $participants->closeCursor ();
             if (hasParticipated ($db, $participantid, $this->surveyid)){
                 ?>
                 <p><strong>Ya se ha votado en esta consulta con esta dirección de correo.</strong></p>

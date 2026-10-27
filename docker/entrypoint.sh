@@ -62,29 +62,15 @@ define('CONFIG', [
 "altcha_enabled" => getenv('ALTCHA_ENABLED') === 'false' ? false : true,
 "altcha_hmac_key" => getenv('ALTCHA_HMAC_KEY') ?: '',
 
-// Clave del HMAC del correo y el DNI de las participantes: obligatoria y fija.
+// Clave del HMAC del correo de las participantes: obligatoria y fija.
 "participant_hmac_key" => getenv('PARTICIPANT_HMAC_KEY') ?: '',
-
-// Firma del extracto de formacion: autoridades de confianza y NIF de los
-// sellos admitidos (separados por comas).
-"pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
-"pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
-
-// Documento que acredita el regimen (Clases Pasivas o resto): sello de MUFACE admitido para el
-// certificado de afiliacion (separados por comas), antiguedad maxima del PDF y
-// autoridades de confianza y expresion regular de los organismos que pueden firmar el
-// nombramiento, la hoja de servicios y la credencial.
-"muface_ca_file" => getenv('MUFACE_CA_FILE') ?: 'certs/muface_ca.pem',
-"muface_signer_ids" => array_map('trim', explode(',', getenv('MUFACE_SIGNER_IDS') ?: 'Q2861001B')),
-"pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
-"nombramiento_ca_file" => getenv('NOMBRAMIENTO_CA_FILE') ?: 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => getenv('NOMBRAMIENTO_SIGNER_ORGS') ?: '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
 
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
 "survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',
 /**
- * For using the default icon when no icon is defined
+ * For using the default icon (the Menos Lectivas logo, img/menoslectivas.webp)
+ * when no icon is defined
  */
 "use_default_icon" => true,
 ]);

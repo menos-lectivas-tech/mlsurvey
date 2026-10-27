@@ -46,54 +46,12 @@ const CONFIG = [
 "altcha_hmac_key" => '',
 
 /**
- * Key of the HMAC that hashes the email addresses and DNIs of the participants.
+ * Key of the HMAC that hashes the email addresses of the participants.
  * It is mandatory: generate it once (e.g. with "openssl rand -hex 32") and keep it,
  * changing or losing it makes every registered participant unrecognizable.
  */
 
 "participant_hmac_key" => '',
-
-/**
- * Signed training record PDF (extracto de formación) asked for participating.
- * pdf_ca_file: PEM file with the certification authorities trusted for the
- * signature. Only these are trusted, not the system ones.
- * pdf_signer_ids: serialNumber (NIF) of the certificates allowed to sign the
- * PDF. S7800001E is the Comunidad de Madrid electronic seal.
- * It needs the openssl and pdftotext (poppler-utils) commands.
- */
-
-"pdf_ca_file" => 'certs/extracto_ca.pem',
-"pdf_signer_ids" => ['S7800001E'],
-
-/**
- * Second PDF asked for participating: the digitally signed MUFACE membership
- * certificate (Clases Pasivas) or the digitally signed appointment,
- * nombramiento (the rest: career civil servants who joined from 2011 on and
- * interim ones).
- * muface_ca_file: PEM file with the certification authorities trusted for the
- * signature of the MUFACE certificate. Only these are trusted, not the system
- * ones.
- * muface_signer_ids: serialNumber (NIF) of the certificates allowed to sign
- * it. Q2861001B is the MUFACE electronic seal.
- * pdf_max_age_days: how old the MUFACE certificate can be, counting from its
- * issue date. The appointment must be of the current school year.
- * nombramiento_ca_file: PEM file with the certification authorities trusted
- * for the signature of the appointment, the service record (hoja de
- * servicios) and the teaching credential.
- * nombramiento_signer_orgs: regular expression the organizationIdentifier of
- * the signer's certificate must match (they are signed with the personal
- * certificate of a public employee or the representative certificate of the
- * school): the Comunidad de Madrid (S7800001E) and the public bodies of Madrid
- * (NIF Q with province code 28 or 78 to 88).
- * The service record and the credential must be signed in the current school
- * year, and the service record not longer than pdf_max_age_days ago.
- */
-
-"muface_ca_file" => 'certs/muface_ca.pem',
-"muface_signer_ids" => ['Q2861001B'],
-"pdf_max_age_days" => 30,
-"nombramiento_ca_file" => 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
 
 /**
  * For enabling stress test bypasses
@@ -109,7 +67,8 @@ const CONFIG = [
 "survey_edit_restric" => false,
 
 /**
- * For using the default icon when no icon is defined
+ * For using the default icon (the Menos Lectivas logo, img/menoslectivas.webp)
+ * when no icon is defined
  */
 "use_default_icon" => true,
 ];

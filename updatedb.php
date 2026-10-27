@@ -28,7 +28,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 8;
+$maxversion = 9;
 
 try {
   if (!versionTableExists ()){
@@ -123,6 +123,11 @@ try {
       unregisterdate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp)");
     $db->exec("UPDATE {Version} SET versioncode = 8 WHERE versionid = 1");
     
+  }
+  if ($version < 9){
+    /* Ya no se piden documentos: se borra el hash del DNI. */
+    $db->exec ("DROP INDEX IF EXISTS Participants_dnihashed_IDX ON {Participants}");
+    $db->exec ("ALTER TABLE {Participants} DROP COLUMN IF EXISTS dnihashed");
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");

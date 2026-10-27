@@ -1,20 +1,13 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
-* Discriminate partitipats by email address domain.
-* Identify participants by digitally signed PDFs, so each person can vote only once. Interim
-  teachers upload the appointment (_nombramiento_) of the current school year on its own.
-  Career civil servants upload the training record (_extracto de formación_) together with
-  the MUFACE membership certificate: the DNI is read from the training record and the one in
-  the certificate must be the same. Both can also use the teaching credential (_credencial
-  docente_) or the service record (_hoja de servicios_) on their own.
-  The signatures are checked.
+* Discriminate partitipats by email address domain: only `educa.madrid.org` addresses can
+  participate.
+* Identify participants by their email address, so each address can vote only once. The
+  participation link is sent to that address.
 * The system needs to be as anonymous as possible.
 
-To archieve this the DNI and the email address are stored with a deterministic Hash function
-(SHA-256), each one in its own unique column (`participant` for the email address and
-`dnihashed` for the DNI), so the same documents can't be used from several
-email addresses; the PDF is not stored.
-Clearly, someone with access to the database could compromise anonymity by hashing every possible DNI. This is something we will aim to address in future releases.
+To archieve this the email address is stored with a keyed hash function (HMAC-SHA-256,
+`participant_hmac_key`) in the unique column `participant`.
 
 Votes are not linked to participants: `Responses` stores each vote with no reference to who
 cast it, and `Voted` only records which participants have already voted in each survey (with
@@ -29,7 +22,6 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl` and `pdftotext` (poppler-utils) commands, for checking the signed PDF.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -65,7 +57,7 @@ Every configuration item has a description, you only need to notice:
 * `site_url` is mandatory: it is the public URL of the site and the participation
   links sent by email are built from it.
 * `participant_hmac_key` is mandatory: the key of the HMAC that hashes the email
-  addresses and DNIs of the participants. Generate it once (`openssl rand -hex 32`)
+  addresses of the participants. Generate it once (`openssl rand -hex 32`)
   and keep it: with another key no registered participant is recognized.
 * If you have a working Sendmail in your system you only need to set:
 ```php
@@ -77,22 +69,6 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
-* `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
-  PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
-  electronic seal (`S7800001E`) by default.
-* `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
-  membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
-  electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate can be (30 days by default).
-* `nombramiento_ca_file` and `nombramiento_signer_orgs` set who is trusted for signing the
-  appointment, the service record (hoja de servicios) and the teaching credential: the
-  certification authorities in `certs/nombramiento_ca.pem` (Camerfirma and FNMT) and a regular
-  expression the `organizationIdentifier` of the signer's certificate must match, by default
-  the Comunidad de Madrid (`VATES-S7800001E`) and the public bodies of Madrid (NIF `Q` with
-  province code 28 or 78 to 88). They are signed with the personal certificate of a public
-  employee or the representative certificate of the school, so personal certificates of
-  citizens or certificates of companies are rejected. The appointment's body is a scanned image, so its DNI and date are read from
-  the PDF title, which the signature covers too.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -199,14 +175,7 @@ the database to be ready before serving requests.
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
-| `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
-| `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
-| `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
-| `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
-| `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate can be, counting from its issue date. |
-| `NOMBRAMIENTO_CA_FILE` | `certs/nombramiento_ca.pem` | PEM file with the certification authorities trusted for the signature of the appointment, the service record and the teaching credential. |
-| `NOMBRAMIENTO_SIGNER_ORGS` | Comunidad de Madrid and public bodies of Madrid | Regular expression the `organizationIdentifier` of the signer's certificate must match. |
+| `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

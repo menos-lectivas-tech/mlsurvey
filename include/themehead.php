@@ -12,10 +12,8 @@
         if (m === "light" || m === "dark") {
             document.documentElement.setAttribute("data-theme", m);
         }
-        var a = localStorage.getItem("mlsurvey:theme-accent");
-        document.documentElement.setAttribute("data-accent", a || "esmeralda");
     } catch (e) {
-        document.documentElement.setAttribute("data-accent", "esmeralda");
+        /* Sin localStorage, manda prefers-color-scheme. */
     }
 })();
 </script>
