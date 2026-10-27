@@ -60,13 +60,13 @@ function url_base64_decode(#[\SensitiveParameter] string $data): string {
 }
 
 /**
- * Hash that identifies a participant by her email address or DNI: HMAC-SHA256 with
+ * Hash that identifies a participant by her email address: HMAC-SHA256 with
  * the participant_hmac_key of the configuration. Without the key the hashes stored
- * in Participants can't be checked against a list of addresses or DNIs.
+ * in Participants can't be checked against a list of addresses.
  * The HMAC is computed over the SHA-256 of the value, so updatedb.php can convert
  * the plain SHA-256 hashes stored by older versions.
  *
- * @param string $value Email address or DNI.
+ * @param string $value Email address.
  *
  * @return string Hexadecimal hash, 64 characters.
  */

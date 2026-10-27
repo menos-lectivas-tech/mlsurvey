@@ -174,232 +174,9 @@
     align-items: stretch;
 }
 
-.ml-participate-row input[type="file"] {
-    flex: 1 1 260px;
-    min-width: 0;
-    margin-bottom: 14px;
-}
-
-.ml-participate-kind {
-    border: 0;
-    padding: 0;
-    margin: 0 0 14px;
-}
-
-.ml-participate-kind legend {
-    font-size: inherit;
-    font-weight: 600;
-    border: 0;
-    margin-bottom: 6px;
-}
-
-.ml-participate-card .ml-participate-kind label {
-    font-weight: 400;
-}
-
-.ml-participate-card .ml-participate-kind label {
-    display: inline-block;
-    margin-right: 20px;
-}
-
-/* --- Asistente de documentos: situación, documento y ficheros ----- */
-.ml-wizard-progress {
-    display: flex;
-    gap: 8px;
-    list-style: none;
-    padding: 0;
-    margin: 16px 0 20px;
-}
-
-.ml-wizard-progress li {
-    flex: 1 1 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 8px;
-    border-top: 3px solid var(--ml-border-strong);
-    color: var(--ml-text-muted);
-    font-size: 0.9375rem;
-}
-
-.ml-wizard-progress__num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--ml-radius-full);
-    background: var(--ml-surface-3);
-    font-size: 0.8125rem;
-    font-weight: 700;
-}
-
-.ml-wizard-progress li.is-done,
-.ml-wizard-progress li[aria-current="step"] {
-    border-top-color: var(--ml-accent);
-    color: var(--ml-text);
-}
-
-.ml-wizard-progress li[aria-current="step"] {
-    font-weight: 600;
-}
-
-.ml-wizard-progress li.is-done .ml-wizard-progress__num,
-.ml-wizard-progress li[aria-current="step"] .ml-wizard-progress__num {
-    background: var(--ml-accent);
-    color: var(--ml-accent-contrast);
-}
-
-.ml-wizard-step {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    min-width: 0;
-}
-
-.ml-wizard-step[hidden],
-.ml-choice[hidden] {
-    display: none;
-}
-
-.ml-wizard-title {
-    float: none;
-    width: 100%;
-    border: 0;
-    margin: 0 0 6px;
-    padding: 0;
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--ml-text);
-}
-
-.ml-wizard-title:focus {
-    outline: none;
-}
-
-.ml-wizard-help {
-    color: var(--ml-text-soft);
-    margin: 0 0 16px;
-}
-
-.ml-choices {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-/* Cada opción es una tarjeta: se marca entera al elegirla. */
-.ml-choice {
-    display: flex;
-    flex-direction: column;
-    background: var(--ml-surface);
-    border: 2px solid var(--ml-border);
-    border-radius: var(--ml-radius);
-    transition: border-color var(--ml-transition), box-shadow var(--ml-transition);
-}
-
-.ml-choice:hover {
-    border-color: var(--ml-border-strong);
-    box-shadow: var(--ml-shadow-sm);
-}
-
-.ml-choice:has(input:checked) {
-    border-color: var(--ml-accent);
-    box-shadow: 0 0 0 3px var(--ml-accent-ring);
-}
-
-.ml-choice:has(input:focus-visible) {
-    box-shadow: 0 0 0 3px var(--ml-accent-ring);
-}
-
-.ml-participate-card label.ml-choice,
-.ml-participate-card .ml-choice__label {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 12px;
-    flex: 1 1 auto;
-    margin: 0;
-    padding: 16px;
-    font-weight: 400;
-    cursor: pointer;
-}
-
-.ml-choice input[type="radio"] {
-    flex: none;
-    width: 18px;
-    height: 18px;
-    margin: 2px 0 0;
-    accent-color: var(--ml-accent);
-}
-
-.ml-choice__body {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.ml-choice__title {
-    font-weight: 700;
-    color: var(--ml-text);
-}
-
-.ml-choice__desc {
-    color: var(--ml-text-soft);
-    font-size: 0.9375rem;
-}
-
-.ml-choice__links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
-    margin: -8px 0 0;
-    padding: 0 16px 14px 46px;
-    font-size: 0.9375rem;
-}
-
-.ml-tag {
-    display: block;
-    width: fit-content;
-    margin-top: 4px;
-    padding: 1px 8px;
-    border-radius: var(--ml-radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    vertical-align: 2px;
-    white-space: nowrap;
-}
-
-.ml-tag--now {
-    background: var(--ml-success-soft);
-    color: var(--ml-success);
-}
-
-.ml-tag--wait {
-    background: var(--ml-warning-soft);
-    color: var(--ml-warning);
-}
-
-.ml-wizard-nav {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.ml-wizard-nav [data-next] {
-    margin-left: auto;
-}
-
-.ml-wizard-step[data-step="3"] .ml-wizard-nav {
-    margin-top: 12px;
-}
-
-/* Título de cada documento, con su icono de información y, debajo y en
-   pequeño, dónde se obtiene. */
-.ml-participate-doc {
+/* Título de cada campo, con su icono de información y, debajo y en
+   pequeño, una aclaración. */
+.ml-participate-field {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -407,13 +184,13 @@
     margin-bottom: 6px;
 }
 
-.ml-participate-card .ml-participate-doc label {
+.ml-participate-card .ml-participate-field label {
     margin: 0;
     font-size: 1.0625rem;
     font-weight: 700;
 }
 
-.ml-participate-doc small {
+.ml-participate-field small {
     flex-basis: 100%;
     color: var(--ml-text-soft);
 }
@@ -434,68 +211,10 @@
     background: var(--ml-surface-2);
 }
 
-/* Información sobre el tratamiento de los documentos: se abre en un diálogo
-   desde el enlace que hay antes de la casilla de consentimiento. */
-.ml-participate-legal-link {
-    margin: 0 0 8px;
-}
-
-.ml-link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ml-accent-text);
-    font: inherit;
-    text-align: left;
-    text-decoration: underline;
-    cursor: pointer;
-}
-
-.ml-link:hover,
-.ml-link:focus-visible {
-    text-decoration-thickness: 2px;
-}
-
-.ml-dialog.ml-legal-dialog {
-    width: min(640px, calc(100vw - 32px));
-}
-
-/* El texto es largo: se desplaza dentro del diálogo y el botón de cerrar
-   queda siempre a la vista. */
-.ml-legal-body {
-    max-height: min(60vh, 32em);
-    overflow-y: auto;
-    padding-right: 4px;
-    color: var(--ml-text-soft);
-    font-size: 0.9375rem;
-    line-height: 1.55;
-}
-
-.ml-legal-body h5 {
-    margin: 12px 0 8px;
-    color: var(--ml-text);
-}
-
-.ml-legal-body p,
-.ml-legal-body ol,
-.ml-legal-body ul {
-    margin: 0 0 8px;
-}
-
-.ml-participate-card .ml-participate-consent {
-    font-weight: 400;
-    margin-bottom: 14px;
-}
-
 .ml-participate-row input[type="email"] {
     flex: 1 1 260px;
     min-width: 0;
     max-width: 420px;
-}
-
-/* En el asistente el correo va con los ficheros: el mismo espacio debajo. */
-.ml-wizard .ml-participate-row input[type="email"] {
-    margin-bottom: 14px;
 }
 
 .button-3.ml-participate-btn {
@@ -558,20 +277,6 @@
     .ml-participate-row input[type="email"] {
         flex: none;
         max-width: none;
-    }
-
-    /* En columna, la base de 260px sería la altura: un hueco bajo cada fichero. */
-    .ml-participate-row input[type="file"] {
-        flex: none;
-    }
-
-    /* En el móvil solo se lee el nombre del paso actual. */
-    .ml-wizard-progress li:not([aria-current="step"]) .ml-wizard-progress__name {
-        display: none;
-    }
-
-    .ml-wizard-progress li:not([aria-current="step"]) {
-        flex: none;
     }
 
     .button-3.ml-participate-btn {

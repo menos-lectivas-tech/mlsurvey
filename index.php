@@ -63,10 +63,11 @@ $view->doInit();
 <head>
 	<meta charset="utf-8">
 	<?php include 'include/themehead.php'; ?>
-	<title><?= Config::$sitename != "" ? h(Config::$sitename) : "mlsurvey · Consultas" ?></title>
+	<title><?= Config::$sitename != "" ? h(Config::$sitename) : "Consultas Menos Lectivas" ?></title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<meta name="description" content="Plataforma de consultas y votaciones." />
 	<meta name="color-scheme" content="light dark" />
+	<link rel="icon" type="image/webp" href="img/menoslectivas.webp" />
 	<!-- css -->
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css">
 	<link href="css/bootstrap.min.css" rel="stylesheet" />
@@ -104,7 +105,7 @@ $view->doInit();
 								<span class="icon-bar"></span>
 							</button>
 						<?php endif; ?>
-						<!-- Sustituir .ml-brand-mark por <img src="img/logo.svg" alt=""> cuando haya logotipo. -->
+						<!-- Logotipo: el subido en la administración o, si no hay, el de Menos Lectivas. -->
 						<?php if ($view->showNavigation()): ?>
 							<a class="navbar-brand" href="index.php">
 							<?php else: ?>
@@ -117,10 +118,10 @@ $view->doInit();
 									<img src="<?= h($iconfile); ?>" alt="">
 								<?php
 							} else if (!empty(Config::PARAMS["use_default_icon"])) { ?>
-									<span class="ml-brand-mark" aria-hidden="true">ml</span>
+									<img src="img/menoslectivas.webp" alt="">
 								<?php } ?>
 								<span>
-									<?= Config::$mainheader != "" ? h(Config::$mainheader) : "mlsurvey" ?>
+									<?= Config::$mainheader != "" ? h(Config::$mainheader) : "Consultas Menos Lectivas" ?>
 								</span>
 								<?= $view->showNavigation() ? "</a>" : "</span>" ?>
 					</div>
@@ -182,7 +183,7 @@ $view->doInit();
 					<?php
 					if (!empty(Config::PARAMS["use_default_icon"])): ?>
 						<div class="widget">
-							<h5 class="widgetheading">mlsurvey</h5>
+							<h5 class="widgetheading">Consultas Menos Lectivas</h5>
 							<p>Consultas y votaciones en línea: participación con código,
 								resultados publicados al cierre.</p>
 						</div>
@@ -213,7 +214,7 @@ $view->doInit();
 						<div class="col-lg-6">
 							<div class="copyright">
 								<p>
-									<span>Powered by: <a href="https://github.com/menos-lectivas-tech/mlsurvey" target="_blank">mlsurvey</a></span>
+									<span>Powered by: <a href="https://github.com/menos-lectivas-tech/mlsurvey" target="_blank">Consultas Menos Lectivas</a></span>
 								</p>
 								<p>
 									<span>Special thanks to: <a href="https://github.com/PHPMailer/PHPMailer" target="_blank">PHPMailer</a>,

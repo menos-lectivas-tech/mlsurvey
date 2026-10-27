@@ -1,9 +1,8 @@
 /* =====================================================================
    mlsurvey · selector de tema
    ---------------------------------------------------------------------
-   Dos ejes independientes, persistidos en localStorage:
+   Modo persistido en localStorage:
      · modo   -> auto | light | dark   (auto = sigue al sistema operativo)
-     · acento -> nombre de la paleta de css/theme.css
 
    La aplicación del tema se hace antes de pintar con el script en línea
    de <head> (ver index.php). Este archivo sólo monta la interfaz.
@@ -12,9 +11,7 @@
     "use strict";
 
     var STORE_MODE = "mlsurvey:theme-mode";
-    var STORE_ACCENT = "mlsurvey:theme-accent";
     var DEFAULT_MODE = "auto";
-    var DEFAULT_ACCENT = "esmeralda";
     var root = document.documentElement;
 
     /* localStorage puede lanzar (modo privado, cookies bloqueadas). */
@@ -43,10 +40,6 @@
         }
     }
 
-    function applyAccent(accent) {
-        root.setAttribute("data-accent", accent);
-    }
-
     function init() {
         var panel = document.getElementById("ml-theme-panel");
         var trigger = document.getElementById("ml-theme-btn");
@@ -55,9 +48,7 @@
         }
 
         var mode = read(STORE_MODE, DEFAULT_MODE);
-        var accent = read(STORE_ACCENT, DEFAULT_ACCENT);
         var modeButtons = panel.querySelectorAll("[data-mode]");
-        var accentButtons = panel.querySelectorAll("[data-accent]");
 
         function syncChecked(buttons, attr, value) {
             Array.prototype.forEach.call(buttons, function (btn) {
@@ -70,7 +61,6 @@
 
         function refresh() {
             syncChecked(modeButtons, "data-mode", mode);
-            syncChecked(accentButtons, "data-accent", accent);
         }
 
         Array.prototype.forEach.call(modeButtons, function (btn) {
@@ -78,15 +68,6 @@
                 mode = btn.getAttribute("data-mode");
                 applyMode(mode);
                 write(STORE_MODE, mode);
-                refresh();
-            });
-        });
-
-        Array.prototype.forEach.call(accentButtons, function (btn) {
-            btn.addEventListener("click", function () {
-                accent = btn.getAttribute("data-accent");
-                applyAccent(accent);
-                write(STORE_ACCENT, accent);
                 refresh();
             });
         });

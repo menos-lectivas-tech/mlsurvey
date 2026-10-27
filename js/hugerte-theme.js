@@ -174,7 +174,7 @@
     if (global.MutationObserver) {
         new global.MutationObserver(onThemeChange).observe(root, {
             attributes: true,
-            attributeFilter: ["data-theme", "data-accent"]
+            attributeFilter: ["data-theme"]
         });
     }
 

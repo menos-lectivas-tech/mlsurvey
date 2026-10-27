@@ -1,3 +1,12 @@
+# Unreleased
+- Removed the verification of participants with digitally signed documents (and the
+  Register page). Participating only needs an `educa.madrid.org` email address: the
+  participant is registered on its first request and the participation link is sent to
+  that address. The `pdf_*`, `muface_*` and `nombramiento_*` settings and the `certs/`
+  folder are no longer used, nor are openssl and poppler-utils.
+- Database version 9 drops the `dnihashed` column of `Participants`.
+- The unsubscription form is on the participation page and checks the captcha.
+
 # 1.4
 - Minor change in survey_manage UX.
 - Add unsubscription functionality.

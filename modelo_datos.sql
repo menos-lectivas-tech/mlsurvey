@@ -72,14 +72,11 @@ PARTITION BY SYSTEM_TIME;
 
 CREATE TABLE Participants (
 	participantid INT UNSIGNED auto_increment NOT NULL,
-	participant CHAR(64) NOT NULL, /*sha256 of the email address*/
-	dnihashed CHAR(64) NULL, /*HMAC (participant_hmac_key) of the DNI; NULL in rows older than the column*/
+	participant CHAR(64) NOT NULL, /*HMAC (participant_hmac_key) of the email address*/
 	CONSTRAINT Participants_PK PRIMARY KEY (participantid)	
 );
 /*Una fila por dirección: la tabla es inmutable, un duplicado ya no se puede borrar.*/
 CREATE UNIQUE INDEX Participants_participant_IDX USING BTREE ON Participants (participant);
-/*Los mismos documentos no se pueden usar desde varias direcciones, ni una dirección con varios.*/
-CREATE UNIQUE INDEX Participants_dnihashed_IDX USING BTREE ON Participants (dnihashed);
 
 CREATE TABLE Participation (
 	participationid INT UNSIGNED auto_increment NOT NULL,

@@ -36,11 +36,11 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: var(--ml-font);
-    color: var(--ml-text);
-    font-weight: 650;
+    font-family: var(--ml-font-heading);
+    color: var(--ml-heading);
+    font-weight: 700;
     line-height: 1.25;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
     margin: 0 0 0.6em;
 }
 
@@ -130,13 +130,11 @@ footer .container {
 header .navbar,
 header .navbar-default {
     background: var(--ml-header-bg);
-    -webkit-backdrop-filter: saturate(180%) blur(12px);
-    backdrop-filter: saturate(180%) blur(12px);
     border: 0;
-    border-bottom: 1px solid var(--ml-header-border);
+    border-bottom: 4px solid var(--ml-header-border);
     border-radius: 0;
     margin-bottom: 0;
-    min-height: 64px;
+    min-height: 72px;
     padding: 0;
 }
 
@@ -145,7 +143,7 @@ header .navbar .container {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 64px;
+    min-height: 72px;
 }
 
 .navbar-header {
@@ -159,11 +157,12 @@ header .navbar .container {
 .navbar-default .navbar-brand {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    color: var(--ml-text);
-    font-size: 1.0625rem;
-    font-weight: 680;
-    letter-spacing: -0.02em;
+    gap: 12px;
+    color: var(--ml-header-text);
+    font-family: var(--ml-font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     text-transform: none;
     line-height: 1.2;
     height: auto;
@@ -173,31 +172,23 @@ header .navbar .container {
 
 .navbar-brand:hover,
 .navbar-default .navbar-brand:hover,
-.navbar-brand:focus {
-    color: var(--ml-accent-text);
+.navbar-brand:focus,
+.navbar-default .navbar-brand:focus {
+    color: var(--ml-highlight);
     text-decoration: none;
 }
 
 /* Marca sin enlace (páginas sin navegación): sin efecto hover. */
 .navbar-default .ml-brand-static:hover {
-    color: var(--ml-text);
+    color: var(--ml-header-text);
     cursor: default;
 }
 
-/* Marca de agua del logotipo mientras no haya uno real. */
-.ml-brand-mark {
-    display: inline-grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
+/* Logotipo: el de Menos Lectivas o el que se suba en la administración. */
+.navbar-brand img {
+    height: 52px;
+    width: auto;
     flex: none;
-    border-radius: var(--ml-radius-sm);
-    background: linear-gradient(140deg, var(--ml-accent), var(--ml-accent-hover));
-    color: var(--ml-accent-contrast);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0;
-    box-shadow: var(--ml-shadow-accent);
 }
 
 header .navbar-collapse {
@@ -222,13 +213,13 @@ header .navbar-nav > li {
 header .navbar-nav > li > a,
 header .navbar-default .navbar-nav > li > a {
     display: block;
-    color: var(--ml-text-soft);
-    font-size: 0.9rem;
-    font-weight: 550;
+    color: var(--ml-header-text-soft);
+    font-size: 0.95rem;
+    font-weight: 600;
     line-height: 1.2;
     margin: 0;
     padding: 8px 14px;
-    border-radius: var(--ml-radius-full);
+    border-radius: var(--ml-radius-sm);
     background: transparent;
     transition: background var(--ml-transition), color var(--ml-transition);
 }
@@ -237,8 +228,8 @@ header .navbar-nav > li > a:hover,
 header .navbar-default .navbar-nav > li > a:hover,
 header .navbar-nav > li > a:focus,
 header .navbar-default .navbar-nav > li > a:focus {
-    color: var(--ml-text);
-    background: var(--ml-surface-2);
+    color: var(--ml-header-text);
+    background: var(--ml-header-hover);
     text-decoration: none;
 }
 
@@ -246,28 +237,27 @@ header .navbar-nav > li.active > a,
 header .navbar-default .navbar-nav > .active > a,
 header .navbar-default .navbar-nav > .active > a:hover,
 header .navbar-default .navbar-nav > .active > a:focus {
-    color: var(--ml-accent-contrast);
-    background: var(--ml-accent);
-    box-shadow: var(--ml-shadow-accent);
+    color: var(--ml-highlight-contrast);
+    background: var(--ml-highlight);
 }
 
 /* Botón hamburguesa */
 .navbar-default .navbar-toggle {
-    border: 1px solid var(--ml-border);
+    border: 1px solid var(--ml-header-control-border);
     border-radius: var(--ml-radius-sm);
-    background: var(--ml-surface);
+    background: transparent;
     margin: 0;
     padding: 8px 10px;
 }
 
 .navbar-default .navbar-toggle:hover,
 .navbar-default .navbar-toggle:focus {
-    background: var(--ml-surface-2);
-    border-color: var(--ml-border-strong);
+    background: var(--ml-header-hover);
+    border-color: var(--ml-header-text);
 }
 
 .navbar-default .navbar-toggle .icon-bar {
-    background-color: var(--ml-text-soft);
+    background-color: var(--ml-header-text);
 }
 
 /* ------------------------------------------------------------------
@@ -275,6 +265,7 @@ header .navbar-default .navbar-nav > .active > a:focus {
    ------------------------------------------------------------------ */
 footer {
     background: var(--ml-footer-bg);
+    border-top: 1px solid var(--ml-footer-border);
     color: var(--ml-footer-text);
     padding: 48px 0 0;
     margin-top: auto;
@@ -371,7 +362,7 @@ footer ul.link-list li {
     width: 32px;
     height: 32px;
     border-radius: var(--ml-radius-full);
-    background: rgb(255 255 255 / 0.06);
+    background: var(--ml-accent-soft);
     color: var(--ml-footer-text);
     transition: background var(--ml-transition), color var(--ml-transition);
 }
@@ -692,6 +683,7 @@ a.scrollup i {
     flex: none;
 }
 
+/* Botones redondos de la cabecera: sobre su fondo de color. */
 .ml-theme-btn,
 .ml-nav-icon {
     display: grid;
@@ -699,9 +691,9 @@ a.scrollup i {
     width: 38px;
     height: 38px;
     padding: 0;
-    background: var(--ml-surface);
-    color: var(--ml-text-soft);
-    border: 1px solid var(--ml-border);
+    background: transparent;
+    color: var(--ml-header-text);
+    border: 1px solid var(--ml-header-control-border);
     border-radius: var(--ml-radius-full);
     cursor: pointer;
     transition: background var(--ml-transition), color var(--ml-transition),
@@ -711,9 +703,9 @@ a.scrollup i {
 .ml-theme-btn:hover,
 .ml-nav-icon:hover,
 .ml-nav-icon:focus {
-    background: var(--ml-surface-2);
-    color: var(--ml-text);
-    border-color: var(--ml-border-strong);
+    background: var(--ml-header-hover);
+    color: var(--ml-header-text);
+    border-color: var(--ml-header-text);
 }
 
 .ml-theme-btn svg,
@@ -783,34 +775,6 @@ a.scrollup i {
     background: var(--ml-surface);
     color: var(--ml-text);
     box-shadow: var(--ml-shadow-sm);
-}
-
-/* Muestras de color */
-.ml-swatches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.ml-swatches button {
-    position: relative;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 2px solid transparent;
-    border-radius: var(--ml-radius-full);
-    background: var(--swatch);
-    cursor: pointer;
-    transition: transform var(--ml-transition), box-shadow var(--ml-transition);
-}
-
-.ml-swatches button:hover {
-    transform: scale(1.12);
-}
-
-.ml-swatches button[aria-checked="true"] {
-    border-color: var(--ml-text);
-    box-shadow: 0 0 0 2px var(--ml-elevated) inset;
 }
 
 /* ------------------------------------------------------------------
@@ -918,10 +882,9 @@ a.scrollup i {
 .ml-nav-icon.is-active,
 .ml-nav-icon.is-active:hover,
 .ml-nav-icon.is-active:focus {
-    color: var(--ml-accent-contrast);
-    background: var(--ml-accent);
-    border-color: var(--ml-accent);
-    box-shadow: var(--ml-shadow-accent);
+    color: var(--ml-highlight-contrast);
+    background: var(--ml-highlight);
+    border-color: var(--ml-highlight);
 }
 
 /* El menú se pega a la derecha, justo antes de sus iconos y del selector
