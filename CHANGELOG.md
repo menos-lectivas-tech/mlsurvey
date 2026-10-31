@@ -1,3 +1,5 @@
+# 1.4.1
+- Added privacypolicy.html manage.
 # 1.4
 - Minor change in survey_manage UX.
 - Add unsubscription functionality.
