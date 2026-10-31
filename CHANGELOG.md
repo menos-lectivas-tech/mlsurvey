@@ -1,3 +1,7 @@
+# ml-1.4.1
+- Added privacypolicy.html in GetCode
+- Add a menu item for unsubscriptions
+
 # Unreleased
 - Removed the verification of participants with digitally signed documents (and the
   Register page). Participating only needs an `educa.madrid.org` email address: the
