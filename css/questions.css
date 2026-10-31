@@ -462,11 +462,12 @@
 
 /* El texto es largo: se desplaza dentro del diálogo y el botón de cerrar
    queda siempre a la vista. */
-.ml-legal-body {
+.ml-legal-body,
+.ml-legal-body p {
     max-height: min(60vh, 32em);
     overflow-y: auto;
     padding-right: 4px;
-    color: var(--ml-text-soft);
+    color: var(--ml-text-soft) !important;
     font-size: 0.9375rem;
     line-height: 1.55;
 }

@@ -35,7 +35,7 @@ abstract class RegistrationView extends View
     /* Páginas en las que se descarga cada documento. */
     private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
     private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
-
+    private const PRIVACY_POLICY_FILE = "privacypolicy.html";
     private array $docs = array();
 
     function __construct()
@@ -407,50 +407,58 @@ abstract class RegistrationView extends View
                     <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
                         aria-labelledby="ml-legal-title">
                         <div class="ml-dialog__form">
-                            <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
-                                condición de docente de la enseñanza pública</h2>
-                            <div class="ml-legal-body" tabindex="0">
-                                <p>Para comprobar que eres docente en activo en un centro público de la
-                                    Comunidad de Madrid necesitamos algún documento probatorio que
-                                    esté firmado digitalmente:</p>
-                                <ul>
-                                    <li>Si eres interino/a: tu nombramiento del curso actual, tu
-                                        credencial docente o tu hoja de servicios actualizada.</li>
-                                    <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
-                                        formación junto con tu certificado de afiliación a MUFACE, tu
-                                        credencial docente o tu hoja de servicios actualizada.</li>
-                                </ul>
-                                <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
-                                    para comprobar su autenticidad, que el NIF coincide si son dos y que
-                                    figuras en servicio activo en la Consejería de Educación. Se procesan en
-                                    memoria y se eliminan en cuanto termina la comprobación. No guardamos los
-                                    documentos ni ningún dato extraído de ellos.</p>
-                                <p>Lo único que conservamos es tu NIF transformado con una función
-                                    criptográfica y una clave secreta que se custodia aparte, de modo que sin
-                                    esa clave no es posible conocerlo. Solo sirve para impedir que una misma
-                                    persona tenga más de una cuenta.</p>
-                                <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                    información de la necesaria, como tu domicilio, tu puesto de trabajo o,
-                                    en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
-                                    ni la conservamos.</p>
-                                <h5>Información básica sobre protección de datos</h5>
-                                <ul>
-                                    <li><strong>Finalidad:</strong> verificar tu condición de docente en
-                                        activo de la enseñanza pública y evitar cuentas duplicadas.</li>
-                                    <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
-                                        en cualquier momento.</li>
-                                    <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
-                                        servicio se aloja en la Unión Europea.</li>
-                                    <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                        oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
-                                        También puedes reclamar ante la Agencia Española de
-                                        Protección de Datos (<a href="https://www.aepd.es" target="_blank"
-                                            rel="noopener noreferrer">aepd.es</a>).</li>
-                                </ul>
-                                <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
-                                    ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
-                                    con otros documentos.</p>
-                            </div>
+                            <?php if (
+                                !file_exists(self::PRIVACY_POLICY_FILE) ||
+                                !is_file(self::PRIVACY_POLICY_FILE)
+                            ) {
+                            ?>
+                                <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
+                                    condición de docente de la enseñanza pública</h2>
+                                <div class="ml-legal-body" tabindex="0">
+                                    <p>Para comprobar que eres docente en activo en un centro público de la
+                                        Comunidad de Madrid necesitamos algún documento probatorio que
+                                        esté firmado digitalmente:</p>
+                                    <ul>
+                                        <li>Si eres interino/a: tu nombramiento del curso actual, tu
+                                            credencial docente o tu hoja de servicios actualizada.</li>
+                                        <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
+                                            formación junto con tu certificado de afiliación a MUFACE, tu
+                                            credencial docente o tu hoja de servicios actualizada.</li>
+                                    </ul>
+                                    <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
+                                        para comprobar su autenticidad, que el NIF coincide si son dos y que
+                                        figuras en servicio activo en la Consejería de Educación. Se procesan en
+                                        memoria y se eliminan en cuanto termina la comprobación. No guardamos los
+                                        documentos ni ningún dato extraído de ellos.</p>
+                                    <p>Lo único que conservamos es tu NIF transformado con una función
+                                        criptográfica y una clave secreta que se custodia aparte, de modo que sin
+                                        esa clave no es posible conocerlo. Solo sirve para impedir que una misma
+                                        persona tenga más de una cuenta.</p>
+                                    <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
+                                        información de la necesaria, como tu domicilio, tu puesto de trabajo o,
+                                        en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
+                                        ni la conservamos.</p>
+                                    <h5>Información básica sobre protección de datos</h5>
+                                    <ul>
+                                        <li><strong>Finalidad:</strong> verificar tu condición de docente en
+                                            activo de la enseñanza pública y evitar cuentas duplicadas.</li>
+                                        <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
+                                            en cualquier momento.</li>
+                                        <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
+                                            servicio se aloja en la Unión Europea.</li>
+                                        <li><strong>Derechos:</strong> acceso, rectificación, supresión,
+                                            oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
+                                            También puedes reclamar ante la Agencia Española de
+                                            Protección de Datos (<a href="https://www.aepd.es" target="_blank"
+                                                rel="noopener noreferrer">aepd.es</a>).</li>
+                                    </ul>
+                                    <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
+                                        ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
+                                        con otros documentos.</p>
+                                </div>
+                            <?php } else {
+                                echo file_get_contents(self::PRIVACY_POLICY_FILE);
+                            } ?>
                             <div class="ml-dialog__actions">
                                 <button type="button" class="button-3" id="ml-legal-close">
                                     Cerrar</button>
@@ -474,7 +482,7 @@ abstract class RegistrationView extends View
             </form>
         </section>
         <?php
-        if (empty ($selected))
+        if (empty($selected))
             $this->showUnregister();
         ?>
         <script>
@@ -910,7 +918,7 @@ abstract class RegistrationView extends View
     ?>
         <section class="ml-participate-card" id="unregister">
             <form name="unregisterform" method="POST" action="unsubscribe">
-                <?= setTokenHTML();?>
+                <?= setTokenHTML(); ?>
                 <h3>Date de baja</h3>
                 <p>Date de baja indicando tu dirección de correo.</p>
                 <p><strong>El proceso se puede alargar hasta 30 días para que no puedas repetir tu participación
@@ -922,7 +930,7 @@ abstract class RegistrationView extends View
                 </p>
                 <div class="ml-participate-doc">
                     <label for="email">Dirección de correo</label>
-                    
+
                     <small>Debe coindidir con la que proporcionaste al registrarte.</small>
                 </div>
                 <div class="ml-participate-row">
