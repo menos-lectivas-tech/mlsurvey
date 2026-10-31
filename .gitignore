@@ -12,4 +12,4 @@ views/test*
 modelo_datos_ml.sql
 *.delete
 test-docs
-
+privacypolicy*.html

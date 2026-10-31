@@ -29,6 +29,7 @@ abstract class ParticipationRequestView extends View
     private const DOMAIN = "educa.madrid.org";
     /* Minutos que tienen que pasar entre un envío del enlace y el siguiente. */
     protected const RESEND_WAIT_MINUTES = 5;
+    private const PRIVACY_POLICY_FILE = 'privacypolicyemail.html';
 
     function getMenuGroup()
     {
@@ -101,8 +102,12 @@ abstract class ParticipationRequestView extends View
     /* Guarda la petición de participación. Se llama con el bloqueo del correo
        cogido. Devuelve [pid, código] para el enlace, o null (con el motivo ya
        mostrado) si no procede. */
-    abstract protected function reserveParticipation(PDO $db, string $email, string $hashemail,
-        int $surveyid): ?array;
+    abstract protected function reserveParticipation(
+        PDO $db,
+        string $email,
+        string $hashemail,
+        int $surveyid
+    ): ?array;
 
     /* Mensaje de que el enlace se ha enviado; $surveyname ya va escapado. */
     abstract protected function showSent(string $surveyname);
@@ -303,12 +308,42 @@ abstract class ParticipationRequestView extends View
                 <input type="hidden" name="surveyid" value="<?= $surveyid; ?>">
                 <div class="ml-participate-field">
                     <label for="email">Dirección de correo</label>
-                    <?= $this->infoButton("Dirección de correo",
-                        "Solo se admiten direcciones de " . self::DOMAIN . ".\n\n" . $texts['emailinfo']); ?>
+                    <?= $this->infoButton(
+                        "Dirección de correo",
+                        "Solo se admiten direcciones de " . self::DOMAIN . ".\n\n" . $texts['emailinfo']
+                    ); ?>
                     <small><?= h($texts['emailhint']); ?></small>
                 </div>
                 <div class="ml-participate-row">
                     <input type="email" name="email" id="email" required>
+                    <p class="ml-participate-legal-link">Antes de continuar, lee
+                        <button type="button" class="ml-link" id="ml-legal-open"
+                            aria-haspopup="dialog">cómo tratamos dirección de correo y la información
+                            sobre protección de datos</button>.
+                    </p>
+                    <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
+                        aria-labelledby="ml-legal-title">
+                        <div class="ml-dialog__form">
+                            <?php if (
+                                !file_exists(self::PRIVACY_POLICY_FILE) ||
+                                !is_file(self::PRIVACY_POLICY_FILE)
+                            ) {
+                            ?>
+                                <p>Política de protección de datos no definida</p>
+                            <?php
+                            } else {
+                                echo file_get_contents(self::PRIVACY_POLICY_FILE);
+                            } ?>
+                            <div class="ml-dialog__actions">
+                                <button type="button" class="button-3" id="ml-legal-close">
+                                    Cerrar</button>
+                            </div>
+                        </div>
+                    </dialog>
+                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                            value="1" id="acepto" required>
+                        He leído la información sobre el tratamiento de mi dirección de correo y
+                        consiento su tratamiento con la finalidad indicada.</label>
                     <?= altchaWidgetHTML(); ?>
                     <button type="submit" class="button-3 ml-participate-btn"
                         name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">
@@ -328,7 +363,7 @@ abstract class ParticipationRequestView extends View
                 });
             });
         </script>
-<?php
+    <?php
     }
 
     /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
@@ -336,5 +371,28 @@ abstract class ParticipationRequestView extends View
     {
         return '<button type="button" class="ml-info" aria-label="Más información: ' . h($title) .
             '" data-title="' . h($title) . '" data-info="' . h($info) . '">' . mlIcon('info') . '</button>';
+    }
+
+    #[Override]
+    public function addJavascript()
+    {
+    ?>
+        <script src="js/mldialog.js"></script>
+        <script type="text/javascript">
+            var legal = document.getElementById("ml-legal");
+            document.getElementById("ml-legal-open").addEventListener("click", function() {
+                if (typeof legal.showModal === "function")
+                    legal.showModal();
+                else
+                    legal.setAttribute("open", "");
+            });
+            document.getElementById("ml-legal-close").addEventListener("click", function() {
+                if (typeof legal.close === "function")
+                    legal.close();
+                else
+                    legal.removeAttribute("open");
+            });
+        </script>
+<?php
     }
 }
