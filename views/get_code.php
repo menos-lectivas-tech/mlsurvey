@@ -13,6 +13,7 @@ require_once 'include/mlmailer.php';
 require_once 'utils/participation.php';
 require_once 'utils/showsurvey.php';
 require_once 'utils/crypt.php';
+require_once 'utils/clientcert.php';
 
 class GetCode extends RegistrationView
 {
@@ -79,26 +80,35 @@ class GetCode extends RegistrationView
             if (!showSurveyHeader($db, $surveyid, true))
                 return;
 
-            $this->showEmailForm($surveyid, [
-                'action' => self::PAGE,
-                'title' => "Participar en la consulta",
-                'infotitle' => "Cómo participar",
-                'info' => "Indica tu dirección de correo.\n\n" .
-                    "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
-                    "con un enlace personal para participar, que caduca en una hora.\n\n" .
-                    "SI ES LA PRIMERA VEZ, a continuación te preguntaremos tu situación y te " .
-                    "pediremos uno o dos documentos firmados electrónicamente. Si son válidos " .
-                    "recibirás el mensaje con el enlace.\n" .
-                    "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
-                    "que son de la misma persona. Con el DNI que figura en ellos se evita " .
-                    "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
-                    "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
-                    "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
-                'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
-                    "el enlace y ya no podrás votar.",
-                'emailhint' => "Revísala bien: ahí recibirás el enlace.",
-                'button' => "Participar en la consulta",
-            ]);
+            /* Con el certificado activado se elige primero el método, como en
+               las sedes electrónicas: el certificado solo se pide al elegirlo. */
+            $method = $_GET['metodo'] ?? null;
+            if (clientCertEnabled() && $method !== 'email') {
+                $this->showMethodSelector($surveyid);
+            } else {
+                $this->showEmailForm($surveyid, [
+                    'action' => self::PAGE,
+                    'title' => "Participar en la consulta",
+                    'infotitle' => "Cómo participar",
+                    'info' => "Indica tu dirección de correo.\n\n" .
+                        "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
+                        "con un enlace personal para participar, que caduca en una hora.\n\n" .
+                        "SI ES LA PRIMERA VEZ, a continuación te preguntaremos tu situación y te " .
+                        "pediremos uno o dos documentos firmados electrónicamente. Si son válidos " .
+                        "recibirás el mensaje con el enlace.\n" .
+                        "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
+                        "que son de la misma persona. Con el DNI que figura en ellos se evita " .
+                        "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
+                        "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
+                        "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
+                    'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
+                        "el enlace y ya no podrás votar.",
+                    'emailhint' => "Revísala bien: ahí recibirás el enlace.",
+                    'button' => "Participar en la consulta",
+                ]);
+                if (clientCertEnabled())
+                    $this->showOtherMethodLink($surveyid);
+            }
         ?>
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
@@ -109,6 +119,65 @@ class GetCode extends RegistrationView
             echo ("<p><strong>Error al acceder a la consulta seleccionada.</strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} getting survey for code.");
         }
+    }
+
+    /* Ventana de elección del método de identificación. Todos sacan el DNI:
+       el certificado y el DNIe del propio certificado (CertLogin), y el correo
+       de los documentos firmados que se piden la primera vez. */
+    private function showMethodSelector($surveyid)
+    {
+        $certurl = clientCertUrl() . "?responseid=" . (int) $surveyid;
+        $emailurl = self::PAGE . "?responseid=" . (int) $surveyid . "&metodo=email";
+        $methods = [
+            [
+                'url' => $certurl,
+                'title' => "DNI electrónico",
+                'text' => "Con el DNIe y un lector de tarjetas, o un móvil con NFC. " .
+                    "Necesitarás el PIN del DNIe.",
+                'button' => "Acceder con DNIe",
+            ],
+            [
+                'url' => $certurl,
+                'title' => "Certificado digital",
+                'text' => "Con un certificado de persona física (FNMT u otra autoridad " .
+                    "admitida) instalado en el navegador. Vota directamente, sin esperar " .
+                    "ningún correo.",
+                'button' => "Acceder con certificado",
+            ],
+            [
+                'url' => $emailurl,
+                'title' => "Correo electrónico y documentos",
+                'text' => "Recibirás un enlace personal en tu correo. La primera vez te " .
+                    "pediremos documentos firmados electrónicamente, de los que se lee tu DNI.",
+                'button' => "Acceder con correo",
+            ],
+        ];
+        ?>
+        <section class="ml-participate-card ml-auth-select">
+            <h3>Elige cómo identificarte</h3>
+            <p>Con cualquiera de los métodos se comprueba tu DNI, para que nadie participe dos
+                veces. Con el DNIe o el certificado, el navegador te pedirá elegirlo
+                <strong>después</strong> de pulsar el botón. Si es la primera vez, te pediremos
+                además los documentos que acreditan que eres docente.</p>
+            <ul class="ml-auth-methods">
+                <?php foreach ($methods as $m) { ?>
+                    <li class="ml-auth-method">
+                        <h4><?= h($m['title']); ?></h4>
+                        <p><?= h($m['text']); ?></p>
+                        <a class="button-3 ml-participate-btn" href="<?= h($m['url']); ?>"><?=
+                            h($m['button']); ?></a>
+                    </li>
+                <?php } ?>
+            </ul>
+        </section>
+        <?php
+    }
+
+    private function showOtherMethodLink($surveyid)
+    {
+        $url = self::PAGE . "?responseid=" . (int) $surveyid;
+        echo ("<p class='ml-auth-back'><a href='" . h($url) .
+            "'>&larr; Elegir otro método de identificación</a></p>");
     }
 
     /**

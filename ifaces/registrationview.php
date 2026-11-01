@@ -685,14 +685,23 @@ abstract class RegistrationView extends View
      * $then is called with the participant id and whether it has just been created,
      * still holding the locks of the DNI and the email address.
      *
+     * With $expecteddni (the one of the digital certificate) the DNI of the
+     * documents must be that one.
+     *
      * @return mixed What $then returns, or null (the reason is already shown) if the
      * documents aren't valid or the DNI or the address belong to another participant.
      */
-    protected function registerWithDocs($db, $email, callable $then)
+    protected function registerWithDocs($db, $email, callable $then, ?string $expecteddni = null)
     {
         $dni = $this->getDni();
         if ($dni === null)
             return null;
+        if ($expecteddni !== null && !hash_equals($expecteddni, $dni)) {
+            echo ("<p><strong>El DNI de los documentos no coincide con el de tu certificado " .
+                "digital.</strong></p>");
+            logMessage(LOGGER_WARN, "Documents rejected: the DNI is not the one in the client certificate.");
+            return null;
+        }
         $hashdni = participantHash($dni);
         $hashemail = participantHash($email);
 

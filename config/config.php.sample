@@ -96,6 +96,26 @@ const CONFIG = [
 "nombramiento_signer_orgs" => '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
 
 /**
+ * Identification with a digital certificate (TLS client certificate) as an
+ * alternative to the email address when participating. See README.md: Apache
+ * must ask for the certificate (SSLVerifyClient) where clientcert_url is served.
+ * clientcert_enabled: shows the option in the survey page.
+ * clientcert_url: URL of the cert_login page; absolute if it is served by
+ * another virtual host (e.g. "https://cert.example.org/cert_login").
+ * clientcert_ca_file: PEM file with the certification authorities (roots and
+ * intermediates) trusted for the certificates, the same as Apache's
+ * SSLCACertificateFile.
+ * clientcert_revocation: checks that the certificate isn't revoked, with OCSP
+ * and, if the responder doesn't answer, with the CRL of the certificate (see
+ * utils/certrevocation.php). Turn it off only for tests.
+ */
+
+"clientcert_enabled" => false,
+"clientcert_url" => 'cert_login',
+"clientcert_ca_file" => 'certs/clientcert_ca.pem',
+"clientcert_revocation" => true,
+
+/**
  * For enabling stress test bypasses
  */
 

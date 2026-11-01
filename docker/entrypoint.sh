@@ -80,6 +80,13 @@ define('CONFIG', [
 "nombramiento_ca_file" => getenv('NOMBRAMIENTO_CA_FILE') ?: 'certs/nombramiento_ca.pem',
 "nombramiento_signer_orgs" => getenv('NOMBRAMIENTO_SIGNER_ORGS') ?: '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
 
+// Identificacion con certificado digital (certificado de cliente TLS): ver README.
+"clientcert_enabled" => getenv('CLIENTCERT_ENABLED') === 'true',
+"clientcert_url" => getenv('CLIENTCERT_URL') ?: 'cert_login',
+"clientcert_ca_file" => getenv('CLIENTCERT_CA_FILE') ?: 'certs/clientcert_ca.pem',
+// Revocacion: OCSP y, si no responde, la CRL del certificado (en PHP).
+"clientcert_revocation" => getenv('CLIENTCERT_REVOCATION') === 'false' ? false : true,
+
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
 "survey_edit_restric" => getenv('SURVEY_EDIT_RESTRIC') === 'true',
@@ -91,6 +98,85 @@ define('CONFIG', [
 PHPEOF
     chown www-data:www-data "$CONFIG_FILE"
     chmod 640 "$CONFIG_FILE"
+fi
+
+# --- HTTPS ---------------------------------------------------------------
+# Certificado del servidor: si no hay uno en SSL_CERT_FILE/SSL_KEY_FILE se
+# genera uno autofirmado (valido para SSL_HOSTNAME, localhost y 127.0.0.1).
+# Se guarda en el volumen ssl, asi que sobrevive a un recreado del contenedor.
+export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/mlsurvey/ssl/server.crt}"
+export SSL_KEY_FILE="${SSL_KEY_FILE:-/etc/mlsurvey/ssl/server.key}"
+SSL_HOSTNAME="${SSL_HOSTNAME:-localhost}"
+if [ ! -s "$SSL_CERT_FILE" ] || [ ! -s "$SSL_KEY_FILE" ]; then
+    echo "[mlsurvey] no hay certificado en ${SSL_CERT_FILE}: se genera uno autofirmado para ${SSL_HOSTNAME}."
+    mkdir -p "$(dirname "$SSL_CERT_FILE")" "$(dirname "$SSL_KEY_FILE")"
+    SAN="DNS:localhost,IP:127.0.0.1"
+    [ "$SSL_HOSTNAME" != "localhost" ] && SAN="DNS:${SSL_HOSTNAME},${SAN}"
+    openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
+        -subj "/CN=${SSL_HOSTNAME}" \
+        -addext "subjectAltName=${SAN}" \
+        -keyout "$SSL_KEY_FILE" -out "$SSL_CERT_FILE" 2>/dev/null
+    chmod 600 "$SSL_KEY_FILE"
+fi
+
+# HTTP -> HTTPS: el puerto 80 redirige a SITE_URL si es https. Ponlo a false
+# si un proxy delante termina el TLS y habla HTTP con el contenedor.
+REDIRECT_CONF=/etc/apache2/mlsurvey-http-redirect.conf
+case "${HTTPS_REDIRECT:-true}:${SITE_URL:-}" in
+    true:https://*)
+        echo "Redirect permanent / ${SITE_URL%/}/" > "$REDIRECT_CONF" ;;
+    *)
+        rm -f "$REDIRECT_CONF" ;;
+esac
+
+# Certificado digital de las participantes: un host propio, en el puerto
+# CLIENTCERT_PORT, que lo pide al conectar (SSLVerifyClient optional). Con
+# TLS 1.3 no se puede pedir a mitad de conexion solo para /cert_login.
+CLIENTCERT_CONF=/etc/apache2/mlsurvey-clientcert.conf
+rm -f "$CLIENTCERT_CONF"
+if [ "${CLIENTCERT_ENABLED:-false}" = "true" ]; then
+    CA="${CLIENTCERT_CA_FILE:-certs/clientcert_ca.pem}"
+    case "$CA" in /*) ;; *) CA="${APP_DIR}/${CA}" ;; esac
+    if [ ! -s "$CA" ]; then
+        echo "[mlsurvey] AVISO: CLIENTCERT_ENABLED=true pero no existe ${CA}: no se pide el certificado digital."
+    else
+        # Este host pide el certificado nada mas conectar, asi que solo debe
+        # usarse para identificarse y votar (cert_login y su envio a
+        # participate). Todo lo demas vuelve al sitio normal (SITE_URL), para
+        # que navegar por la web no pida el certificado.
+        CERT_REDIRECT=""
+        if [ -n "${SITE_URL:-}" ]; then
+            CERT_REDIRECT="
+    RewriteEngine On
+    RewriteCond %{ENV:REDIRECT_STATUS} ^\$
+    RewriteCond %{REQUEST_URI} !^/(cert_login|participate)/?\$
+    RewriteCond %{REQUEST_URI} !^/(css|js|fonts|img)/
+    RewriteRule ^ ${SITE_URL%/}%{REQUEST_URI} [R=302,L]"
+        fi
+        cat > "$CLIENTCERT_CONF" <<EOF
+Listen ${CLIENTCERT_PORT:-8444}
+<VirtualHost *:${CLIENTCERT_PORT:-8444}>
+    DocumentRoot /var/www/html
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+
+    SSLEngine on
+    SSLCertificateFile    \${SSL_CERT_FILE}
+    SSLCertificateKeyFile \${SSL_KEY_FILE}
+
+    SSLCACertificateFile ${CA}
+    SSLVerifyClient optional
+    SSLVerifyDepth 3
+    # La revocacion la comprueba PHP (OCSP y, si no responde, la CRL):
+    # con SSLOCSPEnable una caida del OCSP de la autoridad impide entrar.
+    SSLOCSPEnable off
+    # SSL_CLIENT_VERIFY y SSL_CLIENT_CERT para PHP (utils/clientcert.php).
+    SSLOptions +StdEnvVars +ExportCertData
+${CERT_REDIRECT}
+</VirtualHost>
+EOF
+        echo "[mlsurvey] certificado digital: se pide en el puerto ${CLIENTCERT_PORT:-8444} (CLIENTCERT_URL=${CLIENTCERT_URL:-})."
+    fi
 fi
 
 # Esperar a la base de datos (el init de MariaDB tarda en cargar modelo_datos.sql).

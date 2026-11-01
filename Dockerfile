@@ -6,11 +6,22 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip openssl poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql opcache \
-    && a2enmod rewrite headers
+    && a2enmod rewrite headers ssl socache_shmcb
 
 COPY docker/apache-mlsurvey.conf /etc/apache2/conf-available/mlsurvey.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/mlsurvey.ini
-RUN a2enconf mlsurvey
+COPY docker/apache-site.conf /etc/apache2/sites-available/mlsurvey.conf
+RUN a2enconf mlsurvey \
+    && a2dissite 000-default \
+    && a2ensite mlsurvey \
+    && mkdir -p /etc/mlsurvey/ssl
+
+# HTTPS: certificado del servidor. Si no existe al arrancar, el entrypoint
+# genera uno autofirmado (ver docker-compose.yml para usar uno propio).
+ENV SSL_CERT_FILE=/etc/mlsurvey/ssl/server.crt \
+    SSL_KEY_FILE=/etc/mlsurvey/ssl/server.key \
+    CLIENTCERT_PORT=8444
+EXPOSE 80 443 8444
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

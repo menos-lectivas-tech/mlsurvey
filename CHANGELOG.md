@@ -1,3 +1,18 @@
+# 1.5
+- Participants can identify with a digital certificate (TLS client certificate) instead of
+  the email address: the new `cert_login` page reads the DNI/NIE of the certificate and, if
+  it is registered, shows the survey form right away. If it isn't, the documents wizard is
+  shown (their DNI must be the one of the certificate) and, once registered, the survey form.
+  New `clientcert_enabled`, `clientcert_url` and `clientcert_ca_file` settings; Apache must
+  ask for the certificate (see `README.md` and `docker/apache-clientcert.conf.example`).
+  Revocation is checked by PHP (`clientcert_revocation`, `CLIENTCERT_REVOCATION`): with OCSP
+  and, if the responder doesn't answer, with the CRL of the certificate, so an outage of the
+  FNMT OCSP service doesn't block the identification.
+- Docker Compose serves the application over HTTPS (`HTTPS_PORT`, 8443), with a self-signed
+  certificate when none is mounted; plain HTTP redirects to `SITE_URL`. With
+  `CLIENTCERT_ENABLED=true` the host that asks for the digital certificate is served on
+  `CLIENTCERT_PORT` (8444).
+
 # 1.4.1
 - Added privacypolicy.html manage.
 # 1.4

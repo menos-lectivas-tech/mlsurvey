@@ -68,6 +68,9 @@ services:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+      # Host que pide el certificado digital (CLIENTCERT_ENABLED, activo por defecto).
+      - "${CLIENTCERT_PORT:-8444}:8444"
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -82,7 +85,16 @@ services:
       APACHE_LISTEN_BACKLOG: ${APACHE_LISTEN_BACKLOG:-1024}
       # URL publica del sitio, tal como la ven las participantes. Los enlaces
       # de los correos se construyen con ella, no con la cabecera Host.
-      SITE_URL: ${SITE_URL:-http://localhost:${WEB_PORT:-8080}/}
+      SITE_URL: ${SITE_URL:-https://localhost:${HTTPS_PORT:-8443}/}
+      # HTTPS. Sin certificado en SSL_CERT_FILE/SSL_KEY_FILE se genera uno
+      # autofirmado para SSL_HOSTNAME. Para uno propio, montalo (ver volumes)
+      # y apunta aqui sus rutas dentro del contenedor.
+      SSL_HOSTNAME: ${SSL_HOSTNAME:-localhost}
+      SSL_CERT_FILE: ${SSL_CERT_FILE:-/etc/mlsurvey/ssl/server.crt}
+      SSL_KEY_FILE: ${SSL_KEY_FILE:-/etc/mlsurvey/ssl/server.key}
+      # true: el puerto HTTP redirige a SITE_URL (si es https). false si
+      # delante hay un proxy que termina el TLS y entra por HTTP.
+      HTTPS_REDIRECT: ${HTTPS_REDIRECT:-true}
       # 0: error, 1: warn, 2: info, 3: debug. En produccion 0.
       LOG_LEVEL: ${LOG_LEVEL:-0}
       # Envio de correo (antes en la base de datos, ahora en config/config.php).
@@ -119,6 +131,14 @@ services:
       PDF_MAX_AGE_DAYS: ${PDF_MAX_AGE_DAYS:-30}
       NOMBRAMIENTO_CA_FILE: ${NOMBRAMIENTO_CA_FILE:-certs/nombramiento_ca.pem}
       NOMBRAMIENTO_SIGNER_ORGS: ${NOMBRAMIENTO_SIGNER_ORGS:-}
+      # Identificacion con certificado digital (ver README): Apache tiene que
+      # pedir el certificado donde se sirve CLIENTCERT_URL.
+      CLIENTCERT_ENABLED: ${CLIENTCERT_ENABLED:-true}
+      CLIENTCERT_URL: ${CLIENTCERT_URL:-https://localhost:${CLIENTCERT_PORT:-8444}/cert_login}
+      CLIENTCERT_CA_FILE: ${CLIENTCERT_CA_FILE:-certs/clientcert_ca.pem}
+      # Revocacion del certificado de la participante: OCSP y, si no
+      # responde, la CRL del certificado. false solo para pruebas.
+      CLIENTCERT_REVOCATION: ${CLIENTCERT_REVOCATION:-true}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
@@ -127,6 +147,9 @@ services:
       SURVEY_EDIT_RESTRIC: ${SURVEY_EDIT_RESTRIC:-false}
     volumes:
       - uploads:/var/www/html/files
+      # Certificado HTTPS (el autofirmado se guarda aqui). Para uno propio:
+      #   - ./docker/ssl:/etc/mlsurvey/ssl:ro   (server.crt y server.key)
+      - ssl:/etc/mlsurvey/ssl
       # Para desarrollo, descomenta para editar el codigo sin reconstruir la imagen:
       - ./:/var/www/html
       # Sin esto, el montaje anterior tapa el vendor/ que instala composer
@@ -137,3 +160,4 @@ volumes:
   db_data:
   uploads:
   mail_data:
+  ssl:

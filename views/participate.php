@@ -91,8 +91,8 @@ class Participate extends View {
                     echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
                     return;
                 }
-                $formid = $this->saveParticipation ($this->surveyid, self::TESTID);
-                $this->showSurvey ($db, $this->surveyid, $formid);
+                $formid = self::saveParticipation ($this->surveyid, self::TESTID);
+                self::showSurvey ($db, $this->surveyid, $formid);
                 return;
             }
             
@@ -122,8 +122,8 @@ class Participate extends View {
                     la solicitud de baja del registro de participantes.</strong></p>";
                 return;
             }
-            $formid = $this->saveParticipation ($this->surveyid, $participantid);
-            $this->showSurvey ($db, $this->surveyid, $formid);
+            $formid = self::saveParticipation ($this->surveyid, $participantid);
+            self::showSurvey ($db, $this->surveyid, $formid);
 
         }
         catch (Exception $e){
@@ -144,7 +144,7 @@ class Participate extends View {
        Va en el propio formulario, no suelto en la sesión: con dos enlaces
        abiertos a la vez, las respuestas de uno acababan en la consulta
        del otro. */
-    private function saveParticipation ($surveyid, $participantid): string {
+    public static function saveParticipation ($surveyid, $participantid): string {
         if (!isset ($_SESSION[self::PARTICIPATIONS]) || !is_array ($_SESSION[self::PARTICIPATIONS]))
             $_SESSION[self::PARTICIPATIONS] = array ();
         $formid = bin2hex (random_bytes (16));
@@ -167,7 +167,7 @@ class Participate extends View {
         return $participation;
     }
 
-    private function showSurvey ($db, $surveyid, $formid){
+    public static function showSurvey ($db, $surveyid, $formid){
 
         echo ('<form name="participate" id="participate" action="participate" method="POST">');
         echo ("<input type='hidden' name='" . self::FORM_FIELD . "' value='{$formid}'>");

@@ -535,6 +535,47 @@
     margin: 16px 20px;
 }
 
+/* --- Elección del método de identificación ------------------------ */
+.ml-auth-methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+}
+
+.ml-auth-method {
+    display: flex;
+    flex-direction: column;
+    background: var(--ml-surface);
+    border: 1px solid var(--ml-border);
+    border-radius: var(--ml-radius);
+    padding: 18px;
+}
+
+.ml-auth-method:hover,
+.ml-auth-method:focus-within {
+    border-color: var(--ml-accent);
+}
+
+.ml-auth-method > h4 {
+    margin: 0 0 8px;
+}
+
+.ml-auth-method > p {
+    flex: 1;
+}
+
+.ml-auth-method > .ml-participate-btn {
+    align-self: flex-start;
+    text-decoration: none;
+}
+
+.ml-auth-back {
+    margin: -8px 0 24px;
+}
+
 /* --- Móvil -------------------------------------------------------- */
 @media (max-width: 600px) {
     .question {
