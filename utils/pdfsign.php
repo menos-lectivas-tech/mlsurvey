@@ -465,6 +465,35 @@ function getHojaServiciosNIF(string $path): string|false
         logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
         throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
     }
+
+    /* Tiene que haber un servicio de este curso, es decir, que haya empezado
+       o terminado a partir del 1 de septiembre. Cada servicio es
+       "<función> <causa cese> <posesión> [<cese>]", con la función en 7 cifras
+       (0590007) y las fechas en dd/mm/aaaa. */
+    $date = '(\d\d)\/(\d\d)\/(\d{4})';
+    preg_match_all("/\\b\\d{7}\\b .{0,60}?\\b$date\\b(?: $date\\b)?/u", $text, $services, PREG_SET_ORDER);
+    if (empty($services)) {
+        logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no services found in it.");
+        throw new PdfSignException("No se han podido leer los servicios de la Hoja de Servicios.");
+    }
+    $current = false;
+    foreach ($services as $service) {
+        /* Grupos 1-3: posesión; 4-6: cese, si lo hay. */
+        foreach ([1, 4] as $i) {
+            if (!isset($service[$i + 2]) || $service[$i + 2] === "")
+                continue;
+            [$day, $month, $year] = array_map('intval', array_slice($service, $i, 3));
+            if (checkdate($month, $day, $year) &&
+                    (new DateTimeImmutable("today"))->setDate($year, $month, $day) >= pdfCourseStart()) {
+                $current = true;
+                break 2;
+            }
+        }
+    }
+    if (!$current) {
+        logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no service started or ended this course.");
+        throw new PdfSignException("La Hoja de Servicios no tiene ningún servicio vigente en el curso actual.");
+    }
     return reset($found);
 }
 
