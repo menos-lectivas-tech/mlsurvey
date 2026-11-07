@@ -34,8 +34,8 @@ class Register extends RegistrationView
         $this->showDeclaracionForm(null, [
             'action' => self::PAGE,
             'title' => "Regístrate",
-            'intro' => "Acredita que eres docente de la enseñanza pública con una declaración " .
-                "firmada con tu certificado digital. Te registraremos con la dirección de correo " .
+            'intro' => "Para registrarte tienes que declarar, firmando digitalmente con tu " .
+                "certificado, que eres docente de la enseñanza pública. Te registraremos con la dirección de correo " .
                 "de EducaMadrid que indiques en ella y te enviaremos allí la confirmación. Una vez " .
                 "registrado/a, para participar en una consulta solo tendrás que indicar esa " .
                 "dirección y recibirás en ella el enlace para votar.",

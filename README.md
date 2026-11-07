@@ -8,6 +8,10 @@ With this project we are trying to develop an online voting system based on the 
   must be the one of the signer's certificate and the participant is registered with the email
   address of the declaration. The participation link is always sent to that address, so it
   must exist.
+  The declaration can also be signed right in the registration form: the participant writes the
+  email address, AutoFirma (the signing app of the Spanish Government, that must be installed)
+  asks for the certificate, the server fills in the model with the DNI/NIE of that certificate
+  and the address, AutoFirma signs it and the form sends it. It is checked like an uploaded one.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -29,7 +33,8 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl`, `pdftotext` (poppler-utils) and `qpdf` commands, for checking the signed PDF.
+* The `openssl`, `pdftotext` (poppler-utils) and `qpdf` (>= 11) commands, for checking the signed
+  PDF and filling in the declaration that is signed in the browser.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -90,6 +95,12 @@ Every configuration item has a description, you only need to notice:
   is rejected. Turn it off only for tests.
 * `declaracion_email_domains` lists the domains allowed for the email address of the
   declaration (`educa.madrid.org` by default).
+* Signing the declaration in the browser needs nothing else on the server: in desktop browsers
+  `js/afirma/autoscript.js` (from the [Cliente @firma](https://github.com/ctt-gob-es/clienteafirma))
+  talks to AutoFirma through a local WebSocket. In Android and iOS it uses the @firma
+  intermediate server, which the application provides itself (`afirma_storage` and
+  `afirma_retrieve`, `utils/afirmaproxy.php`); the messages are kept encrypted for a few minutes
+  in the system temporary directory.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,

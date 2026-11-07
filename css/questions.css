@@ -185,6 +185,75 @@
     margin-bottom: 4px;
 }
 
+/* Aviso de que es una declaración responsable firmada. */
+.ml-declaracion-aviso {
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    background: var(--ml-warning-soft);
+    border-left: 4px solid var(--ml-warning);
+    border-radius: var(--ml-radius-sm);
+}
+
+.ml-declaracion-aviso p {
+    margin: 0 0 6px;
+}
+
+.ml-declaracion-aviso p:last-child {
+    margin-bottom: 0;
+}
+
+/* Firmarla aquí con AutoFirma o subir el PDF firmado (js/declaracion-firma.js). */
+.ml-firma-modes {
+    margin: 0 0 16px;
+    padding: 0;
+    border: 0;
+}
+
+.ml-firma-modes legend {
+    margin-bottom: 8px;
+    border: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: inherit;
+}
+
+.ml-participate-card .ml-firma-modes label {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.ml-firma-panel {
+    margin-bottom: 8px;
+}
+
+.ml-firma-panel .ml-participate-row input[type="email"] {
+    margin-bottom: 8px;
+}
+
+.ml-firma-help {
+    color: var(--ml-text-soft);
+    font-size: 0.9375rem;
+}
+
+.ml-firma-status {
+    margin: 14px 0 0;
+    font-weight: 600;
+}
+
+.ml-firma-status--error {
+    color: var(--ml-danger, #b3261e);
+}
+
+.ml-firma-modes[hidden],
+.ml-firma-panel[hidden],
+.ml-firma-status[hidden] {
+    display: none !important;
+}
+
 /* Título de cada documento, con su icono de información y, debajo y en
    pequeño, dónde se obtiene. */
 .ml-participate-doc {

@@ -194,9 +194,11 @@ class GetCode extends RegistrationView
                 'action' => self::PAGE,
                 'title' => "Primera vez: acredita que eres docente",
                 'intro' => "La dirección " . $email . " no ha participado antes. Para " .
-                    "participar tienes que acreditarte con una declaración firmada: te " .
+                    "participar tienes que declarar, firmando digitalmente con tu certificado, " .
+                    "que eres docente de la enseñanza pública: te " .
                     "enviaremos el enlace para participar a la dirección de correo de " .
                     "EducaMadrid que indiques en ella.",
+                'email' => $email,
             ]);
         return null;
     }

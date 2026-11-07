@@ -10,7 +10,10 @@
  * certificate of a trusted authority, and the DNI of the certificate must be
  * the one written in the form.
  *
- * Needs the openssl, pdftotext (poppler-utils) and qpdf commands.
+ * It also fills in the model for signing it in the browser with AutoFirma
+ * (declaracionFill, views/declaracion_pdf.php).
+ *
+ * Needs the openssl, pdftotext (poppler-utils) and qpdf (>= 11) commands.
  */
 require_once 'include/config.php';
 require_once 'utils/logger.php';
@@ -25,6 +28,10 @@ const PDF_DECLARACION_TITLE = "autodeclaracion como docente en la educacion publ
 /* Nombres de los campos del formulario del modelo. */
 const PDF_FIELD_DNI = "DNI";
 const PDF_FIELD_EMAIL = "email";
+/* El modelo que se rellena en el servidor para firmarlo desde el navegador. */
+const PDF_DECLARACION_MODEL = "docs/modelo_declaracion.pdf";
+/* Campo de firma vacío del modelo, donde AutoFirma pone la firma visible. */
+const PDF_FIELD_SIGNATURE = "Signature";
 
 /**
  * The message is meant to be shown to the participant.
@@ -281,7 +288,18 @@ function checkDeclaracion (string $path): array {
             "el del certificado con el que está firmada.");
     }
 
-    $email = strtolower (trim ($fields[PDF_FIELD_EMAIL] ?? ""));
+    return ["dni" => $dni, "email" => declaracionEmail ($fields[PDF_FIELD_EMAIL] ?? "")];
+}
+
+/**
+ * Normalizes and checks the email address of the declaration: it must be valid
+ * and of one of the declaracion_email_domains.
+ *
+ * @return string The address in lower case.
+ * @throws PdfSignException if it isn't valid.
+ */
+function declaracionEmail (string $email): string {
+    $email = strtolower (trim ($email));
     if ($email == "" || filter_var ($email, FILTER_VALIDATE_EMAIL) === false){
         logMessage (LOGGER_WARN, "Declaration rejected: no valid email address in the form.");
         throw new PdfSignException ("La dirección de correo de la declaración no es válida.");
@@ -294,5 +312,105 @@ function checkDeclaracion (string $path): array {
         throw new PdfSignException ("La dirección de correo de la declaración tiene que ser de " .
             implode (" o ", $domains) . ".");
     }
-    return ["dni" => $dni, "email" => $email];
+    return $email;
+}
+
+/**
+ * Gets the DNI/NIE of the certificate the participant has chosen for signing
+ * the declaration in the browser (with AutoFirma), checking that it is a
+ * personal certificate of a trusted authority in force. It is only for filling
+ * in the declaration and warning early: the signed declaration is checked
+ * again in full by checkDeclaracion.
+ *
+ * @param string $certb64 DER certificate in base64 (standard or URL safe).
+ *
+ * @return string The DNI/NIE in upper case.
+ * @throws PdfSignException if the certificate isn't valid.
+ */
+function declaracionCertDni (string $certb64): string {
+    $der = strlen ($certb64) > 16384 ? false :
+        base64_decode (strtr (preg_replace ('/\s+/', '', $certb64) ?? "", "-_", "+/"), true);
+    $cert = $der === false || $der === "" ? false : @openssl_x509_read (
+        "-----BEGIN CERTIFICATE-----\n" . chunk_split (base64_encode ($der), 64, "\n") .
+        "-----END CERTIFICATE-----\n");
+    if ($cert === false)
+        throw new PdfSignException ("No se ha podido leer el certificado seleccionado.");
+    $info = openssl_x509_parse ($cert);
+    $dni = $info === false ? null : certSubjectDni ($info);
+    if ($dni === null)
+        throw new PdfSignException ("El certificado seleccionado no es de persona física: " .
+            "usa tu certificado personal o tu DNIe.");
+    $cafile = Config::PARAMS["declaracion_ca_file"] ?? "certs/declaracion_ca.pem";
+    if (!is_readable ($cafile))
+        throw new Exception ("CA file {$cafile} is not readable");
+    /* Comprueba la cadena hasta las autoridades de $cafile y que esté en vigor. */
+    if (openssl_x509_checkpurpose ($cert, X509_PURPOSE_ANY, [$cafile]) !== true){
+        logMessage (LOGGER_WARN, "Certificate for the declaration rejected: untrusted or expired.");
+        throw new PdfSignException ("El certificado seleccionado está caducado o no es de una " .
+            "autoridad de certificación admitida.");
+    }
+    return $dni;
+}
+
+/**
+ * Fills in the declaration model (docs/modelo_declaracion.pdf) with the DNI/NIE
+ * and the email address, ready to be signed: the fields get their appearance
+ * (so that the signed PDF looks the same in every viewer) and become read-only.
+ *
+ * @return string The PDF.
+ */
+function declaracionFill (string $dni, string $email): string {
+    $model = PDF_DECLARACION_MODEL;
+    [$code, $out, $err] = pdfRunCommand (["qpdf", "--json", "--json-key=acroform", $model]);
+    if ($code != 0 && $code != 3)
+        throw new Exception ("qpdf failed reading the model form ({$code}): " . trim ($err));
+    $values = [PDF_FIELD_DNI => $dni, PDF_FIELD_EMAIL => $email];
+    $objects = [];
+    foreach (json_decode ($out, true)["acroform"]["fields"] ?? [] as $field){
+        $name = $field["fullname"] ?? null;
+        if (isset ($values[$name]) && preg_match ('/^(\d+) (\d+) R$/', $field["object"] ?? "", $m))
+            $objects[$name] = $m[1];
+    }
+    if (count ($objects) != count ($values))
+        throw new Exception ("The declaration model doesn't have the DNI and email fields");
+
+    /* --update-from-json cambia el objeto entero: se lee y se cambia solo el valor. */
+    $cmd = ["qpdf", "--json-output", "--json-key=qpdf"];
+    foreach ($objects as $id)
+        $cmd[] = "--json-object={$id}";
+    $cmd[] = $model;
+    $cmd[] = "-";
+    [$code, $out, $err] = pdfRunCommand ($cmd);
+    $json = $code == 0 || $code == 3 ? json_decode ($out, true) : null;
+    if (!is_array ($json["qpdf"][1] ?? null))
+        throw new Exception ("qpdf failed reading the model fields ({$code}): " . trim ($err));
+    $update = ["qpdf" => [$json["qpdf"][0], []]];
+    foreach ($objects as $name => $id){
+        $key = "obj:{$id} 0 R";
+        $object = $json["qpdf"][1][$key]["value"] ?? null;
+        if (!is_array ($object))
+            throw new Exception ("Field {$name} of the declaration model not found");
+        $object["/V"] = "u:" . $values[$name];
+        /* Solo lectura (bit 1), conservando los demás indicadores. */
+        $object["/Ff"] = ((int) ($object["/Ff"] ?? 0)) | 1;
+        $update["qpdf"][1][$key] = ["value" => $object];
+    }
+
+    $updatefile = tempnam (sys_get_temp_dir (), "mlj");
+    $outfile = tempnam (sys_get_temp_dir (), "mlp");
+    try {
+        file_put_contents ($updatefile, json_encode ($update, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        [$code, , $err] = pdfRunCommand (["qpdf", $model, "--update-from-json={$updatefile}",
+            "--generate-appearances", $outfile]);
+        if ($code != 0 && $code != 3)
+            throw new Exception ("qpdf failed filling in the declaration ({$code}): " . trim ($err));
+        $pdf = file_get_contents ($outfile);
+        if ($pdf === false || strncmp ($pdf, "%PDF-", 5) != 0)
+            throw new Exception ("qpdf didn't write the declaration");
+        return $pdf;
+    }
+    finally {
+        @unlink ($updatefile);
+        @unlink ($outfile);
+    }
 }

@@ -148,45 +148,106 @@ abstract class RegistrationView extends View
 
     /* Segundo paso, solo para quien aún no está registrado: se pide la
        declaración firmada, de la que se leen el DNI y la dirección de correo
-       educamadrid con la que se registra. No se pide la dirección en el
-       formulario: es la de la declaración.
-       Textos de $texts: action, title e intro. */
+       educamadrid con la que se registra.
+       Hay dos formas de hacerla, y las dos acaban enviando el PDF firmado en
+       el campo «documento»:
+       - Firmarla aquí (js/declaracion-firma.js): se pide la dirección, AutoFirma
+         pide elegir el certificado, el servidor genera la declaración con el DNI
+         del certificado y esa dirección (declaracion_pdf), AutoFirma la firma y
+         se envía sola. Sin JavaScript esta parte no se muestra.
+       - Subir el modelo rellenado y firmado por su cuenta.
+       La dirección del formulario solo sirve para generar la declaración: la
+       que cuenta es la de la declaración firmada.
+       Textos de $texts: action, title, intro y, opcional, email (la dirección
+       con la que rellenar el formulario). */
     protected function showDeclaracionForm($surveyid, array $texts)
     {
+        $domains = array_map('strtolower', (array) (Config::PARAMS["declaracion_email_domains"] ??
+            ["educa.madrid.org"]));
     ?>
         <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?></h3>
             <p><?= h($texts['intro']); ?></p>
+            <div class="ml-declaracion-aviso" role="note">
+                <p><strong>Vas a firmar una declaración responsable.</strong> Con tu firma
+                    digital declaras, bajo tu responsabilidad, que trabajas como docente en la
+                    educación pública de la Comunidad de Madrid. Firmarla con tu certificado o tu
+                    DNIe equivale a firmarla de tu puño y letra: queda identificado/a quién la firma.</p>
+                <p>Esta consulta es solo para el profesorado de la enseñanza pública. Si declaras
+                    algo que no es cierto, <strong>podremos emprender acciones legales</strong>.</p>
+            </div>
             <form id="declaracion" name="declaracion" method="POST"
-                action="<?= h($texts['action']); ?>" enctype="multipart/form-data">
+                action="<?= h($texts['action']); ?>" enctype="multipart/form-data"
+                data-pdf-url="declaracion_pdf" data-storage-url="afirma_storage"
+                data-retriever-url="afirma_retrieve">
                 <?= setTokenHTML(); ?>
                 <?php if ($surveyid !== null) { ?>
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                 <?php } ?>
-                <ol class="ml-declaracion-steps">
-                    <li>Descarga el <a href="<?= h(self::MODEL_URL); ?>" target="_blank"
-                            rel="noopener noreferrer" download>modelo de declaración</a>.</li>
-                    <li>Rellena tu número de documento (NIF o NIE) y tu dirección de correo de
-                        EducaMadrid. Con esa dirección quedarás registrado/a y en ella recibirás
-                        los mensajes.</li>
-                    <li>Fírmalo con tu certificado digital de persona física o tu DNIe (por
-                        ejemplo, con AutoFirma o Adobe Acrobat Reader). El certificado tiene que ser
-                        el tuyo: su número de documento tiene que coincidir con el que has escrito.</li>
-                    <li>Adjunta aquí el PDF firmado, sin modificarlo después de firmar.</li>
-                </ol>
-                <div class="ml-participate-doc">
-                    <label for="documento">Declaración firmada</label>
-                    <?= $this->infoButton(
-                        "Declaración firmada",
-                        "El modelo de declaración relleno con tu NIF o NIE y tu dirección de " .
-                            "correo de EducaMadrid, y firmado digitalmente con tu propio certificado.\n\n" .
-                            "Si lo modificas después de firmarlo, la firma deja de ser válida."
-                    ); ?>
-                    <small>El PDF tal como queda después de firmarlo.</small>
+                <fieldset class="ml-firma-modes" id="ml-firma-modes" hidden>
+                    <legend>¿Cómo quieres hacer la declaración?</legend>
+                    <label><input type="radio" name="modo_firma" value="autofirma" checked>
+                        Firmarla aquí con mi certificado digital <em>(recomendado)</em></label>
+                    <label><input type="radio" name="modo_firma" value="pdf">
+                        Subir un PDF que ya he firmado</label>
+                </fieldset>
+                <div class="ml-firma-panel" id="ml-firma-autofirma" hidden>
+                    <ol class="ml-declaracion-steps">
+                        <li>Escribe tu dirección de correo de EducaMadrid. Con esa dirección
+                            quedarás registrado/a y en ella recibirás los mensajes.</li>
+                        <li>Pulsa «Firmar y enviar»: se abrirá AutoFirma para que elijas tu
+                            certificado digital de persona física o tu DNIe.</li>
+                        <li>Generaremos la declaración con el NIF o NIE de tu certificado y esa
+                            dirección, y AutoFirma te pedirá confirmar la firma. Al confirmarla
+                            declaras que eres docente de la enseñanza pública de la Comunidad de
+                            Madrid. Después la enviaremos.</li>
+                    </ol>
+                    <div class="ml-participate-doc">
+                        <label for="firma_email">Dirección de correo de EducaMadrid</label>
+                        <?= $this->infoButton(
+                            "Dirección de correo de EducaMadrid",
+                            "Es la que aparecerá en tu declaración firmada: con ella quedarás " .
+                                "registrado/a y en esta y en próximas consultas tendrás que usar " .
+                                "siempre la misma.\n\nDominios autorizados: " .
+                                (empty($domains) ? "cualquiera" : implode(", ", $domains)) . "."
+                        ); ?>
+                        <small>Revísala bien: ahí recibirás los mensajes.</small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="email" name="firma_email" id="firma_email"
+                            autocomplete="email" value="<?= h($texts['email'] ?? ""); ?>">
+                    </div>
+                    <p class="ml-firma-help">Necesitas tener instalado
+                        <a href="https://firmaelectronica.gob.es/Home/Descargas.html" target="_blank"
+                            rel="noopener noreferrer">AutoFirma</a>, la aplicación de firma del
+                        Gobierno de España (en el móvil, Cliente @firma móvil).</p>
                 </div>
-                <div class="ml-participate-row">
-                    <input type="file" name="documento" id="documento" required
-                        accept="application/pdf,.pdf">
+                <div class="ml-firma-panel" id="ml-firma-pdf">
+                    <ol class="ml-declaracion-steps">
+                        <li>Descarga el <a href="<?= h(self::MODEL_URL); ?>" target="_blank"
+                                rel="noopener noreferrer" download>modelo de declaración</a>.</li>
+                        <li>Rellena tu número de documento (NIF o NIE) y tu dirección de correo de
+                            EducaMadrid. Con esa dirección quedarás registrado/a y en ella recibirás
+                            los mensajes.</li>
+                        <li>Léelo y fírmalo con tu certificado digital de persona física o tu DNIe (por
+                            ejemplo, con AutoFirma o Adobe Acrobat Reader). El certificado tiene que ser
+                            el tuyo: su número de documento tiene que coincidir con el que has escrito.</li>
+                        <li>Adjunta aquí el PDF firmado, sin modificarlo después de firmar.</li>
+                    </ol>
+                    <div class="ml-participate-doc">
+                        <label for="documento">Declaración firmada</label>
+                        <?= $this->infoButton(
+                            "Declaración firmada",
+                            "El modelo de declaración relleno con tu NIF o NIE y tu dirección de " .
+                                "correo de EducaMadrid, y firmado digitalmente con tu propio certificado.\n\n" .
+                                "Si lo modificas después de firmarlo, la firma deja de ser válida."
+                        ); ?>
+                        <small>El PDF tal como queda después de firmarlo.</small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="file" name="documento" id="documento" required
+                            accept="application/pdf,.pdf">
+                    </div>
                 </div>
                 <p class="ml-participate-legal-link">Antes de enviarla, lee
                     <button type="button" class="ml-link" id="ml-legal-open"
@@ -249,13 +310,17 @@ abstract class RegistrationView extends View
                     consiento su tratamiento con la finalidad indicada.</label>
                 <div class="ml-participate-row">
                     <?= altchaWidgetHTML(); ?>
-                    <button type="submit" class="button-3 ml-participate-btn"
-                        name="<?= self::ACTION_DECLARACION; ?>" value="<?= self::ACTION_DECLARACION; ?>">
+                    <button type="submit" class="button-3 ml-participate-btn" id="ml-declaracion-submit"
+                        name="<?= self::ACTION_DECLARACION; ?>" value="<?= self::ACTION_DECLARACION; ?>"
+                        data-label-autofirma="Firmar y enviar" data-label-pdf="Enviar declaración">
                         Enviar declaración</button>
                 </div>
+                <p class="ml-firma-status" id="ml-firma-status" role="status" aria-live="polite" hidden></p>
             </form>
         </section>
         <?php $this->showUnregister(); ?>
+        <script src="js/afirma/autoscript.js"></script>
+        <script src="js/declaracion-firma.js"></script>
         <script>
             (function() {
                 /* La información de protección de datos se muestra en un diálogo. */
