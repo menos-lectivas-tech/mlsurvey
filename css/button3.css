@@ -193,13 +193,3 @@
     margin-left: 8px;
 }
 
-.ml-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-}
-
-.ml-actions .button-3 + .button-3 {
-    margin-left: 0;
-}

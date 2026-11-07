@@ -104,7 +104,7 @@ class Resend extends GetCode
                 echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
                 return;
             }
-            if (!$this->checkDomain($db, $email)) {
+            if (!$this->checkDomain($email)) {
                 return;
             }
             $hashemail = participantHash($email);

@@ -1,18 +1,18 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
-* Identify participants by digitally signed PDFs, so each person can vote only once. Interim
-  teachers upload the appointment (_nombramiento_) of the current school year on its own.
-  Career civil servants upload the training record (_extracto de formación_) together with
-  the MUFACE membership certificate: the DNI is read from the training record and the one in
-  the certificate must be the same. Both can also use the teaching credential (_credencial
-  docente_) or the service record (_hoja de servicios_) on their own.
-  The signatures are checked.
+* Identify participants by a digitally signed PDF, so each person can vote only once. The
+  first time, participants download the self-declaration model (`docs/modelo_declaracion.pdf`),
+  fill in their DNI/NIE and their EducaMadrid email address and sign it with their own
+  personal certificate (FNMT, DNIe...). The signature is checked, the DNI written in the form
+  must be the one of the signer's certificate and the participant is registered with the email
+  address of the declaration. The participation link is always sent to that address, so it
+  must exist.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
 (SHA-256), each one in its own unique column (`participant` for the email address and
-`dnihashed` for the DNI), so the same documents can't be used from several
+`dnihashed` for the DNI), so the same DNI can't be used from several
 email addresses; the PDF is not stored.
 Clearly, someone with access to the database could compromise anonymity by hashing every possible DNI. This is something we will aim to address in future releases.
 
@@ -29,7 +29,7 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl` and `pdftotext` (poppler-utils) commands, for checking the signed PDF.
+* The `openssl`, `pdftotext` (poppler-utils) and `qpdf` commands, for checking the signed PDF.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -77,24 +77,19 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
-* `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
-  PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
-  electronic seal (`S7800001E`) by default.
-* `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
-  membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
-  electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate can be (30 days by default).
-* `nombramiento_ca_file` and `nombramiento_signer_orgs` set who is trusted for signing the
-  appointment, the service record (hoja de servicios) and the teaching credential: the
-  certification authorities in `certs/nombramiento_ca.pem` (Camerfirma and FNMT) and a regular
-  expression the `organizationIdentifier` of the signer's certificate must match, by default
-  the Comunidad de Madrid (`VATES-S7800001E`) and the public bodies of Madrid (NIF `Q` with
-  province code 28 or 78 to 88). They are signed with the personal certificate of a public
-  employee or the representative certificate of the school, so personal certificates of
-  citizens or certificates of companies are rejected. The appointment's body is a scanned image, so its DNI and date are read from
-  the PDF title, which the signature covers too.
-* `clientcert_enabled`, `clientcert_url` and `clientcert_ca_file` set the identification
-  with a digital certificate, see [below](#identification-with-a-digital-certificate).
+* `declaracion_ca_file` sets the certification authorities (roots and intermediates) trusted
+  for the certificate that signs the declaration, `certs/declaracion_ca.pem` by default. The
+  bundled file has only the FNMT ones (`AC RAIZ FNMT-RCM` + `AC FNMT Usuarios`); add e.g.
+  `AC RAIZ DNIE 2` + the `AC DNIE 00x` for the DNIe. The DNI/NIE of the signer is read from the
+  `serialNumber` of the certificate subject (`IDCES-12345678Z` or `12345678Z`); certificates
+  without a personal DNI (electronic seals, components) are rejected.
+* `declaracion_revocation` checks that the signer's certificate isn't revoked
+  (`utils/certrevocation.php`): first with the OCSP responder of the certificate and, if it
+  doesn't answer, with its CRL (the FNMT splits it in partitions, so only the one of the
+  certificate is downloaded and cached for 3 hours). If neither can be used, the declaration
+  is rejected. Turn it off only for tests.
+* `declaracion_email_domains` lists the domains allowed for the email address of the
+  declaration (`educa.madrid.org` by default).
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -119,35 +114,6 @@ And then
 The participation request form is protected with [ALTCHA](https://altcha.org/), a
 proof of work captcha that needs no external service: the widget is served from
 `js/altcha/` and the challenges are generated and checked by `utils/altcha.php`.
-
-### Identification with a digital certificate
-Besides the email address, participants can identify with a digital certificate
-(FNMT, DNIe...) installed in the browser. The DNI/NIE is read from the `serialNumber` of the
-certificate subject (`IDCES-12345678Z` or `12345678Z`); certificates without a personal DNI
-(electronic seals, components) are rejected. If that DNI is registered the survey form is
-shown at once; if not, the documents wizard is shown first, with the email address in its
-last step, and the DNI of the documents must be the one of the certificate.
-
-The certificate is asked for by Apache (mod_ssl), so it needs HTTPS:
-1. Build `certs/clientcert_ca.pem` with the roots and intermediates you trust, e.g. for the
-   FNMT `AC RAIZ FNMT-RCM` + `AC FNMT Usuarios`, and for the DNIe `AC RAIZ DNIE 2` + the
-   `AC DNIE 00x` (the bundled file has only the FNMT ones). It is used by Apache (`SSLCACertificateFile`) and checked again by PHP.
-2. Ask for the certificate where `cert_login` is served. With TLS 1.3 the browsers don't
-   support asking for it in the middle of a connection, so the simplest way is a virtual
-   host of its own (e.g. `cert.example.org`) with `SSLVerifyClient optional` for the whole
-   host: see `docker/apache-clientcert.conf.example`. The whole application is served there
-   too, as the forms of the page (documents, vote) are submitted to the same host.
-3. Set `clientcert_enabled` to `true` and `clientcert_url` to the URL of the page, e.g.
-   `https://cert.example.org/cert_login` (`cert_login` if it is the same host).
-
-Revocation is checked by PHP (`clientcert_revocation`, `utils/certrevocation.php`), not by
-Apache: first with the OCSP responder of the certificate and, if it doesn't answer, with the
-CRL of the certificate. The FNMT splits its CRL in thousands of partitions, so only the one
-of the certificate is downloaded; it is cached in the temporary directory and refreshed
-every 3 hours, and an old copy is used while it is current (`nextUpdate`) if the download
-fails. If neither OCSP nor the CRL can be used, the certificate is rejected. Leave
-`SSLOCSPEnable` off in Apache: with it an outage of the OCSP responder rejects every
-certificate.
 
 ### Configure the mail bounce checker
 For avoiding conflicts with a wrong typed email address the application comes with a script 
@@ -225,12 +191,6 @@ certificate, mount it into the container, e.g. replacing the `ssl` volume in
 the intermediates) and `server.key`. If a reverse proxy terminates TLS in front of the
 container and talks HTTP to it, set `HTTPS_REDIRECT=false`.
 
-With `CLIENTCERT_ENABLED=true` the entrypoint also brings up the host that asks for the
-digital certificate on its own port (`CLIENTCERT_PORT`, 8444), with
-`SSLVerifyClient optional` and the authorities of `CLIENTCERT_CA_FILE`; `CLIENTCERT_URL`
-must point to it (`https://localhost:8444/cert_login` by default). If the CA file does
-not exist, the certificate is not asked for and a warning is logged.
-
 The first start takes a while: MariaDB loads the schema and the `web` container waits for
 the database to be ready before serving requests.
 
@@ -253,18 +213,9 @@ the database to be ready before serving requests.
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP (the Compose setup uses HTTPS): the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
-| `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
-| `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
-| `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
-| `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate can be, counting from its issue date. |
-| `NOMBRAMIENTO_CA_FILE` | `certs/nombramiento_ca.pem` | PEM file with the certification authorities trusted for the signature of the appointment, the service record and the teaching credential. |
-| `NOMBRAMIENTO_SIGNER_ORGS` | Comunidad de Madrid and public bodies of Madrid | Regular expression the `organizationIdentifier` of the signer's certificate must match. |
-| `CLIENTCERT_ENABLED` | `true` | Identification with a digital certificate when participating (see above). |
-| `CLIENTCERT_URL` | `https://localhost:8444/cert_login` | URL of the page that asks for the certificate; absolute if it is another host. |
-| `CLIENTCERT_PORT` | `8444` | Host port of the host that asks for the certificate. |
-| `CLIENTCERT_REVOCATION` | `true` | Check the revocation of the certificate (OCSP, or its CRL if the responder doesn't answer); `false` only for tests. |
-| `CLIENTCERT_CA_FILE` | `certs/clientcert_ca.pem` | PEM file with the certification authorities trusted for the certificates. |
+| `DECLARACION_CA_FILE` | `certs/declaracion_ca.pem` | PEM file with the certification authorities trusted for the certificate that signs the declaration. |
+| `DECLARACION_REVOCATION` | `true` | Check the revocation of that certificate (OCSP, or its CRL if the responder doesn't answer); `false` only for tests. |
+| `DECLARACION_EMAIL_DOMAINS` | `educa.madrid.org` | Space separated domains allowed for the email address of the declaration. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

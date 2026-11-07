@@ -70,7 +70,6 @@ $view->doInit();
 	<!-- css -->
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css">
 	<link href="css/bootstrap.min.css" rel="stylesheet" />
-	<link href="css/fancybox/jquery.fancybox.css" rel="stylesheet">
 	<link href="css/style.css" rel="stylesheet" />
 	<!-- El sistema de temas va después de la plantilla: la reescribe. -->
 	<link href="css/theme.css" rel="stylesheet" />
@@ -83,10 +82,6 @@ $view->doInit();
 	<?php
 	$view->addHead();
 	?>
-	<!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
-	<!--[if lt IE 9]>
-      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
 </head>
 
 <body>
@@ -127,12 +122,8 @@ $view->doInit();
 					<?php if ($view->showNavigation()): ?>
 						<div class="navbar-collapse collapse ">
 							<ul class="nav navbar-nav">
-								<!--                        <li class="active"><a href="">Inicio</a></li> 
-						<li><a href="admin">Administración</a></li>
-						<li><a href="surveys">Consultas</a></li>-->
 								<?php
 								foreach ($menuarray as $key => $menuitem) {
-									//var_dump($menuitem);
 									/* Las entradas con icono van aparte, a la derecha del menú. */
 									if (isset($menuitem[ML_MENU_ICON]))
 										continue;
@@ -254,16 +245,9 @@ $view->doInit();
 	<!-- javascript
     ================================================== -->
 	<!-- Placed at the end of the document so the pages load faster -->
-	<script src="js/jquery.easing.1.3.js"></script>
 	<script src="js/bootstrap.min.js"></script>
-	<script src="js/jquery.fancybox.pack.js"></script>
-	<script src="js/jquery.fancybox-media.js"></script>
-	<script src="js/portfolio/jquery.quicksand.js"></script>
-	<script src="js/portfolio/setting.js"></script>
-	<script src="js/animate.js"></script>
 	<script src="js/custom.js"></script>
 	<script src="js/theme.js"></script>
-	<!--<script src="js/owl-carousel/owl.carousel.js"></script>-->
 	<?php
 	if (isView($view))
 		$view->addJavascript();

@@ -1,3 +1,22 @@
+# 1.6
+- Registration asks for a single document: the self-declaration as a teacher
+  (`docs/modelo_declaracion.pdf`), a PDF form with the DNI/NIE and the EducaMadrid email
+  address, signed with the participant's own personal certificate. The DNI of the form must
+  be the one of the signer's certificate, and the participant is registered with the email
+  address of the declaration: the forms no longer ask for it. The documents wizard (interim /
+  career civil servant) and the checks of the appointment, service record, teaching
+  credential, MUFACE certificate and training record are removed, with their settings
+  (`pdf_*`, `muface_*`, `nombramiento_*`). New `declaracion_ca_file`,
+  `declaracion_revocation` and `declaracion_email_domains` settings. Needs `qpdf`.
+- The identification with a digital certificate (`cert_login`, `clientcert_*` settings and
+  the host on `CLIENTCERT_PORT`) is removed: the participation link is always sent by email,
+  so the address must exist.
+- Unused code removed: the old `response_survey` view (email + code form), the partial
+  results code of `participate`, `MLAsymmetricCrypt`, `hasCode`, unused constants and
+  helpers, commented-out code, and the leftovers of the original web template (fancybox,
+  quicksand/portfolio, animate, easing, prettify, local icon fonts, extra select2 builds and
+  translations, and ~1000 lines of CSS rules for markup the site doesn't have).
+
 # 1.5
 - Participants can identify with a digital certificate (TLS client certificate) instead of
   the email address: the new `cert_login` page reads the DNI/NIE of the certificate and, if

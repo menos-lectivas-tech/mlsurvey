@@ -65,27 +65,13 @@ define('CONFIG', [
 // Clave del HMAC del correo y el DNI de las participantes: obligatoria y fija.
 "participant_hmac_key" => getenv('PARTICIPANT_HMAC_KEY') ?: '',
 
-// Firma del extracto de formacion: autoridades de confianza y NIF de los
-// sellos admitidos (separados por comas).
-"pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
-"pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
-
-// Documento que acredita el regimen (Clases Pasivas o resto): sello de MUFACE admitido para el
-// certificado de afiliacion (separados por comas), antiguedad maxima del PDF y
-// autoridades de confianza y expresion regular de los organismos que pueden firmar el
-// nombramiento, la hoja de servicios y la credencial.
-"muface_ca_file" => getenv('MUFACE_CA_FILE') ?: 'certs/muface_ca.pem',
-"muface_signer_ids" => array_map('trim', explode(',', getenv('MUFACE_SIGNER_IDS') ?: 'Q2861001B')),
-"pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
-"nombramiento_ca_file" => getenv('NOMBRAMIENTO_CA_FILE') ?: 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => getenv('NOMBRAMIENTO_SIGNER_ORGS') ?: '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
-
-// Identificacion con certificado digital (certificado de cliente TLS): ver README.
-"clientcert_enabled" => getenv('CLIENTCERT_ENABLED') === 'true',
-"clientcert_url" => getenv('CLIENTCERT_URL') ?: 'cert_login',
-"clientcert_ca_file" => getenv('CLIENTCERT_CA_FILE') ?: 'certs/clientcert_ca.pem',
-// Revocacion: OCSP y, si no responde, la CRL del certificado (en PHP).
-"clientcert_revocation" => getenv('CLIENTCERT_REVOCATION') === 'false' ? false : true,
+// Declaracion firmada que se pide para registrarse: autoridades de confianza
+// para el certificado con el que se firma, comprobacion de su revocacion
+// (OCSP y, si no responde, la CRL) y dominios admitidos para el correo
+// (separados por espacios).
+"declaracion_ca_file" => getenv('DECLARACION_CA_FILE') ?: 'certs/declaracion_ca.pem',
+"declaracion_revocation" => getenv('DECLARACION_REVOCATION') === 'false' ? false : true,
+"declaracion_email_domains" => array_values(array_filter(explode(' ', strtolower(getenv('DECLARACION_EMAIL_DOMAINS') ?: 'educa.madrid.org')))),
 
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
@@ -128,56 +114,6 @@ case "${HTTPS_REDIRECT:-true}:${SITE_URL:-}" in
     *)
         rm -f "$REDIRECT_CONF" ;;
 esac
-
-# Certificado digital de las participantes: un host propio, en el puerto
-# CLIENTCERT_PORT, que lo pide al conectar (SSLVerifyClient optional). Con
-# TLS 1.3 no se puede pedir a mitad de conexion solo para /cert_login.
-CLIENTCERT_CONF=/etc/apache2/mlsurvey-clientcert.conf
-rm -f "$CLIENTCERT_CONF"
-if [ "${CLIENTCERT_ENABLED:-false}" = "true" ]; then
-    CA="${CLIENTCERT_CA_FILE:-certs/clientcert_ca.pem}"
-    case "$CA" in /*) ;; *) CA="${APP_DIR}/${CA}" ;; esac
-    if [ ! -s "$CA" ]; then
-        echo "[mlsurvey] AVISO: CLIENTCERT_ENABLED=true pero no existe ${CA}: no se pide el certificado digital."
-    else
-        # Este host pide el certificado nada mas conectar, asi que solo debe
-        # usarse para identificarse y votar (cert_login y su envio a
-        # participate). Todo lo demas vuelve al sitio normal (SITE_URL), para
-        # que navegar por la web no pida el certificado.
-        CERT_REDIRECT=""
-        if [ -n "${SITE_URL:-}" ]; then
-            CERT_REDIRECT="
-    RewriteEngine On
-    RewriteCond %{ENV:REDIRECT_STATUS} ^\$
-    RewriteCond %{REQUEST_URI} !^/(cert_login|participate)/?\$
-    RewriteCond %{REQUEST_URI} !^/(css|js|fonts|img)/
-    RewriteRule ^ ${SITE_URL%/}%{REQUEST_URI} [R=302,L]"
-        fi
-        cat > "$CLIENTCERT_CONF" <<EOF
-Listen ${CLIENTCERT_PORT:-8444}
-<VirtualHost *:${CLIENTCERT_PORT:-8444}>
-    DocumentRoot /var/www/html
-    ErrorLog \${APACHE_LOG_DIR}/error.log
-    CustomLog \${APACHE_LOG_DIR}/access.log combined
-
-    SSLEngine on
-    SSLCertificateFile    \${SSL_CERT_FILE}
-    SSLCertificateKeyFile \${SSL_KEY_FILE}
-
-    SSLCACertificateFile ${CA}
-    SSLVerifyClient optional
-    SSLVerifyDepth 3
-    # La revocacion la comprueba PHP (OCSP y, si no responde, la CRL):
-    # con SSLOCSPEnable una caida del OCSP de la autoridad impide entrar.
-    SSLOCSPEnable off
-    # SSL_CLIENT_VERIFY y SSL_CLIENT_CERT para PHP (utils/clientcert.php).
-    SSLOptions +StdEnvVars +ExportCertData
-${CERT_REDIRECT}
-</VirtualHost>
-EOF
-        echo "[mlsurvey] certificado digital: se pide en el puerto ${CLIENTCERT_PORT:-8444} (CLIENTCERT_URL=${CLIENTCERT_URL:-})."
-    fi
-fi
 
 # Esperar a la base de datos (el init de MariaDB tarda en cargar modelo_datos.sql).
 echo "[mlsurvey] esperando a MariaDB en ${DB_HOST}:${DB_PORT} ..."

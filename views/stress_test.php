@@ -10,7 +10,6 @@ require_once "ifaces/view.php";
 require_once "utils/user.php";
 require_once "utils/dbutils.php";
 require_once 'utils/logger.php';
-require_once "utils/fileutils.php";
 require_once "utils/host.php";
 require_once "utils/crypt.php";
 
@@ -143,7 +142,6 @@ class StressTest extends View {
                 unlink (self::TEST_FILE);
             $db = dbConn ();
             $db->exec ("DELETE FROM {StressTest}");
-            //delDir (self::TEST_DIR);
             return true;
         }
         catch (Exception $e){

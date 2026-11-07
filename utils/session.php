@@ -35,12 +35,3 @@ function clearSession (){
     session_regenerate_id(true);
     return;
 }
-
-
-/* Borra solo lo que guarda el flujo de participación: la misma sesión
-   puede tener abierta la administración, y no hay que cerrarla. */
-function clearParticipationSession (){
-    foreach (['surveyid', 'surveyname', 'participantid'] as $key)
-        unset ($_SESSION[$key]);
-
-}

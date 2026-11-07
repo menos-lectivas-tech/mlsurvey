@@ -4,13 +4,7 @@ require_once "ifaces/view.php";
 require_once "utils/dbutils.php";
 
 class Surveys extends View {
-    public const SURVEY_RESPONSE = "response";
     public const SURVEY_PARTIALS = "partials";
-    private const SURVEY_QUERY = "query";
-    private const RESPONSE_VALUES = [
-        'code' => "Obtener código",
-        'response' => "Responder"
-    ];
 
     function getMenuGroup (){
         return ML_MENU_GROUP_SURVEYS;

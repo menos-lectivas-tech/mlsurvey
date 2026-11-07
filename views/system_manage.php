@@ -122,46 +122,10 @@ class SystemManage extends View
         <link href="css/questions.css" rel="stylesheet" />
         <script src="js/select2.js"></script>
         <script type="text/javascript">
-            function isDomain(domain) {
-                regexp = /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$/i;
-
-                if (regexp.test(domain)) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-
             function checkDomains(domains) {
-                const domainsarray = domains.split(" ");
-                return domainsarray.every(isDomain);
+                const domain = /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$/i;
+                return domains.split(" ").every(d => domain.test(d));
             }
-
-            function allowedFields(method) {
-                var smtpdiv = document.getElementById("smtpdiv");
-                var sendmaildiv = document.getElementById("sendmaildiv");
-                var mailtest = document.getElementById("mailtest");
-                /* smtpdiv y sendmaildiv pueden no existir: los datos del
-                   servidor de correo ya no se editan desde aquí. */
-                function display(element, value) {
-                    if (element != null)
-                        element.style.display = value;
-                }
-                if (method == "<?= MLMailer::SMTP_METHOD ?>") {
-                    display(sendmaildiv, "none");
-                    display(smtpdiv, "block");
-                    display(mailtest, "block");
-                } else if (method == "<?= MLMailer::SENDMAIL_METHOD ?>") {
-                    display(sendmaildiv, "block");
-                    display(smtpdiv, "none");
-                    display(mailtest, "block");
-                } else {
-                    display(sendmaildiv, "none");
-                    display(smtpdiv, "none");
-                    display(mailtest, "none");
-                }
-            }
-
 
             /* Igual que en las pantallas de gestión: el diálogo del tema
                es asíncrono, así que cuando hay que preguntar se frena el
@@ -228,20 +192,12 @@ class SystemManage extends View
             $(document).ready(function() {
 
                 $(".searchbox").select2();
-                /* La configuración de correo está en config/config.php. */
-                allowedFields(<?= json_encode(Config::PARAMS["email_method"] ?? ""); ?>);
-
 
                 const sendtest = document.getElementById('sendtest');
 
                 sendtest.addEventListener('change', (event) => {
                     const recipient = document.getElementById("testrecipient")
                     recipient.disabled = !(event.currentTarget.checked);
-                    /*if (event.currentTarget.checked) {
-                        recipient.disabled = false;
-                    } else {
-                        rece
-                    }*/
                 });
 
                 hugerte.init(mlHugerte.options({
@@ -254,7 +210,7 @@ class SystemManage extends View
         </script>
         <h2>Configuración del sistema.</h2>
         <form id="systemmanage" name="systemmanage" method="POST"
-            action="system_manage" onload='prepareTimezones ();' enctype="multipart/form-data">
+            action="system_manage" enctype="multipart/form-data">
             <?= setTokenHTML(); ?>
             <div class="question">
                 <p><label for="timezone">Zona horaria:</label>
@@ -303,7 +259,7 @@ class SystemManage extends View
                 }
                 ?>
                 </details>
-                <div class="option" id="mailtest" style="display: none;">
+                <div class="option" id="mailtest">
                     <p><label for="sendtest">Enviar mensaje de prueba:</label>
                         <input type="checkbox" id="sendtest" name="sendtest">
                     </p>

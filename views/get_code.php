@@ -13,7 +13,6 @@ require_once 'include/mlmailer.php';
 require_once 'utils/participation.php';
 require_once 'utils/showsurvey.php';
 require_once 'utils/crypt.php';
-require_once 'utils/clientcert.php';
 
 class GetCode extends RegistrationView
 {
@@ -38,17 +37,17 @@ class GetCode extends RegistrationView
      * - If it's a GET with survey info, shows the form asking for the email address.
      * - If it's the submit of that form and the address is already registered, sends the
      * email and shows the result (success or failure). If it isn't registered, shows a
-     * second form asking whether they are interim or career civil servants, the signed
-     * training record PDF and the PDF that proves it.
-     * The DNI is not asked for: it is read from the training record.
-     * - If it's the submit of the second form, checks the PDFs, sends the email and shows
-     * the result (success or failure).
+     * second form asking for the signed declaration.
+     * - If it's the submit of the second form, checks the declaration, from which the DNI
+     * and the email address are read, sends the email to that address and shows the
+     * result (success or failure). The participation URL is always sent by email, so the
+     * address must exist.
      */
     public function show()
     {
         if ($this->isSubmit()) {
             if ($this->checkSubmit())
-                $this->generateCode($this->isDocsSubmit());
+                $this->generateCode($this->isDeclaracionSubmit());
             return;
         }
 
@@ -80,35 +79,25 @@ class GetCode extends RegistrationView
             if (!showSurveyHeader($db, $surveyid, true))
                 return;
 
-            /* Con el certificado activado se elige primero el método, como en
-               las sedes electrónicas: el certificado solo se pide al elegirlo. */
-            $method = $_GET['metodo'] ?? null;
-            if (clientCertEnabled() && $method !== 'email') {
-                $this->showMethodSelector($surveyid);
-            } else {
-                $this->showEmailForm($surveyid, [
-                    'action' => self::PAGE,
-                    'title' => "Participar en la consulta",
-                    'infotitle' => "Cómo participar",
-                    'info' => "Indica tu dirección de correo.\n\n" .
-                        "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
-                        "con un enlace personal para participar, que caduca en una hora.\n\n" .
-                        "SI ES LA PRIMERA VEZ, a continuación te preguntaremos tu situación y te " .
-                        "pediremos uno o dos documentos firmados electrónicamente. Si son válidos " .
-                        "recibirás el mensaje con el enlace.\n" .
-                        "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
-                        "que son de la misma persona. Con el DNI que figura en ellos se evita " .
-                        "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
-                        "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
-                        "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
-                    'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
-                        "el enlace y ya no podrás votar.",
-                    'emailhint' => "Revísala bien: ahí recibirás el enlace.",
-                    'button' => "Participar en la consulta",
-                ]);
-                if (clientCertEnabled())
-                    $this->showOtherMethodLink($surveyid);
-            }
+            $this->showEmailForm($surveyid, [
+                'action' => self::PAGE,
+                'title' => "Participar en la consulta",
+                'infotitle' => "Cómo participar",
+                'info' => "Indica tu dirección de correo.\n\n" .
+                    "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
+                    "con un enlace personal para participar, que caduca en una hora.\n\n" .
+                    "SI ES LA PRIMERA VEZ, a continuación te pediremos una declaración con tu NIF " .
+                    "o NIE y tu dirección de correo de EducaMadrid, firmada con tu certificado " .
+                    "digital. Si es válida, recibirás el mensaje con el enlace en esa dirección.\n" .
+                    "Con el DNI de la declaración se evita que una misma persona participe dos " .
+                    "veces. El fichero no se guarda.\n\n" .
+                    "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
+                    "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
+                'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
+                    "el enlace.",
+                'emailhint' => "Revísala bien: ahí recibirás el enlace.",
+                'button' => "Participar en la consulta",
+            ]);
         ?>
             <details class="ml-survey-preview">
                 <summary>Ver las preguntas de la consulta</summary>
@@ -121,72 +110,14 @@ class GetCode extends RegistrationView
         }
     }
 
-    /* Ventana de elección del método de identificación. Todos sacan el DNI:
-       el certificado y el DNIe del propio certificado (CertLogin), y el correo
-       de los documentos firmados que se piden la primera vez. */
-    private function showMethodSelector($surveyid)
-    {
-        $certurl = clientCertUrl() . "?responseid=" . (int) $surveyid;
-        $emailurl = self::PAGE . "?responseid=" . (int) $surveyid . "&metodo=email";
-        $methods = [
-            [
-                'url' => $certurl,
-                'title' => "DNI electrónico",
-                'text' => "Con el DNIe y un lector de tarjetas, o un móvil con NFC. " .
-                    "Necesitarás el PIN del DNIe.",
-                'button' => "Acceder con DNIe",
-            ],
-            [
-                'url' => $certurl,
-                'title' => "Certificado digital",
-                'text' => "Con un certificado de persona física (FNMT u otra autoridad " .
-                    "admitida) instalado en el navegador. Vota directamente, sin esperar " .
-                    "ningún correo.",
-                'button' => "Acceder con certificado",
-            ],
-            [
-                'url' => $emailurl,
-                'title' => "Correo electrónico y documentos",
-                'text' => "Recibirás un enlace personal en tu correo. La primera vez te " .
-                    "pediremos documentos firmados electrónicamente, de los que se lee tu DNI.",
-                'button' => "Acceder con correo",
-            ],
-        ];
-        ?>
-        <section class="ml-participate-card ml-auth-select">
-            <h3>Elige cómo identificarte</h3>
-            <p>Con cualquiera de los métodos se comprueba tu DNI, para que nadie participe dos
-                veces. Con el DNIe o el certificado, el navegador te pedirá elegirlo
-                <strong>después</strong> de pulsar el botón. Si es la primera vez, te pediremos
-                además los documentos que acreditan que eres docente.</p>
-            <ul class="ml-auth-methods">
-                <?php foreach ($methods as $m) { ?>
-                    <li class="ml-auth-method">
-                        <h4><?= h($m['title']); ?></h4>
-                        <p><?= h($m['text']); ?></p>
-                        <a class="button-3 ml-participate-btn" href="<?= h($m['url']); ?>"><?=
-                            h($m['button']); ?></a>
-                    </li>
-                <?php } ?>
-            </ul>
-        </section>
-        <?php
-    }
-
-    private function showOtherMethodLink($surveyid)
-    {
-        $url = self::PAGE . "?responseid=" . (int) $surveyid;
-        echo ("<p class='ml-auth-back'><a href='" . h($url) .
-            "'>&larr; Elegir otro método de identificación</a></p>");
-    }
-
     /**
-     * Called with $withdocs false from the email form and true from the documents one.
+     * Called with $withdeclaracion false from the email form and true from the declaration one.
      * In the first case, if the email address is not in Participants table the method
-     * only shows the documents form.
+     * only shows the declaration form.
      *
-     * In the second case the documents are checked and the participant is looked for
-     * or inserted in Participants table by RegistrationView::registerWithDocs.
+     * In the second case the declaration is checked and the participant is looked for
+     * or inserted in Participants table by RegistrationView::registerWithDeclaracion. The email
+     * address is the one of the declaration.
      *
      * Then, if the participant hasn't participated in the survey, the method
      * generates a random 256bit key, encrypts the email address with this key
@@ -194,22 +125,18 @@ class GetCode extends RegistrationView
      * survey ID in the Participation table. Then it sends this information to the email address
      * formatted as an URL.
      */
-    private function generateCode(bool $withdocs)
+    private function generateCode(bool $withdeclaracion)
     {
         $surveyid = $_REQUEST['surveyid'] ?? null;
         if (!is_string($surveyid) || !ctype_digit($surveyid)) {
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
         }
-        if ($withdocs && !$this->checkConsent("participar"))
+        $email = null;
+        if ($withdeclaracion ? !$this->checkConsent("participar") : ($email = $this->getEmail()) === null)
             return;
-        $email = $this->getEmail();
-        if ($email === null)
-            return;
-        $start_time = microtime(true);
         $surveyname = "";
         try {
-
             $db = dbConn();
             /* El nombre va tal cual en el correo y escapado en la página. */
             $mailsurveyname = $this->getSurveyName($db, $surveyid);
@@ -222,78 +149,62 @@ class GetCode extends RegistrationView
                 echo ("<p><strong>La consulta <em>{$surveyname}</em> no está abierta.</strong></p>");
                 return;
             }
-            if (!$this->checkDomain($db, $email)) {
-                return;
-            }
-            $hashemail = participantHash($email);
-            /* Primer paso con una dirección que aún no está registrada: antes
-               de enviarle el enlace tiene que acreditarse con los documentos. */
-            if (!$withdocs && $this->getParticipantId($db, $hashemail) === null) {
-                if (showSurveyHeader($db, $surveyid, true))
-                    $this->showDocsForm($surveyid, $email, [
-                        'action' => self::PAGE,
-                        'back' => self::PAGE . "?responseid=" . (int) $surveyid,
-                        'title' => "Primera vez: acredita que eres docente",
-                        'intro' => "no ha participado antes. Sigue estos pasos para acreditarte y te " .
-                            "enviaremos a esa dirección un enlace para participar.",
-                    ]);
-                return;
-            }
-            if ($withdocs) {
-                $reserved = $this->registerWithDocs(
-                    $db,
-                    $email,
-                    fn($participantid) =>
-                    $this->reserveParticipation($db, $email, $hashemail, $participantid, $surveyid)
-                );
-            } else {
-                if (!$this->lockEmail($db, $hashemail))
-                    return;
-                try {
-                    $reserved = $this->reserveCodeEmail($db, $email, $hashemail, $surveyid);
-                } finally {
-                    unlockParticipant($db, $hashemail);
-                }
-            }
+            if ($withdeclaracion)
+                $reserved = $this->registerWithDeclaracion($db, function ($participantid, $created, $docemail)
+                        use ($db, $surveyid, &$email) {
+                    $email = $docemail;
+                    return $this->reserveParticipation($db, $email, participantHash($email),
+                        $participantid, $surveyid);
+                });
+            else
+                $reserved = $this->reserveCodeEmail($db, $email, $surveyid);
             if ($reserved === null)
                 return;
             [$pid, $code] = $reserved;
-            $end_time = microtime(true);
-            $exectime = $end_time - $start_time;
-            logMessage(LOGGER_DEBUG, "Get code exec time {$exectime}.");
             $mailer = new MlMailer();
             $mailer->configure();
             $mailer->sendCode($email, $pid, url_base64_encode($code), $mailsurveyname);
-            echo ("<p><strong>El código para participar en la consulta <em>{$surveyname}</em> " .
-                "ha sido enviado a la dirección indicada.</strong></p>");
+            echo ("<p><strong>El enlace para participar en la consulta <em>{$surveyname}</em> " .
+                "ha sido enviado a " . h($email) . ".</strong></p>");
         } catch (Exception $e) {
             echo ("<p><strong>Error generando código para la consulta <em>{$surveyname}</em></strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} when generating code for survey");
         }
     }
 
-    /* Guarda la petición de código de una dirección ya registrada. Se llama
-       con el bloqueo del correo cogido. Devuelve [pid, código], o null si no
-       procede (ya ha participado o ya pidió uno hace poco). */
-    private function reserveCodeEmail($db, $email, $hashemail, $surveyid)
+    /* Petición de código de una dirección del primer formulario. Si no está
+       registrada, muestra el formulario de la declaración. Devuelve
+       [pid, código], o null si no procede (con el motivo ya mostrado). */
+    private function reserveCodeEmail($db, string $email, $surveyid): ?array
     {
-        $participantid = $this->getParticipantId($db, $hashemail);
-        if ($participantid === null) {
-            echo ("<p><strong>La dirección de correo indicada no ha participado anteriormente.</strong></p>");
+        if (!$this->checkDomain($email))
             return null;
+        $hashemail = participantHash($email);
+        if (!$this->lockEmail($db, $hashemail))
+            return null;
+        try {
+            $participantid = $this->getParticipantId($db, $hashemail);
+            if ($participantid !== null)
+                return $this->reserveParticipation($db, $email, $hashemail, $participantid, $surveyid);
+        } finally {
+            unlockParticipant($db, $hashemail);
         }
-        return $this->reserveParticipation($db, $email, $hashemail, $participantid, $surveyid);
+        if (showSurveyHeader($db, $surveyid, true))
+            $this->showDeclaracionForm($surveyid, [
+                'action' => self::PAGE,
+                'title' => "Primera vez: acredita que eres docente",
+                'intro' => "La dirección " . $email . " no ha participado antes. Para " .
+                    "participar tienes que acreditarte con una declaración firmada: te " .
+                    "enviaremos el enlace para participar a la dirección de correo de " .
+                    "EducaMadrid que indiques en ella.",
+            ]);
+        return null;
     }
 
     /* Con la participante ya identificada y su bloqueo cogido: comprueba que no ha votado ni pedido un código hace poco y guarda la
        petición. Devuelve [pid, código], o null (con el motivo ya mostrado). */
     private function reserveParticipation($db, $email, $hashemail, $participantid, $surveyid)
     {
-        /*if (hasCode ($db, $participantid, $surveyid)){ //Echar un vistazo
-            //Needs a time limit.
-            echo ("<p><strong>La dirección de correo indicada ya ha solicitado un código para esta consulta</strong></p>");
-            return null;
-        }*/
         if (hasParticipated($db, $participantid, $surveyid)) {
             echo ("<p><strong>Ya se ha votado en esta consulta con la dirección de correo indicada.</strong></p>");
             return null;
@@ -301,7 +212,7 @@ class GetCode extends RegistrationView
         if (checkUnsubscribe($db, $participantid)) {
             echo "<p><strong>No puedes participar en la consulta porque has confirmado
                     la solicitud de baja del registro de participantes.</strong></p>";
-            return;
+            return null;
         }
         /* participant va cifrado con un código aleatorio distinto en cada
            petición, así que no sirve para buscar las anteriores: el límite

@@ -1,6 +1,6 @@
 <?php
 /**
- * Revocation check of the client certificate.
+ * Revocation check of the certificate that signs the declaration.
  *
  * First the OCSP responder of the certificate (Authority Information Access) is
  * asked; if it doesn't answer (e.g. the FNMT one returning "502 Proxy Error"),
@@ -39,7 +39,7 @@ function certCheckRevocation (OpenSSLCertificate $cert, string $cafile){
     $info = openssl_x509_parse ($cert);
     $issuer = certFindIssuer ($cert, $info, $cafile);
     if ($issuer === null){
-        logMessage (LOGGER_ERROR, "Revocation: issuer of the client certificate not found in {$cafile}.");
+        logMessage (LOGGER_ERROR, "Revocation: issuer of the certificate not found in {$cafile}.");
         throw new CertRevocationException ("No se ha podido comprobar si el certificado " .
             "digital está revocado.");
     }
@@ -56,18 +56,18 @@ function certCheckRevocation (OpenSSLCertificate $cert, string $cafile){
     if ($status === "good")
         return;
     if ($status === "revoked"){
-        logMessage (LOGGER_WARN, "Client certificate rejected: revoked.");
+        logMessage (LOGGER_WARN, "Certificate rejected: revoked.");
         throw new CertRevocationException ("El certificado digital está revocado.");
     }
     if ($status === "unknown"){
-        logMessage (LOGGER_WARN, "Client certificate rejected: unknown to its OCSP responder.");
+        logMessage (LOGGER_WARN, "Certificate rejected: unknown to its OCSP responder.");
         throw new CertRevocationException ("La autoridad de certificación no reconoce " .
             "el certificado digital.");
     }
-    logMessage (LOGGER_ERROR, "Client certificate rejected: neither OCSP nor CRL available.");
+    logMessage (LOGGER_ERROR, "Certificate rejected: neither OCSP nor CRL available.");
     throw new CertRevocationException ("No se ha podido comprobar si el certificado digital " .
         "está revocado: el servicio de la autoridad de certificación no responde. Inténtalo " .
-        "más tarde o participa con tu dirección de correo.");
+        "más tarde.");
 }
 
 /* Certificado de $cafile que ha emitido $cert, o null. */

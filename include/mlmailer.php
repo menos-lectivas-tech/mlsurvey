@@ -14,24 +14,9 @@ require_once 'utils/host.php';
 require_once 'utils/logger.php';
 
 class MLMailer extends PHPMailer {
-    public const NO_METHOD = 0;
     public const SMTP_METHOD = "SMTP";
     public const SENDMAIL_METHOD = "Sendmail";
 
-    public const METHODS = [
-        self::NO_METHOD => '',
-        self::SMTP_METHOD => 'SMTP',
-        self::SENDMAIL_METHOD => 'Sendmail',
-    ];
-
-    public const ENCRYPTION = [
-        0 => "",
-        self::ENCRYPTION_SMTPS => "SSL",
-        self::ENCRYPTION_STARTTLS => "STARTTLS"
-    ];
-    /* Se añade al final de todos los mensajes. */
-    /*private const UNSUBSCRIBE = "\n\n--\nSi quieres darte de baja, envía un correo a " .
-        "datos@huelga14o.org con el asunto BAJA.";*/
     private $m_from = "";
     public function configure (){
         $method = Config::PARAMS["email_method"];
@@ -51,7 +36,6 @@ class MLMailer extends PHPMailer {
 
     private function configSMTP (){
         $this->isSMTP ();
-        //$this->SMTPDebug = SMTP::DEBUG_SERVER;
         $this->Host = Config::PARAMS["email_server"];
         $this->Port = Config::PARAMS["email_port"];
         $this->SMTPAuth = true;

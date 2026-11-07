@@ -16,7 +16,6 @@ function encrypt (#[\SensitiveParameter]string $data, #[\SensitiveParameter]stri
     $encrypted = openssl_encrypt ($data, $method, $key);
     if ($encrypted === false){
         throw new Exception("Error when encrypting: " . openssl_error_string());
-        return false;
     }
     return $encrypted;
 }
@@ -34,7 +33,6 @@ function decrypt (#[\SensitiveParameter]string $encrypted, #[\SensitiveParameter
     $data = openssl_decrypt ($encrypted, $method, $key);
     if ($data === false){
         throw new Exception("Error when decrypting: " . openssl_error_string());
-        return false;
     }
     return $data;
 }
@@ -43,9 +41,7 @@ function decrypt (#[\SensitiveParameter]string $encrypted, #[\SensitiveParameter
  * Base64 encoding method replacing URL unsafe characters with safe ones.
  */
 function url_base64_encode (#[\SensitiveParameter] string $data):string {
-    $encoded = strtr(base64_encode($data), '+=/', '-_.');
-    //return rtrim($encoded, '=');
-    return $encoded;
+    return strtr(base64_encode($data), '+=/', '-_.');
 }
 
 /**

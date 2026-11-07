@@ -44,43 +44,6 @@ function checkUnsubscribe (PDO $db, int $participantid):bool {
     return $ret;
 }
 
-/**
- * Checks if a participant has a valid code.
- * Does not work as Participation table has changed and does not have a participantid column
- * By now it's not posible to know if an email addres has a code, as all stored info is
- * encrypted.
- * 
- * @param PDO $db PDO database.
- * @param int $participantid
- * @param int $surveyid
- * 
- * @return bool
- */
-function hasCode ($db, $participantid, $surveyid){
-    $result = false;   
-    $query = $db->prepare ("SELECT participationid, participationdate 
-        FROM {Participation} WHERE participantid = :pid AND surveyid = :sid LIMIT 1");
-    $query->bindParam (":pid", $participantid, PDO::PARAM_INT);
-    $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-    $query->execute ();
-    if ($query->rowCount () > 0){
-        $row = $query->fetch ();
-        $pid = $row["participationid"];
-        $date = new DateTime($row["participationdate"]);
-        $now = new DateTime ();
-        if ($date->add (DateInterval::createFromDateString('1 hour')) > $now){
-            $result = true;
-        }
-        $query->closeCursor ();
-        if (!$result) {
-            $delete = $db->prepare ("DELETE FROM {Participation} WHERE participationid = :pid");
-            $delete->bindParam (":pid", $pid, PDO::PARAM_INT);
-            $delete->execute ();
-        }
-    }
-    return $result;
-}
-
 /* Serializa las peticiones de una misma persona: sin esto, dos
    peticiones simultáneas creaban cada una su fila en Participants (y la
    tabla no admite borrados) o se saltaban el límite de una por hora. */
