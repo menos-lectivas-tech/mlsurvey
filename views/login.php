@@ -34,8 +34,6 @@ class Login extends View {
                 return;
         }
 
-        /*$token = bin2hex (random_bytes (16));
-        $_SESSION['token'] = $token;*/
 ?>
 <link href="css/button3.css" rel="stylesheet" />
 <form id="loginbox" name="loginbox" method="POST" action="login" 
@@ -58,13 +56,6 @@ onload='document.getElementById("user").focus();'>
         include_once 'views/' . $class . '.php';
         $class = getClassName($class);
         $next = new $class;
-        /*if ($next instanceof View)
-            $next->show ();
-        else {
-            throw new Exception("La clase de entrada no implementa View");
-            return 1;
-        }
-        return 0;*/
         return showView ($next);
     }
 
@@ -78,16 +69,13 @@ onload='document.getElementById("user").focus();'>
 
         $user = $_REQUEST['user'];
         $passwd = $_REQUEST['passwd'];
-        //$token = $_REQUEST['token'];
         try{
             if (validateUser ($user, $passwd) != 0){
-                //unset ($_SESSION['token']);
                 ?>
                 <h2>Usuario, clave o token de seguridad no válido.</h2>
                 <p>En caso de repetirse, limpia las cookies y reinicia el navegador.</p>
                 <?php
                 logMessage (LOGGER_ERROR, "Invalid login user {$user}");
-                //$this->show ();
                 return 1;
             }
         }
@@ -98,7 +86,6 @@ onload='document.getElementById("user").focus();'>
             <h2>Usuario, clave o token de seguridad no válido.</h2>
             <p>En caso de repetirse, limpia las cookies y reinicia el navegador.</p>
             <?php
-            //$this->show ();
             return 1;
         }
 

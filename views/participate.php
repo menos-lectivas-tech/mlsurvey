@@ -4,11 +4,9 @@
  */
 require_once 'ifaces/view.php';
 require_once 'utils/dbutils.php';
-//require_once 'views/response_survey.php';
 require_once 'utils/participation.php';
 require_once 'utils/token.php';
 require_once 'utils/crypt.php';
-require_once 'include/fileparams.php';
 require_once 'utils/showsurvey.php';
 
 class Participate extends View {
@@ -387,107 +385,4 @@ class Participate extends View {
         $this->surveyid = $row['surveyid'];
         return true;
     }
-
-
-    /**
-     * Checks if survey has "show partial results" option selected.
-     * 
-     * @param PDO $db PDO database object.
-     * @param int $surveyid The survey id.
-     * 
-     * @return bool
-     */
-    private function hasPartials ($db, $surveyid){
-        $query = $db->prepare ("SELECT showpartial FROM {Surveys}
-            WHERE surveyid = :sid LIMIT 1");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->execute ();
-        $survey = $query->fetch ();
-        $ret = !empty ($survey["showpartial"]);
-        $query->closeCursor ();
-        return $ret;
-    }
-
-    /**
-     * Returns the current partial result when configured.
-     * 
-     * @param PDO $db PDO database object.
-     * @param int $surveyid The survey id.
-     * 
-     * @return string JSON with partial result.
-     * 
-     */
-    private function getPartial ($db, $surveyid){
-        $ret = null;
-        $query = $db->prepare ("SELECT results FROM {Results} 
-            WHERE surveyid = :sid");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->execute ();
-        if ($query->rowCount () == 0){
-            $ret =  $this->buildPartial ($db, $surveyid);
-        }
-        else {
-            $ret = json_decode ($query->fetch()["results"], true);
-        }
-        $query->closeCursor ();
-        return $ret;
-    }
-
-    /**
-     * Creates the partial result record when configured and no record is found.
-     * 
-     * @param PDO $db PDO database object.
-     * @param int $surveyid The survey id.
-     * 
-     */
-    private function buildPartial ($db, $surveyid){
-        $partial = array();
-        $partial["Total"] = 0;
-        $partial["Responses"] = array ();
-        $questions = $db->prepare ("SELECT questionid FROM {Questions} 
-            WHERE surveyid = :sid");
-        $questions->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $questions->execute ();
-        while ($question = $questions->fetch ()){
-            $questionid = $question["questionid"];
-            $partial["Responses"][$questionid] = array ();
-            $options = $db->prepare ("SELECT optionid FROM {Options} WHERE
-                surveyid = :sid AND questionid = :qid");
-            $options->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-            $options->bindParam (":qid", $questionid, PDO::PARAM_INT);
-            $options->execute ();
-            while ($option = $options->fetch ()){
-                $partial["Responses"][$questionid][$option["optionid"]] = 0;
-            }
-            $options->closeCursor ();
-        }
-        $questions->closeCursor ();
-
-        $result = json_encode ($partial);
-        $query = $db->prepare ("INSERT INTO {Results} (surveyid, results, ispartial) values
-            (:sid, :res, 1)");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->bindParam (":res", $result, PDO::PARAM_STR);
-        $query->execute ();
-        return $partial;
-    }
-
-    /**
-     * Updates current partial result when configured.
-     * 
-     * @param PDO $db PDO database object.
-     * @param int $surveyid The survey id.
-     * @param string $partials JSON with partial result.
-     * 
-     */
-    private function updatePartials ($db, $surveyid, $partials){
-        $partials["Total"]++;
-        $res = json_encode ($partials);
-        $query = $db->prepare ("UPDATE {Results} set results = :res, ispartial = 1
-            WHERE surveyid = :sid");
-        $query->bindParam (":sid", $surveyid, PDO::PARAM_INT);
-        $query->bindParam (":res", $res, PDO::PARAM_STR);
-        $query->execute ();
-    }
-
 }

@@ -8,26 +8,17 @@ require_once 'utils/token.php';
  * 
  * @param int $id User id.
  * 
- * @return string User name or null if not found.
+ * @return string User name.
  * 
- * @throws Exception Database exception if throwed.
+ * @throws Exception If not found or on database error.
  */
 function getUserName ($id){
-    try {
-        $dbconn = dbConn ();
-        $query = $dbconn->prepare ("SELECT username from {Users} WHERE userid= :id LIMIT 1");
-        $query->bindParam (':id', $id);
-        $query->execute ();
-        if ($query->rowcount () == 0){
-            throw new Exception("Delete user: No userid {$id}");
-            return null;
-        }
-        $row = $query->fetch ();
-        return $row['username'];
-    } catch (Exception $e) {
-        throw $e;
-    }
-    return null;
+    $query = dbConn ()->prepare ("SELECT username from {Users} WHERE userid= :id LIMIT 1");
+    $query->bindParam (':id', $id);
+    $query->execute ();
+    if ($query->rowcount () == 0)
+        throw new Exception("No userid {$id}");
+    return $query->fetch ()['username'];
 }
 
 /**
@@ -38,15 +29,9 @@ function getUserName ($id){
  * @throws Exception Database exception if throwed.
  */
 function rmUser ($id){
-    try {
-        $dbconn = dbConn ();
-        $query = $dbconn->prepare ("DELETE from {Users} WHERE userid= :id");
-        $query->bindParam (':id', $id);
-        $query->execute ();
-    }
-    catch (Exception $e){
-        throw $e;
-    }
+    $query = dbConn ()->prepare ("DELETE from {Users} WHERE userid= :id");
+    $query->bindParam (':id', $id);
+    $query->execute ();
 }
 
 /**
@@ -71,27 +56,16 @@ function adduser ($user, $pass, $role = ''){
     $query = $dbconn->prepare ("select * from {Users} where username= :usu");
     $query->bindParam (':usu', $user);
     $query->execute ();
-    if ($query->rowcount () > 0){
-      throw new Exception("Ya existe un usuario con ese nombre");
-      return 1;
-    }
-    else {
-        try {
-            if ($iscli)
-                echo "Añadiendo usuario\n";
-
-            $pass_crypt = password_hash ($pass, PASSWORD_DEFAULT);
-            $insert = $dbconn->prepare ('insert into {Users} (username, passwd, role) values (:usu, :pass, :role)');
-            $insert->bindParam (':pass', $pass_crypt);
-            $insert->bindParam (':usu', $user);
-            $insert->bindParam (':role', $role);
-            $insert->execute ();
-        }
-        catch (Exception $e){
-            throw $e;
-            return 1;           
-        }
-    }
+    if ($query->rowcount () > 0)
+        throw new Exception("Ya existe un usuario con ese nombre");
+    if ($iscli)
+        echo "Añadiendo usuario\n";
+    $pass_crypt = password_hash ($pass, PASSWORD_DEFAULT);
+    $insert = $dbconn->prepare ('insert into {Users} (username, passwd, role) values (:usu, :pass, :role)');
+    $insert->bindParam (':pass', $pass_crypt);
+    $insert->bindParam (':usu', $user);
+    $insert->bindParam (':role', $role);
+    $insert->execute ();
     return 0;
 }
 
@@ -106,32 +80,14 @@ function adduser ($user, $pass, $role = ''){
  */
 function isAdmin ($id = ""){
     startSession ();
-    if ($id === ""){
-        if (isset($_SESSION['admin']))
-            return true;
-        return false;
-    }
-    else {
-        try {
-            $dbconn = dbConn ();
-            $query = $dbconn->prepare ("SELECT role from {Users} " . 
-            "where userid = :id");
-            $query->bindParam (':id', $id);
-            $query->execute ();
-            if ($query->rowCount () == 0){
-                throw new Exception("Can't find user with id {$id}");
-                return false;
-            }
-            $row = $query->fetch ();
-            if ($row['role'] != "")
-                return true;
-        }
-        catch (Exception $e){
-            throw $e;
-            return false;
-        }
-    }
-    return false;
+    if ($id === "")
+        return isset ($_SESSION['admin']);
+    $query = dbConn ()->prepare ("SELECT role from {Users} where userid = :id");
+    $query->bindParam (':id', $id);
+    $query->execute ();
+    if ($query->rowCount () == 0)
+        throw new Exception("Can't find user with id {$id}");
+    return $query->fetch ()['role'] != "";
 }
 
 /**
@@ -141,9 +97,7 @@ function isAdmin ($id = ""){
  */
 function isUser (){
     startSession ();
-    if (isset($_SESSION['userid']))
-        return true;
-    return false;    
+    return isset ($_SESSION['userid']);
 }
 
 
@@ -162,65 +116,36 @@ function isUser (){
  */
 function validateUser ($user, $passwd, $id = -1){
     startSession ();
-    /*if (!isset($_SESSION['token']) || $_SESSION['token'] != $token){
+    if (!checkToken ())
         throw new Exception("Wrong security token", 1);
-        return 1;
-        
-    }*/
-    if (!checkToken ()){
-        throw new Exception("Wrong security token", 1);
-        return 1;
-    }
-    if (isset($_SESSION['userid']) && $id == -1){
+    if (isset($_SESSION['userid']) && $id == -1)
         return 0;
-    }
 
-
-    try {
-        $dbconn = dbConn ();
-        if ($id == -1){
-            $query = $dbconn->prepare ("select * from {Users} where username = :usu LIMIT 1");
-            $query->bindParam (':usu', $user, PDO::PARAM_STR);
-        }
-        else {
-            $query = $dbconn->prepare ("select * from {Users} where userid = :id LIMIT 1");
-            $query->bindParam (':id', $id, PDO::PARAM_INT);
-        }
-        $query->execute ();
+    $dbconn = dbConn ();
+    if ($id == -1){
+        $query = $dbconn->prepare ("select * from {Users} where username = :usu LIMIT 1");
+        $query->bindParam (':usu', $user, PDO::PARAM_STR);
     }
-    catch (Exception $e){
-        throw $e;
+    else {
+        $query = $dbconn->prepare ("select * from {Users} where userid = :id LIMIT 1");
+        $query->bindParam (':id', $id, PDO::PARAM_INT);
+    }
+    $query->execute ();
+    $row = $query->fetch ();
+    if ($row === false || !isset ($row['passwd']) || !password_verify ($passwd, $row['passwd']))
         return 1;
-        
+    if ($id == -1){
+        /* Id de sesión nuevo al entrar: uno fijado de antemano
+           por un tercero no debe quedar autenticado. */
+        session_regenerate_id (true);
+        $_SESSION['userid'] = $row['userid'];
+        if ($row['role'] != '')
+            $_SESSION['admin'] = true;
+        else
+            unset ($_SESSION['admin']);
     }
-    if ($query->rowCount () != 0){
-        $row = $query->fetch ();
-        if (isset ($row['passwd'])){
-            $pass_crypt = $row['passwd'];
-            //if ($pass_crypt == crypt($passwd, $pass_crypt)) {
-            if (password_verify ($passwd, $pass_crypt)){
-                if ($id == -1){
-                    /* Id de sesión nuevo al entrar: uno fijado de antemano
-                       por un tercero no debe quedar autenticado. */
-                    session_regenerate_id (true);
-                    $_SESSION['userid'] = $row['userid'];
-                    if ($row['role'] != '')
-                        $_SESSION['admin'] = true;
-                    else {
-                        unset ($_SESSION['admin']);
-                    }              
-                }     
-                return 0;
-            }
-        }
-    }
-    
-    return 1;
-    
+    return 0;
 }
-
-
-
 
 /* Si ya hay otra usuaria (distinta de $exceptid) con ese nombre. */
 function userNameExists ($username, $exceptid = -1): bool {
@@ -248,33 +173,18 @@ function alterUser ($id, $username, $isadmin, $passwd = ""){
     /* El nombre identifica a la usuaria al entrar: no puede repetirse. */
     if (userNameExists ($username, $id))
         throw new Exception ("Ya existe un usuario con ese nombre");
-    try {
-        if ($passwd == "")
-            $pass_crypt = "";
-        else
-            $pass_crypt = password_hash ($passwd, PASSWORD_DEFAULT);
-
-        $dbconn = dbConn ();
-        if ($passwd != ""){
-            $query = $dbconn->prepare ("UPDATE {Users} " . 
-                " set username = :name, passwd = :passwd, " . 
-                "role = :admin where userid = :id");
-            $query->bindParam (':passwd', $pass_crypt);
-        }
-        else{
-            $query = $dbconn->prepare ("UPDATE {Users} " . 
-                " set username = :name, role = :admin where userid = :id");
-        }
-
-        $query->bindParam (':id', $id);
-        $query->bindParam (':name', $username);
-        $query->bindParam (':admin', $isadmin);
-        $query->execute ();
+    $dbconn = dbConn ();
+    if ($passwd != ""){
+        $query = $dbconn->prepare ("UPDATE {Users} set username = :name, passwd = :passwd, " .
+            "role = :admin where userid = :id");
+        $query->bindValue (':passwd', password_hash ($passwd, PASSWORD_DEFAULT));
     }
-    catch (Exception $e){
-        throw $e;
-        return 1;
-    }
+    else
+        $query = $dbconn->prepare ("UPDATE {Users} set username = :name, role = :admin where userid = :id");
+    $query->bindParam (':id', $id);
+    $query->bindParam (':name', $username);
+    $query->bindParam (':admin', $isadmin);
+    $query->execute ();
 }
 /*
  * Revalida la usuaria de la sesión contra la base de datos en cada

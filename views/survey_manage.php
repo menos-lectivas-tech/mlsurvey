@@ -858,9 +858,6 @@ class SurveyManage extends View
                 <input id="del-q-{qid}" type="button" class="button-3" 
                                 onclick="delquestion ({qid});" value="Eliminar pregunta"></p>
         </div>`;
-                        /*newquestion = document.createElement ("div");
-                        newquestion.id = "q-" + nextquestionid;
-                        newquestion.class = "question";*/
                         newquestion = newquestionhtml.replace(/{qid}/g, nextquestionid);
                         let position = document.getElementById("q-" + questionid);
                         position.insertAdjacentHTML("afterend", newquestion);

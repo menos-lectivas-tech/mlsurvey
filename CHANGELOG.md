@@ -1,3 +1,48 @@
+# 1.6
+- Registration asks for a single document: the self-declaration as a teacher
+  (`docs/modelo_declaracion.pdf`), a PDF form with the DNI/NIE and the EducaMadrid email
+  address, signed with the participant's own personal certificate. The DNI of the form must
+  be the one of the signer's certificate, and the participant is registered with the email
+  address of the declaration: the forms no longer ask for it. The documents wizard (interim /
+  career civil servant) and the checks of the appointment, service record, teaching
+  credential, MUFACE certificate and training record are removed, with their settings
+  (`pdf_*`, `muface_*`, `nombramiento_*`). New `declaracion_ca_file`,
+  `declaracion_revocation` and `declaracion_email_domains` settings. Needs `qpdf`.
+- New declaration model with a hidden, read-only `docid` field ("autodeclaración docente")
+  that identifies it: the signed declaration must have it, besides the title, so PDFs filled
+  in from the previous model are rejected.
+- The declaration can be signed in the form itself, without downloading, filling in and
+  uploading the model: the participant writes the email address (already filled in when it
+  comes from a survey), AutoFirma asks for the certificate, `declaracion_pdf` fills in the model
+  with the DNI/NIE of that certificate and the address, AutoFirma signs it (PAdES, in the
+  signature field of the model) with the same certificate and the form sends it, checked as an
+  uploaded one. Uploading a signed PDF is still available. Ships `autoscript.js` 1.9 of the
+  Cliente @firma and its intermediate server (`afirma_storage`, `afirma_retrieve`) for mobile
+  devices. Needs qpdf >= 11.
+- The identification with a digital certificate (`cert_login`, `clientcert_*` settings and
+  the host on `CLIENTCERT_PORT`) is removed: the participation link is always sent by email,
+  so the address must exist.
+- Unused code removed: the old `response_survey` view (email + code form), the partial
+  results code of `participate`, `MLAsymmetricCrypt`, `hasCode`, unused constants and
+  helpers, commented-out code, and the leftovers of the original web template (fancybox,
+  quicksand/portfolio, animate, easing, prettify, local icon fonts, extra select2 builds and
+  translations, and ~1000 lines of CSS rules for markup the site doesn't have).
+
+# 1.5
+- Participants can identify with a digital certificate (TLS client certificate) instead of
+  the email address: the new `cert_login` page reads the DNI/NIE of the certificate and, if
+  it is registered, shows the survey form right away. If it isn't, the documents wizard is
+  shown (their DNI must be the one of the certificate) and, once registered, the survey form.
+  New `clientcert_enabled`, `clientcert_url` and `clientcert_ca_file` settings; Apache must
+  ask for the certificate (see `README.md` and `docker/apache-clientcert.conf.example`).
+  Revocation is checked by PHP (`clientcert_revocation`, `CLIENTCERT_REVOCATION`): with OCSP
+  and, if the responder doesn't answer, with the CRL of the certificate, so an outage of the
+  FNMT OCSP service doesn't block the identification.
+- Docker Compose serves the application over HTTPS (`HTTPS_PORT`, 8443), with a self-signed
+  certificate when none is mounted; plain HTTP redirects to `SITE_URL`. With
+  `CLIENTCERT_ENABLED=true` the host that asks for the digital certificate is served on
+  `CLIENTCERT_PORT` (8444).
+
 # 1.4.1
 - Added privacypolicy.html manage.
 # 1.4

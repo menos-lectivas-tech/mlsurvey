@@ -3,8 +3,8 @@
 /**
  * Base class for the views that register participants: GetCode (which also sends
  * the participation URL) and Register.
- * It has the two forms (email address and documents), the checks of the uploaded
- * PDFs and the insertion in Participants table.
+ * It has the two forms (email address and signed declaration), the check of the
+ * uploaded PDF and the insertion in Participants table.
  */
 
 require_once 'utils/html.php';
@@ -21,96 +21,12 @@ require_once 'include/icons.php';
 abstract class RegistrationView extends View
 {
 
-    private int $maxage = 30;
     private const ACTION = "Solicitar";
-    /* Segundo paso: envío de los documentos de quien aún no está registrado. */
-    private const ACTION_DOCS = "Documentos";
-    private const KIND_INTERIM = "interino";
-    private const KIND_CAREER = "carrera";
-    private const KIND_HOJASERVICIOS = "hojaserv";
-    private const KIND_CREDENCIAL = "credencial";
-    /* Situación que se elige en el primer paso del asistente de documentos. */
-    private const REGIME_INTERIM = "interino";
-    private const REGIME_CAREER = "carrera";
-    /* Páginas en las que se descarga cada documento. */
-    private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
-    private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
+    /* Segundo paso: envío de la declaración de quien aún no está registrado. */
+    private const ACTION_DECLARACION = "Declaracion";
+    /* Modelo de la declaración que se descarga, rellena y firma. */
+    private const MODEL_URL = "docs/modelo_declaracion.pdf";
     private const PRIVACY_POLICY_FILE = "privacypolicy.html";
-    private array $docs = array();
-
-    function __construct()
-    {
-        if (isset(Config::PARAMS["pdf_max_age_days"]))
-            $this->maxage = Config::PARAMS["pdf_max_age_days"];
-        /* Documentos con los que se puede acreditar cada situación, en el
-           orden en que se ofrecen. label y desc son los de la tarjeta del
-           segundo paso del asistente; name, info, where y url los del
-           fichero que se adjunta en el tercero. needscert indica si va
-           acompañado del extracto de formación y wait si hay que pedirlo
-           (y puede tardar) en lugar de descargarlo al momento; tag sustituye
-           a la etiqueta "Al momento" de los que no hay que pedir. */
-        $centro = "Si aún no la tienes, pídela cuanto antes en la secretaría: puede " .
-            "tardar unos días en llegarte.";
-        $this->docs = [
-            self::KIND_INTERIM => [
-                'label' => "Nombramiento",
-                'desc' => "Lo recibiste por correo electrónico al principio de curso.",
-                'regimes' => [self::REGIME_INTERIM],
-                'name' => "Nombramiento",
-                'where' => "El PDF que recibiste por correo electrónico al principio de curso.",
-                'url' => "",
-                'info' => "Acuerdo de nombramiento y toma de posesión firmado electrónicamente " .
-                    "por la Comunidad de Madrid.\n\n" .
-                    "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual y estar en vigor.",
-                'needscert' => false,
-                'wait' => false,
-                'tag' => "En tu email",
-            ],
-            self::KIND_CREDENCIAL => [
-                'label' => "Credencial docente",
-                'desc' => $centro,
-                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
-                'name' => "Credencial docente",
-                'where' => "La que te dieron en la secretaría de tu centro.",
-                'url' => "",
-                'info' => "Credencial de nombramiento para puesto docente.\n\n" .
-                    "Debe estar firmada electrónicamente y corresponder al curso actual.",
-                'needscert' => false,
-                'wait' => true,
-            ],
-            self::KIND_HOJASERVICIOS => [
-                'label' => "Hoja de servicios",
-                'desc' => $centro,
-                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
-                'name' => "Hoja de servicios",
-                'where' => "La que te dieron en la secretaría de tu centro.",
-                'url' => "",
-                'info' => "Una hoja de servicios del curso actual firmada electrónicamente " .
-                    "en los últimos {$this->maxage} días.",
-                'needscert' => false,
-                'wait' => true,
-            ],
-            self::KIND_CAREER => [
-                'label' => "Extracto de formación + certificado de MUFACE",
-                'desc' => "Utiliza esta opción si no tienes los anteriores.   
-                     Los dos se descargan al momento con certificado digital o Cl@ve.",
-                'links' => [
-                    "Extracto de formación" => self::URL_EXTRACTO,
-                    "Certificado de MUFACE" => self::URL_MUFACE,
-                ],
-                'regimes' => [self::REGIME_CAREER],
-                'name' => "Certificado de afiliación a MUFACE",
-                'where' => "Se descarga en la sede electrónica de MUFACE.",
-                'url' => self::URL_MUFACE,
-                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
-                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
-                    "expedido en los últimos {$this->maxage} días.",
-                'needscert' => true,
-                'wait' => false,
-                'tag' => "Se obtiene al momento (certificado)",
-            ],
-        ];
-    }
 
     public function loadStyles()
     {
@@ -134,13 +50,13 @@ abstract class RegistrationView extends View
     /* true si la petición es el envío de uno de los dos formularios. */
     protected function isSubmit(): bool
     {
-        return $this->isDocsSubmit() || isset($_REQUEST[self::ACTION]);
+        return $this->isDeclaracionSubmit() || isset($_REQUEST[self::ACTION]);
     }
 
-    /* true si es el envío del segundo formulario, el de los documentos. */
-    protected function isDocsSubmit(): bool
+    /* true si es el envío del segundo formulario, el de la declaración. */
+    protected function isDeclaracionSubmit(): bool
     {
-        return isset($_REQUEST[self::ACTION_DOCS]);
+        return isset($_REQUEST[self::ACTION_DECLARACION]);
     }
 
     /* Comprueba el token y el CAPTCHA del formulario enviado. Devuelve
@@ -158,14 +74,14 @@ abstract class RegistrationView extends View
         return true;
     }
 
-    /* Comprueba que en el formulario de los documentos se ha aceptado su
+    /* Comprueba que en el formulario de la declaración se ha aceptado su
        uso. $purpose es para qué se piden: "participar", "registrarse".
        El required del formulario se puede saltar: se comprueba también aquí. */
     protected function checkConsent(string $purpose): bool
     {
         if (($_REQUEST['acepto'] ?? null) === "1")
             return true;
-        echo ("<p><strong>Para {$purpose} hay que aceptar el uso de los documentos " .
+        echo ("<p><strong>Para {$purpose} hay que aceptar el uso de la declaración " .
             "para verificar que eres docente de la enseñanza pública.</strong></p>");
         return false;
     }
@@ -226,385 +142,187 @@ abstract class RegistrationView extends View
         $domains = Config::$alloweddomains == "" ? "cualquiera" :
             str_replace(" ", ", ", Config::$alloweddomains);
         return "Dominios autorizados: {$domains}.\n\n" .
-            "La dirección queda asociada a tus documentos: en esta y en " .
+            "Es la dirección de tu declaración firmada: en esta y en " .
             "próximas consultas tendrás que usar siempre la misma.\n\n" . $extra;
     }
 
-    /* Segundo paso, solo para direcciones que aún no están registradas: un
-       asistente en tres pasos que pide la situación (interino/a o de
-       carrera), el documento con el que se acredita y, por último, los
-       ficheros. Los pasos se cambian en el navegador: al servidor solo llega
-       el envío final, con el tipo de documento en «tipo». La dirección ya
-       comprobada en el primer paso viaja en el formulario y se vuelve a
-       comprobar al recibirlo.
-       Con $email null el asistente es la página entera (registro): la
-       dirección se pide en el último paso, junto a los ficheros.
-       Textos de $texts: action, title e intro; back con $email, y
-       emailinfo y emailhint sin él.
-       $selected (regimen, tipo, email) es lo elegido en un envío anterior
-       que no ha valido: se vuelve al último paso con ello marcado. */
-    protected function showDocsForm($surveyid, ?string $email, array $texts, array $selected = [])
+    /* Segundo paso, solo para quien aún no está registrado: se pide la
+       declaración firmada, de la que se leen el DNI y la dirección de correo
+       educamadrid con la que se registra.
+       Hay dos formas de hacerla, y las dos acaban enviando el PDF firmado en
+       el campo «documento»:
+       - Firmarla aquí (js/declaracion-firma.js): se pide la dirección, AutoFirma
+         pide elegir el certificado, el servidor genera la declaración con el DNI
+         del certificado y esa dirección (declaracion_pdf), AutoFirma la firma y
+         se envía sola. Sin JavaScript esta parte no se muestra.
+       - Subir el modelo rellenado y firmado por su cuenta.
+       La dirección del formulario solo sirve para generar la declaración: la
+       que cuenta es la de la declaración firmada.
+       Textos de $texts: action, title, intro y, opcional, email (la dirección
+       con la que rellenar el formulario). */
+    protected function showDeclaracionForm($surveyid, array $texts)
     {
-        $askemail = $email === null;
-        $regimes = [
-            self::REGIME_INTERIM => [
-                'label' => "Interino/a",
-                'desc' => "Tienes nombramiento como docente interino/a en este curso.",
-            ],
-            self::REGIME_CAREER => [
-                'label' => "Funcionario/a de carrera o en prácticas",
-                'desc' => "Has aprobado la oposición, aunque estés todavía en el curso de prácticas.",
-            ],
-        ];
-        $steps = [1 => "Tu situación", 2 => "Documento", 3 => $askemail ? "Correo y documentos" : "Adjuntar"];
+        $domains = array_map('strtolower', (array) (Config::PARAMS["declaracion_email_domains"] ??
+            ["educa.madrid.org"]));
     ?>
-        <section class="ml-participate-card ml-wizard">
+        <section class="ml-participate-card">
             <h3><?= h($texts['title']); ?></h3>
-            <?php if ($askemail) { ?>
-                <p><?= h($texts['intro']); ?></p>
-            <?php } else { ?>
-                <p>La dirección <strong><?= h($email); ?></strong> <?= h($texts['intro']); ?>
-                    La dirección queda asociada a tus documentos: tendrás que usar siempre la misma.
-                    <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
-                </p>
-            <?php } ?>
-            <ol class="ml-wizard-progress" id="ml-wizard-progress">
-                <?php foreach ($steps as $n => $name) { ?>
-                    <li data-step="<?= $n; ?>"><span class="ml-wizard-progress__num"><?= $n; ?></span>
-                        <span class="ml-wizard-progress__name"><?= h($name); ?></span>
-                    </li>
-                <?php } ?>
-            </ol>
-            <form id="getcodedocs" name="getcodedocs" method="POST"
-                action="<?= h($texts['action']); ?>" enctype="multipart/form-data">
+            <p><?= h($texts['intro']); ?></p>
+            <div class="ml-declaracion-aviso" role="note">
+                <p><strong>Vas a firmar una declaración responsable.</strong> Con tu firma
+                    digital declaras, bajo tu responsabilidad, que trabajas como docente en la
+                    educación pública de la Comunidad de Madrid. Firmarla con tu certificado o tu
+                    DNIe equivale a firmarla de tu puño y letra: queda identificado/a quién la firma.</p>
+                <p>Esta consulta es solo para el profesorado de la enseñanza pública. Si declaras
+                    algo que no es cierto, <strong>podremos emprender acciones legales</strong>.</p>
+            </div>
+            <form id="declaracion" name="declaracion" method="POST"
+                action="<?= h($texts['action']); ?>" enctype="multipart/form-data"
+                data-pdf-url="declaracion_pdf" data-storage-url="afirma_storage"
+                data-retriever-url="afirma_retrieve">
                 <?= setTokenHTML(); ?>
                 <?php if ($surveyid !== null) { ?>
                     <input type="hidden" name="surveyid" value="<?= (int) $surveyid; ?>">
                 <?php } ?>
-                <?php if (!$askemail) { ?>
-                    <input type="hidden" name="email" value="<?= h($email); ?>">
-                <?php } ?>
-
-                <fieldset class="ml-wizard-step" data-step="1">
-                    <legend class="ml-wizard-title" tabindex="-1">¿Cuál es tu situación?</legend>
-                    <p class="ml-wizard-help">Según tu situación te propondremos los documentos con
-                        los que puedes acreditar que eres docente de la enseñanza pública.</p>
-                    <div class="ml-choices">
-                        <?php foreach ($regimes as $regime => $r) { ?>
-                            <label class="ml-choice">
-                                <input type="radio" name="regimen" value="<?= $regime; ?>"
-                                    <?= ($selected['regimen'] ?? null) === $regime ? "checked" : ""; ?>>
-                                <span class="ml-choice__body">
-                                    <span class="ml-choice__title"><?= h($r['label']); ?></span>
-                                    <span class="ml-choice__desc"><?= h($r['desc']); ?></span>
-                                </span>
-                            </label>
-                        <?php } ?>
-                    </div>
-                    <div class="ml-wizard-nav">
-                        <button type="button" class="button-3 ml-participate-btn" data-next
-                            disabled>Continuar</button>
-                    </div>
+                <fieldset class="ml-firma-modes" id="ml-firma-modes" hidden>
+                    <legend>¿Cómo quieres hacer la declaración?</legend>
+                    <label><input type="radio" name="modo_firma" value="autofirma" checked>
+                        Firmarla aquí con mi certificado digital <em>(recomendado)</em></label>
+                    <label><input type="radio" name="modo_firma" value="pdf">
+                        Subir un PDF que ya he firmado</label>
                 </fieldset>
-
-                <fieldset class="ml-wizard-step" data-step="2" hidden>
-                    <legend class="ml-wizard-title" tabindex="-1">¿Con qué documento quieres
-                        acreditarte?</legend>
-                    <p class="ml-wizard-help">Elige el que tengas a mano. Tiene que estar firmado
-                        electrónicamente: adjunta el PDF tal como lo recibiste o descargaste.</p>
-                    <div class="ml-choices">
-                        <?php foreach ($this->docs as $kind => $d) { ?>
-                            <div class="ml-choice" data-regimes="<?= h(implode(" ", $d['regimes'])); ?>">
-                                <label class="ml-choice__label">
-                                    <input type="radio" name="tipo" value="<?= $kind; ?>"
-                                        data-label="<?= h($d['label']); ?>"
-                                        data-name="<?= h($d['name']); ?>"
-                                        data-where="<?= h($d['where']); ?>"
-                                        data-url="<?= h($d['url']); ?>"
-                                        data-info="<?= h($d['info']); ?>"
-                                        data-cert="<?= $d['needscert'] ? "1" : "0"; ?>"
-                                        <?= ($selected['tipo'] ?? null) === $kind ? "checked" : ""; ?>>
-                                    <span class="ml-choice__body">
-                                        <span class="ml-choice__title"><?= h($d['label']); ?>
-                                            <?php if ($d['wait']) { ?>
-                                                <span class="ml-tag ml-tag--wait">Se solicita en el centro</span>
-                                            <?php } else { ?>
-                                                <span class="ml-tag ml-tag--now"><?= h($d['tag'] ?? "Al momento"); ?></span>
-                                            <?php } ?>
-                                        </span>
-                                        <span class="ml-choice__desc"><?= h($d['desc']); ?></span>
-                                    </span>
-                                </label>
-                                <?php if (!empty($d['links'])) { ?>
-                                    <p class="ml-choice__links">
-                                        <?php foreach ($d['links'] as $text => $url) { ?>
-                                            <a href="<?= h($url); ?>" target="_blank"
-                                                rel="noopener noreferrer">Obtener <?= h(lcfirst($text)); ?></a>
-                                        <?php } ?>
-                                    </p>
-                                <?php } ?>
-                            </div>
-                        <?php } ?>
-                    </div>
-                    <div class="ml-wizard-nav">
-                        <button type="button" class="button-3 is-secondary ml-wizard-back" data-back>Atrás</button>
-                        <button type="button" class="button-3 ml-participate-btn" data-next
-                            disabled>Continuar</button>
-                    </div>
-                </fieldset>
-
-                <div class="ml-wizard-step" data-step="3" hidden>
-                    <h4 class="ml-wizard-title" tabindex="-1"><?= $askemail ?
-                                                                    "Indica tu correo y adjunta tus documentos" : "Adjunta tus documentos"; ?></h4>
-                    <p class="ml-wizard-help">Vas a acreditarte con:
-                        <strong id="ml-wizard-chosen"></strong>.
-                        <button type="button" class="ml-link" data-back>Cambiar</button>
-                    </p>
-                    <?php if ($askemail) { ?>
-                        <div class="ml-participate-doc">
-                            <label for="email">Dirección de correo</label>
-                            <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
-                            <small><?= h($texts['emailhint']); ?></small>
-                        </div>
-                        <div class="ml-participate-row">
-                            <input type="email" name="email" id="email" required autocomplete="email"
-                                value="<?= h($selected['email'] ?? ""); ?>">
-                        </div>
-                    <?php } ?>
-                    <div id="extractodiv">
-                        <div class="ml-participate-doc">
-                            <label for="extracto">Extracto de formación</label>
-                            <?= $this->infoButton(
-                                "Extracto de formación",
-                                "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
-                                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
-                            ); ?>
-                            <small>Se descarga al momento en el portal de la Comunidad de Madrid:
-                                <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                                    rel="noopener noreferrer">obtener aquí</a>.</small>
-                        </div>
-                        <div class="ml-participate-row">
-                            <input type="file" name="extracto" id="extracto"
-                                accept="application/pdf,.pdf">
-                        </div>
-                    </div>
+                <div class="ml-firma-panel" id="ml-firma-autofirma" hidden>
+                    <ol class="ml-declaracion-steps">
+                        <li>Escribe tu dirección de correo de EducaMadrid. Con esa dirección
+                            quedarás registrado/a y en ella recibirás los mensajes.</li>
+                        <li>Pulsa «Firmar y enviar»: se abrirá AutoFirma para que elijas tu
+                            certificado digital de persona física o tu DNIe.</li>
+                        <li>Generaremos la declaración con el NIF o NIE de tu certificado y esa
+                            dirección, y AutoFirma te pedirá confirmar la firma. Al confirmarla
+                            declaras que eres docente de la enseñanza pública de la Comunidad de
+                            Madrid. Después la enviaremos.</li>
+                    </ol>
                     <div class="ml-participate-doc">
-                        <label for="documento" id="documento-name"></label>
-                        <?= $this->infoButton("", "", "documento-info"); ?>
-                        <small><span id="documento-where"></span>
-                            <a id="documento-url" href="#" target="_blank"
-                                rel="noopener noreferrer" hidden>Obtener aquí</a></small>
+                        <label for="firma_email">Dirección de correo de EducaMadrid</label>
+                        <?= $this->infoButton(
+                            "Dirección de correo de EducaMadrid",
+                            "Es la que aparecerá en tu declaración firmada: con ella quedarás " .
+                                "registrado/a y en esta y en próximas consultas tendrás que usar " .
+                                "siempre la misma.\n\nDominios autorizados: " .
+                                (empty($domains) ? "cualquiera" : implode(", ", $domains)) . "."
+                        ); ?>
+                        <small>Revísala bien: ahí recibirás los mensajes.</small>
+                    </div>
+                    <div class="ml-participate-row">
+                        <input type="email" name="firma_email" id="firma_email"
+                            autocomplete="email" value="<?= h($texts['email'] ?? ""); ?>">
+                    </div>
+                    <p class="ml-firma-help">Necesitas tener instalado
+                        <a href="https://firmaelectronica.gob.es/Home/Descargas.html" target="_blank"
+                            rel="noopener noreferrer">AutoFirma</a>, la aplicación de firma del
+                        Gobierno de España (en el móvil, Cliente @firma móvil).</p>
+                </div>
+                <div class="ml-firma-panel" id="ml-firma-pdf">
+                    <ol class="ml-declaracion-steps">
+                        <li>Descarga el <a href="<?= h(self::MODEL_URL); ?>" target="_blank"
+                                rel="noopener noreferrer" download>modelo de declaración</a>.</li>
+                        <li>Rellena tu número de documento (NIF o NIE) y tu dirección de correo de
+                            EducaMadrid. Con esa dirección quedarás registrado/a y en ella recibirás
+                            los mensajes.</li>
+                        <li>Léelo y fírmalo con tu certificado digital de persona física o tu DNIe (por
+                            ejemplo, con AutoFirma o Adobe Acrobat Reader). El certificado tiene que ser
+                            el tuyo: su número de documento tiene que coincidir con el que has escrito.</li>
+                        <li>Adjunta aquí el PDF firmado, sin modificarlo después de firmar.</li>
+                    </ol>
+                    <div class="ml-participate-doc">
+                        <label for="documento">Declaración firmada</label>
+                        <?= $this->infoButton(
+                            "Declaración firmada",
+                            "El modelo de declaración relleno con tu NIF o NIE y tu dirección de " .
+                                "correo de EducaMadrid, y firmado digitalmente con tu propio certificado.\n\n" .
+                                "Si lo modificas después de firmarlo, la firma deja de ser válida."
+                        ); ?>
+                        <small>El PDF tal como queda después de firmarlo.</small>
                     </div>
                     <div class="ml-participate-row">
                         <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
-                    <p class="ml-participate-legal-link">Antes de enviarlos, lee
-                        <button type="button" class="ml-link" id="ml-legal-open"
-                            aria-haspopup="dialog">cómo tratamos tus documentos y la información
-                            sobre protección de datos</button>.
-                    </p>
-                    <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
-                        aria-labelledby="ml-legal-title">
-                        <div class="ml-dialog__form">
-                            <?php if (
-                                !file_exists(self::PRIVACY_POLICY_FILE) ||
-                                !is_file(self::PRIVACY_POLICY_FILE)
-                            ) {
-                            ?>
-                                <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
-                                    condición de docente de la enseñanza pública</h2>
-                                <div class="ml-legal-body" tabindex="0">
-                                    <p>Para comprobar que eres docente en activo en un centro público de la
-                                        Comunidad de Madrid necesitamos algún documento probatorio que
-                                        esté firmado digitalmente:</p>
-                                    <ul>
-                                        <li>Si eres interino/a: tu nombramiento del curso actual, tu
-                                            credencial docente o tu hoja de servicios actualizada.</li>
-                                        <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
-                                            formación junto con tu certificado de afiliación a MUFACE, tu
-                                            credencial docente o tu hoja de servicios actualizada.</li>
-                                    </ul>
-                                    <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
-                                        para comprobar su autenticidad, que el NIF coincide si son dos y que
-                                        figuras en servicio activo en la Consejería de Educación. Se procesan en
-                                        memoria y se eliminan en cuanto termina la comprobación. No guardamos los
-                                        documentos ni ningún dato extraído de ellos.</p>
-                                    <p>Lo único que conservamos es tu NIF transformado con una función
-                                        criptográfica y una clave secreta que se custodia aparte, de modo que sin
-                                        esa clave no es posible conocerlo. Solo sirve para impedir que una misma
-                                        persona tenga más de una cuenta.</p>
-                                    <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                        información de la necesaria, como tu domicilio, tu puesto de trabajo o,
-                                        en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
-                                        ni la conservamos.</p>
-                                    <h5>Información básica sobre protección de datos</h5>
-                                    <ul>
-                                        <li><strong>Finalidad:</strong> verificar tu condición de docente en
-                                            activo de la enseñanza pública y evitar cuentas duplicadas.</li>
-                                        <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
-                                            en cualquier momento.</li>
-                                        <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
-                                            servicio se aloja en la Unión Europea.</li>
-                                        <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                            oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
-                                            También puedes reclamar ante la Agencia Española de
-                                            Protección de Datos (<a href="https://www.aepd.es" target="_blank"
-                                                rel="noopener noreferrer">aepd.es</a>).</li>
-                                    </ul>
-                                    <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
-                                        ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
-                                        con otros documentos.</p>
-                                </div>
-                            <?php } else {
-                                echo file_get_contents(self::PRIVACY_POLICY_FILE);
-                            } ?>
-                            <div class="ml-dialog__actions">
-                                <button type="button" class="button-3" id="ml-legal-close">
-                                    Cerrar</button>
-                            </div>
-                        </div>
-                    </dialog>
-                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
-                            value="1" id="acepto" required>
-                        He leído la información sobre el tratamiento de los documentos y
-                        consiento su tratamiento con la finalidad indicada.</label>
-                    <div class="ml-participate-row">
-                        <?= altchaWidgetHTML(); ?>
-                        <button type="submit" class="button-3 ml-participate-btn"
-                            name="<?= self::ACTION_DOCS; ?>" value="<?= self::ACTION_DOCS; ?>">
-                            Enviar documentos</button>
-                    </div>
-                    <div class="ml-wizard-nav">
-                        <button type="button" class="button-3 is-secondary ml-wizard-back" data-back>Atrás</button>
-                    </div>
                 </div>
+                <p class="ml-participate-legal-link">Antes de enviarla, lee
+                    <button type="button" class="ml-link" id="ml-legal-open"
+                        aria-haspopup="dialog">cómo tratamos tu declaración y la información
+                        sobre protección de datos</button>.
+                </p>
+                <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
+                    aria-labelledby="ml-legal-title">
+                    <div class="ml-dialog__form">
+                        <?php if (
+                            !file_exists(self::PRIVACY_POLICY_FILE) ||
+                            !is_file(self::PRIVACY_POLICY_FILE)
+                        ) {
+                        ?>
+                            <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
+                                condición de docente de la enseñanza pública</h2>
+                            <div class="ml-legal-body" tabindex="0">
+                                <p>Para registrarte necesitamos tu declaración como docente en la
+                                    educación pública de la Comunidad de Madrid, con tu NIF o NIE y tu
+                                    dirección de correo de EducaMadrid, firmada digitalmente con tu
+                                    certificado de persona física o tu DNIe.</p>
+                                <p><strong>Qué hacemos con ella.</strong> La leemos de forma automática
+                                    para comprobar que la firma es válida, que el NIF escrito coincide con el
+                                    del certificado con el que está firmada y que la dirección es de
+                                    EducaMadrid. Se procesa en memoria y se elimina en cuanto termina la
+                                    comprobación. No guardamos el documento.</p>
+                                <p>Lo único que conservamos es tu NIF y tu dirección de correo
+                                    transformados con una función criptográfica y una clave secreta que se
+                                    custodia aparte, de modo que sin esa clave no es posible conocerlos.
+                                    Solo sirven para impedir que una misma persona tenga más de una cuenta.</p>
+                                <h5>Información básica sobre protección de datos</h5>
+                                <ul>
+                                    <li><strong>Finalidad:</strong> verificar tu condición de docente en
+                                        activo de la enseñanza pública y evitar cuentas duplicadas.</li>
+                                    <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
+                                        en cualquier momento.</li>
+                                    <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
+                                        servicio se aloja en la Unión Europea.</li>
+                                    <li><strong>Derechos:</strong> acceso, rectificación, supresión,
+                                        oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
+                                        También puedes reclamar ante la Agencia Española de
+                                        Protección de Datos (<a href="https://www.aepd.es" target="_blank"
+                                            rel="noopener noreferrer">aepd.es</a>).</li>
+                                </ul>
+                                <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
+                                    ningún registro de tu intento. Puedes volver a intentarlo cuando quieras.</p>
+                            </div>
+                        <?php } else {
+                            echo file_get_contents(self::PRIVACY_POLICY_FILE);
+                        } ?>
+                        <div class="ml-dialog__actions">
+                            <button type="button" class="button-3" id="ml-legal-close">
+                                Cerrar</button>
+                        </div>
+                    </div>
+                </dialog>
+                <label class="ml-participate-consent"><input type="checkbox" name="acepto"
+                        value="1" id="acepto" required>
+                    He leído la información sobre el tratamiento de la declaración y
+                    consiento su tratamiento con la finalidad indicada.</label>
+                <div class="ml-participate-row">
+                    <?= altchaWidgetHTML(); ?>
+                    <button type="submit" class="button-3 ml-participate-btn" id="ml-declaracion-submit"
+                        name="<?= self::ACTION_DECLARACION; ?>" value="<?= self::ACTION_DECLARACION; ?>"
+                        data-label-autofirma="Firmar y enviar" data-label-pdf="Enviar declaración">
+                        Enviar declaración</button>
+                </div>
+                <p class="ml-firma-status" id="ml-firma-status" role="status" aria-live="polite" hidden></p>
             </form>
         </section>
-        <?php
-        if (empty($selected))
-            $this->showUnregister();
-        ?>
+        <?php $this->showUnregister(); ?>
+        <script src="js/afirma/autoscript.js"></script>
+        <script src="js/declaracion-firma.js"></script>
         <script>
             (function() {
-                var form = document.getElementById("getcodedocs");
-                var steps = form.querySelectorAll(".ml-wizard-step");
-                var progress = document.querySelectorAll("#ml-wizard-progress li");
-                var choices = form.querySelectorAll(".ml-choice[data-regimes]");
-                var extractodiv = document.getElementById("extractodiv");
-                var extracto = document.getElementById("extracto");
-                var file = document.getElementById("documento");
-                var info = document.getElementById("documento-info");
-                var url = document.getElementById("documento-url");
-                var current = 1;
-
-                function checked(name) {
-                    return form.querySelector('input[name="' + name + '"]:checked');
-                }
-
-                /* Muestra el paso n. Al cambiar de paso a propósito el foco va a
-                   su título, para que el lector de pantalla lo anuncie. */
-                function go(n, focus) {
-                    current = n;
-                    steps.forEach(function(step) {
-                        step.hidden = step.dataset.step != n;
-                    });
-                    progress.forEach(function(li) {
-                        var s = +li.dataset.step;
-                        li.classList.toggle("is-done", s < n);
-                        if (s == n)
-                            li.setAttribute("aria-current", "step");
-                        else
-                            li.removeAttribute("aria-current");
-                    });
-                    if (focus) {
-                        var title = form.querySelector('.ml-wizard-step[data-step="' + n + '"] .ml-wizard-title');
-                        title.focus({
-                            preventScroll: true
-                        });
-                        form.closest(".ml-wizard").scrollIntoView({
-                            block: "start",
-                            behavior: "smooth"
-                        });
-                    }
-                }
-
-                /* En el segundo paso solo se ofrecen los documentos de la
-                   situación elegida; si el marcado no es de ella, se desmarca. */
-                function filterDocs() {
-                    var regime = checked("regimen");
-                    choices.forEach(function(choice) {
-                        var ok = regime && choice.dataset.regimes.split(" ").indexOf(regime.value) >= 0;
-                        choice.hidden = !ok;
-                        var radio = choice.querySelector('input[name="tipo"]');
-                        if (!ok && radio.checked)
-                            radio.checked = false;
-                    });
-                }
-
-                /* El tercer paso pide los ficheros del documento elegido. */
-                function showDocument(clear) {
-                    var kind = checked("tipo");
-                    if (!kind)
-                        return;
-                    var data = kind.dataset;
-                    document.getElementById("ml-wizard-chosen").textContent = data.label;
-                    document.getElementById("documento-name").textContent = data.name;
-                    document.getElementById("documento-where").textContent = data.where;
-                    url.hidden = data.url == "";
-                    url.href = data.url || "#";
-                    var cert = data.cert == "1";
-                    extractodiv.hidden = !cert;
-                    extracto.required = cert;
-                    info.dataset.title = data.name;
-                    info.setAttribute("aria-label", "Más información: " + data.name);
-                    info.dataset.info = data.info;
-                    /* Los ficheros elegidos eran los de otro documento. */
-                    if (clear) {
-                        file.value = "";
-                        extracto.value = "";
-                    }
-                }
-
-                /* «Continuar» solo se activa cuando hay algo elegido en el paso. */
-                function updateButtons() {
-                    steps[0].querySelector("[data-next]").disabled = !checked("regimen");
-                    steps[1].querySelector("[data-next]").disabled = !checked("tipo");
-                }
-
-                form.querySelectorAll('input[name="regimen"]').forEach(function(radio) {
-                    radio.addEventListener("change", function() {
-                        filterDocs();
-                        updateButtons();
-                    });
-                });
-                form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
-                    radio.addEventListener("change", function() {
-                        showDocument(true);
-                        updateButtons();
-                    });
-                });
-                form.querySelectorAll("[data-next]").forEach(function(button) {
-                    button.addEventListener("click", function() {
-                        go(current + 1, true);
-                        if (current > 1) {
-                            const unregister = document.getElementById("unregister");
-                            if (unregister != null)
-                                unregister.style.display = "none";
-                        }
-                    });
-                });
-                form.querySelectorAll("[data-back]").forEach(function(button) {
-                    button.addEventListener("click", function() {
-                        go(current - 1, true);
-                        if (current == 1) {
-                            const unregister = document.getElementById("unregister");
-                            if (unregister != null)
-                                unregister.style.display = "block";
-                        }
-                    });
-                });
-
                 /* La información de protección de datos se muestra en un diálogo. */
                 var legal = document.getElementById("ml-legal");
                 document.getElementById("ml-legal-open").addEventListener("click", function() {
@@ -619,17 +337,6 @@ abstract class RegistrationView extends View
                     else
                         legal.removeAttribute("open");
                 });
-
-                /* Al volver a la página el navegador puede conservar lo elegido:
-                   se continúa desde el último paso completado. */
-                function restore() {
-                    filterDocs();
-                    showDocument(false);
-                    updateButtons();
-                    go(checked("tipo") ? 3 : checked("regimen") ? 2 : 1, false);
-                }
-                restore();
-                window.addEventListener("pageshow", restore);
             })();
         </script>
     <?php
@@ -655,9 +362,9 @@ abstract class RegistrationView extends View
     }
 
     /* Icono de información: al pincharlo se muestra la explicación en un diálogo. */
-    private function infoButton(string $title, string $info, string $id = ""): string
+    private function infoButton(string $title, string $info): string
     {
-        return '<button type="button" class="ml-info"' . ($id === "" ? "" : ' id="' . h($id) . '"') .
+        return '<button type="button" class="ml-info"' .
             ' aria-label="Más información: ' . h($title) . '" data-title="' . h($title) .
             '" data-info="' . h($info) . '">' . mlIcon('info') . '</button>';
     }
@@ -674,30 +381,35 @@ abstract class RegistrationView extends View
     }
 
     /**
-     * Handles the submit of the documents form: checks the two PDFs (getDni) and
-     * looks for the participant with that DNI and email address, inserting it in
-     * Participants table if it doesn't exist.
+     * Handles the submit of the declaration form: checks the signed declaration
+     * (getDeclaracion), from which the DNI and the email address are read, checks
+     * the domain of the address and looks for the participant with that DNI and
+     * email address, inserting it in Participants table if it doesn't exist.
      * The hash of the DNI (dnihashed) identifies the participant. The hash of the email
-     * address is stored with it (participant), and both are unique: the same documents
-     * can't be used from several addresses, nor the same address with the documents of
+     * address is stored with it (participant), and both are unique: the same DNI
+     * can't be used from several addresses, nor the same address with the DNI of
      * several people.
      *
-     * $then is called with the participant id and whether it has just been created,
-     * still holding the locks of the DNI and the email address.
+     * $then is called with the participant id, whether it has just been created and
+     * the email address of the declaration, still holding the locks of the DNI and
+     * the email address.
      *
      * @return mixed What $then returns, or null (the reason is already shown) if the
-     * documents aren't valid or the DNI or the address belong to another participant.
+     * declaration isn't valid or the DNI or the address belong to another participant.
      */
-    protected function registerWithDocs($db, $email, callable $then)
+    protected function registerWithDeclaracion($db, callable $then)
     {
-        $dni = $this->getDni();
-        if ($dni === null)
+        $declaracion = $this->getDeclaracion();
+        if ($declaracion === null)
+            return null;
+        ["dni" => $dni, "email" => $email] = $declaracion;
+        if (!$this->checkDomain($email))
             return null;
         $hashdni = participantHash($dni);
         $hashemail = participantHash($email);
 
         if (!lockParticipant($db, $hashdni)) {
-            echo ("<p><strong>Hay otra petición en curso con el DNI de los documentos. " .
+            echo ("<p><strong>Hay otra petición en curso con el DNI de la declaración. " .
                 "Inténtalo de nuevo en unos segundos.</strong></p>");
             return null;
         }
@@ -707,7 +419,7 @@ abstract class RegistrationView extends View
             try {
                 $created = false;
                 $participantid = $this->findOrCreateParticipant($db, $hashdni, $hashemail, $created);
-                return $participantid === null ? null : $then($participantid, $created);
+                return $participantid === null ? null : $then($participantid, $created, $email);
             } finally {
                 unlockParticipant($db, $hashemail);
             }
@@ -730,95 +442,32 @@ abstract class RegistrationView extends View
         return $db->lastInsertId();
     }
 
-    /* Devuelve la ruta temporal de un PDF subido, o null (con el motivo ya
-       mostrado) si no ha llegado bien. */
-    private function getUpload(string $field, string $docname): ?string
+    /* Comprueba la declaración firmada subida. Devuelve ["dni", "email"],
+       o null (con el motivo ya mostrado) si no vale.
+       El fichero se queda en el temporal de la subida: no se guarda. */
+    private function getDeclaracion(): ?array
     {
-        $file = $_FILES[$field] ?? null;
-        if (
-            !is_array($file) || !is_int($file['error'] ?? null) ||
-            $file['error'] == UPLOAD_ERR_NO_FILE
-        ) {
-            echo ("<p><strong>Hay que adjuntar el {$docname} en PDF.</strong></p>");
+        $file = $_FILES['documento'] ?? null;
+        $error = is_array($file) && is_int($file['error'] ?? null) ? $file['error'] : UPLOAD_ERR_NO_FILE;
+        if ($error == UPLOAD_ERR_NO_FILE) {
+            echo ("<p><strong>Hay que adjuntar la declaración firmada en PDF.</strong></p>");
             return null;
         }
-        if ($file['error'] == UPLOAD_ERR_INI_SIZE || $file['error'] == UPLOAD_ERR_FORM_SIZE) {
-            echo ("<p><strong>El fichero del {$docname} está vacío o es demasiado grande.</strong></p>");
+        if ($error == UPLOAD_ERR_INI_SIZE || $error == UPLOAD_ERR_FORM_SIZE) {
+            echo ("<p><strong>El fichero de la declaración es demasiado grande.</strong></p>");
             return null;
         }
-        if ($file['error'] != UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
-            echo ("<p><strong>Error al recibir el {$docname}.</strong></p>");
-            logMessage(LOGGER_ERROR, "Upload error {$file['error']} getting the PDF.");
+        if ($error != UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
+            echo ("<p><strong>Error al recibir la declaración.</strong></p>");
+            logMessage(LOGGER_ERROR, "Upload error {$error} getting the PDF.");
             return null;
         }
-        return $file['tmp_name'];
-    }
-
-    /* Comprueba la firma del documento subido según lo elegido. El
-       certificado de MUFACE va con el extracto de formación, y los dos
-       tienen que ser de la misma persona; el nombramiento, la credencial y
-       la hoja de servicios valen solos.
-       Devuelve el DNI leído, o null (con el motivo ya mostrado) si no vale.
-       Los ficheros se quedan en el temporal de la subida: no se guardan. */
-    private function getDni(): ?string
-    {
-        $kind = $_REQUEST['tipo'] ?? null;
-        if (!in_array($kind, array_keys($this->docs), true)) {
-            echo ("<p><strong>Hay que indicar la documentación con la que te validas..</strong></p>");
+        try {
+            return checkDeclaracion($file['tmp_name']);
+        } catch (PdfSignException $e) {
+            echo ("<p><strong>Declaración: " . h($e->getMessage()) . "</strong></p>");
             return null;
         }
-        $thedoc = $this->docs[$kind];
-        $docname = $thedoc["name"];
-        $extracto = null;
-        if ($thedoc["needscert"]) {
-            $extracto = $this->getUpload('extracto', "extracto de formación");
-            if ($extracto === null)
-                return null;
-        }
-
-        $document = $this->getUpload('documento', $docname);
-        if ($document === null)
-            return null;
-
-        $dni = "";
-        if ($thedoc["needscert"]) {
-            /* Para que el mensaje de error diga de qué fichero habla. */
-            $checking = "extracto de formación";
-            try {
-                checkExtractoSignature($extracto);
-                $dni = getPdfDni($extracto);
-                $checking = $docname;
-                checkMufaceSignature($document);
-                $documentdni = getMufaceDni($document);
-            } catch (PdfSignException $e) {
-                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
-                return null;
-            }
-            if (!hash_equals($dni, $documentdni)) {
-                echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
-                    "formación.</strong></p>");
-                logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
-                return null;
-            }
-        } else {
-            try {
-                $checking = $docname;
-                if ($kind == self::KIND_INTERIM) {
-                    checkNombramientoSignature($document);
-                    $dni = getNombramientoDni($document);
-                } else if ($kind == self::KIND_HOJASERVICIOS) {
-                    checkHojaServiciosSignature($document);
-                    $dni = getHojaServiciosNIF($document);
-                } else if ($kind == self::KIND_CREDENCIAL) {
-                    checkCredencialSignature($document);
-                    $dni = getCredencialNIF($document);
-                }
-            } catch (PdfSignException $e) {
-                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
-                return null;
-            }
-        }
-        return $dni === "" ? null : $dni;
     }
 
     /* Id de la participante registrada con esa dirección, o null si no hay. */
@@ -850,11 +499,11 @@ abstract class RegistrationView extends View
         $participants->closeCursor();
         $participantid = -1;
         foreach ($rows as $row) {
-            /* Las filas anteriores a los documentos no tienen DNI y la tabla
+            /* Las filas anteriores a la declaración no tienen DNI y la tabla
                es inmutable: no se les puede asociar uno. */
             if ($row['dnihashed'] === null) {
                 echo ("<p><strong>La dirección de correo indicada ya se usó antes de que se " .
-                    "pidieran los documentos y no se puede asociar a ellos. Hay que usar otra " .
+                    "pidiera la declaración y no se puede asociar a ella. Hay que usar otra " .
                     "dirección.</strong></p>");
                 return null;
             }
@@ -863,7 +512,7 @@ abstract class RegistrationView extends View
                 return null;
             }
             if ($row['participant'] !== $hashemail) {
-                echo ("<p><strong>El DNI de los documentos adjuntados ya se ha usado con otra dirección " .
+                echo ("<p><strong>El DNI de la declaración ya se ha usado con otra dirección " .
                     "de correo. Hay que usar siempre la misma dirección.</strong></p>");
                 return null;
             }
@@ -887,32 +536,26 @@ abstract class RegistrationView extends View
 
     private function emailInUse()
     {
-        echo ("<p><strong>La dirección de correo indicada ya se ha usado con los documentos " .
+        echo ("<p><strong>La dirección de correo de la declaración ya se ha usado con el DNI " .
             "de otra persona.</strong></p>");
     }
 
-    protected function checkDomain($db, $email)
+    /* Comprueba que la dirección es de uno de los dominios permitidos en la
+       configuración del sistema (sin dominios, vale cualquiera). Devuelve
+       false (con el motivo ya mostrado) si no. */
+    protected function checkDomain(string $email): bool
     {
-        $query = $db->prepare("SELECT alloweddomains FROM {SystemConfig} LIMIT 1");
-        $query->execute();
-        if ($query->rowCount() == 0) {
+        if (!Config::$haveconfig) {
             echo ("<p><strong>El sistema no está configurado aún. No se puede participar.</strong></p>");
             return false;
         }
-        $domainstring = $query->fetch()['alloweddomains'] ?? "";
-        $query->closeCursor();
-        $domains = array_filter(explode(" ", strtolower(trim($domainstring))));
-        /* Sin dominios configurados puede participar cualquiera. */
-        if (empty($domains))
+        $domains = array_filter(explode(" ", strtolower(trim(Config::$alloweddomains))));
+        if (empty($domains) || in_array(substr(strrchr($email, "@"), 1), $domains, true))
             return true;
-        $emaildomain = substr(strrchr($email, "@"), 1);
-        foreach ($domains as $key => $domain) {
-            if ($emaildomain == $domain)
-                return true;
-        }
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
     }
+
     private function showUnregister()
     {
     ?>

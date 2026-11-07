@@ -54,46 +54,24 @@ const CONFIG = [
 "participant_hmac_key" => '',
 
 /**
- * Signed training record PDF (extracto de formación) asked for participating.
- * pdf_ca_file: PEM file with the certification authorities trusted for the
- * signature. Only these are trusted, not the system ones.
- * pdf_signer_ids: serialNumber (NIF) of the certificates allowed to sign the
- * PDF. S7800001E is the Comunidad de Madrid electronic seal.
- * It needs the openssl and pdftotext (poppler-utils) commands.
+ * Signed self-declaration asked for registering (docs/modelo_declaracion.pdf):
+ * a PDF form with the DNI/NIE and the email address of the participant,
+ * signed with their own personal certificate. The DNI of the form must be the
+ * one of the certificate. It needs the openssl, pdftotext (poppler-utils) and
+ * qpdf commands.
+ * declaracion_ca_file: PEM file with the certification authorities (roots and
+ * intermediates) trusted for the signer's certificate. Only these are
+ * trusted, not the system ones.
+ * declaracion_revocation: checks that the signer's certificate isn't revoked,
+ * with OCSP and, if the responder doesn't answer, with the CRL of the
+ * certificate (see utils/certrevocation.php). Turn it off only for tests.
+ * declaracion_email_domains: domains allowed for the email address of the
+ * declaration (empty: any).
  */
 
-"pdf_ca_file" => 'certs/extracto_ca.pem',
-"pdf_signer_ids" => ['S7800001E'],
-
-/**
- * Second PDF asked for participating: the digitally signed MUFACE membership
- * certificate (Clases Pasivas) or the digitally signed appointment,
- * nombramiento (the rest: career civil servants who joined from 2011 on and
- * interim ones).
- * muface_ca_file: PEM file with the certification authorities trusted for the
- * signature of the MUFACE certificate. Only these are trusted, not the system
- * ones.
- * muface_signer_ids: serialNumber (NIF) of the certificates allowed to sign
- * it. Q2861001B is the MUFACE electronic seal.
- * pdf_max_age_days: how old the MUFACE certificate can be, counting from its
- * issue date. The appointment must be of the current school year.
- * nombramiento_ca_file: PEM file with the certification authorities trusted
- * for the signature of the appointment, the service record (hoja de
- * servicios) and the teaching credential.
- * nombramiento_signer_orgs: regular expression the organizationIdentifier of
- * the signer's certificate must match (they are signed with the personal
- * certificate of a public employee or the representative certificate of the
- * school): the Comunidad de Madrid (S7800001E) and the public bodies of Madrid
- * (NIF Q with province code 28 or 78 to 88).
- * The service record and the credential must be signed in the current school
- * year, and the service record not longer than pdf_max_age_days ago.
- */
-
-"muface_ca_file" => 'certs/muface_ca.pem',
-"muface_signer_ids" => ['Q2861001B'],
-"pdf_max_age_days" => 30,
-"nombramiento_ca_file" => 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
+"declaracion_ca_file" => 'certs/declaracion_ca.pem',
+"declaracion_revocation" => true,
+"declaracion_email_domains" => ['educa.madrid.org'],
 
 /**
  * For enabling stress test bypasses

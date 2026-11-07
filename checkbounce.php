@@ -20,10 +20,6 @@ function deleteParticipation($address)
     $id = $query->fetch()["participantid"];
     $query->closeCursor();
     logMessage(LOGGER_DEBUG, "Deleting participant {$id} as address does not exists");
-    /*$query = $db->prepare("DELETE FROM {Participation} WHERE participant = :p");
-    $query->bindParam(":p", $hashemail, PDO::PARAM_STR);
-    $query->execute();*/
-
     $query = $db->prepare("DELETE FROM {Participants} WHERE participantid = :pid");
     $query->bindParam(":pid", $id, PDO::PARAM_INT);
     $query->execute();

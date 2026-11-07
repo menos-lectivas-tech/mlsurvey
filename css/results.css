@@ -10,10 +10,6 @@
    que es lo que permite usar en claro los tonos de bajo contraste.
    ===================================================================== */
 
-.ml-results-list {
-    margin: 0;
-}
-
 /* --- Paleta categórica: modo claro ------------------------------- */
 .option {
     --s1: #2a78d6;  /* azul     */

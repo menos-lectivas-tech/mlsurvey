@@ -119,8 +119,7 @@ footer .container {
     padding-inline: 24px;
 }
 
-.row,
-.row-fluid {
+.row {
     margin-bottom: 0;
 }
 
@@ -580,7 +579,6 @@ a.scrollup i {
     }
 }
 
-/* Formulario de acceso: una tarjeta centrada en vez de campos sueltos. */
 /* Título y explicación de la administración sobre el formulario de acceso. */
 .ml-admin-intro {
     max-width: 380px;
@@ -816,9 +814,6 @@ a.scrollup i {
 /* ------------------------------------------------------------------
    Utilidades y detalles sueltos
    ------------------------------------------------------------------ */
-.txtContent p {
-    color: var(--ml-text);
-}
 
 .featured_content ul,
 .featured_content ol {
@@ -1011,12 +1006,6 @@ footer .row::after,
     overflow-wrap: break-word;
 }
 
-/* Campo de ancho medio (sustituye a los style="width: 40%" en línea). */
-.featured_content .ml-field-md {
-    width: 100%;
-    max-width: 420px;
-}
-
 /* Las filas de Bootstrap tienen margen negativo de 15px; con el flex del
    pie y el relleno propio del contenedor, el texto quedaba pegado al
    borde de la pantalla. */
@@ -1077,8 +1066,7 @@ footer .row {
     .featured_content input[type="date"],
     .featured_content input[type="time"],
     .featured_content input[type="datetime-local"],
-    .featured_content select,
-    .featured_content .ml-field-md {
+    .featured_content select {
         width: 100%;
         max-width: 100%;
         /* 16px evita el zoom automático de iOS al enfocar. */

@@ -18,10 +18,6 @@ class MLPDO extends PDO {
     $this->m_prefix = $prefix;
   }
 
-  public function showprefix (){
-    return $this->m_prefix;
-  }
-
   /**
    * This method is called by prepare, exec and query for automatically for
    * adding the prefix.
@@ -80,15 +76,4 @@ class MLPDO extends PDO {
             return parent::query($statement);
         }
     }
-
-  /**
-   * This method is for debug purposes.
-   * 
-   * @param string $statement
-   */
-  public function showquery ($statement){
-  
-    return $this->putPrefix ($statement);
-  
-  }
 }

@@ -65,20 +65,13 @@ define('CONFIG', [
 // Clave del HMAC del correo y el DNI de las participantes: obligatoria y fija.
 "participant_hmac_key" => getenv('PARTICIPANT_HMAC_KEY') ?: '',
 
-// Firma del extracto de formacion: autoridades de confianza y NIF de los
-// sellos admitidos (separados por comas).
-"pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
-"pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
-
-// Documento que acredita el regimen (Clases Pasivas o resto): sello de MUFACE admitido para el
-// certificado de afiliacion (separados por comas), antiguedad maxima del PDF y
-// autoridades de confianza y expresion regular de los organismos que pueden firmar el
-// nombramiento, la hoja de servicios y la credencial.
-"muface_ca_file" => getenv('MUFACE_CA_FILE') ?: 'certs/muface_ca.pem',
-"muface_signer_ids" => array_map('trim', explode(',', getenv('MUFACE_SIGNER_IDS') ?: 'Q2861001B')),
-"pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
-"nombramiento_ca_file" => getenv('NOMBRAMIENTO_CA_FILE') ?: 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => getenv('NOMBRAMIENTO_SIGNER_ORGS') ?: '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
+// Declaracion firmada que se pide para registrarse: autoridades de confianza
+// para el certificado con el que se firma, comprobacion de su revocacion
+// (OCSP y, si no responde, la CRL) y dominios admitidos para el correo
+// (separados por espacios).
+"declaracion_ca_file" => getenv('DECLARACION_CA_FILE') ?: 'certs/declaracion_ca.pem',
+"declaracion_revocation" => getenv('DECLARACION_REVOCATION') === 'false' ? false : true,
+"declaracion_email_domains" => array_values(array_filter(explode(' ', strtolower(getenv('DECLARACION_EMAIL_DOMAINS') ?: 'educa.madrid.org')))),
 
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
@@ -92,6 +85,35 @@ PHPEOF
     chown www-data:www-data "$CONFIG_FILE"
     chmod 640 "$CONFIG_FILE"
 fi
+
+# --- HTTPS ---------------------------------------------------------------
+# Certificado del servidor: si no hay uno en SSL_CERT_FILE/SSL_KEY_FILE se
+# genera uno autofirmado (valido para SSL_HOSTNAME, localhost y 127.0.0.1).
+# Se guarda en el volumen ssl, asi que sobrevive a un recreado del contenedor.
+export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/mlsurvey/ssl/server.crt}"
+export SSL_KEY_FILE="${SSL_KEY_FILE:-/etc/mlsurvey/ssl/server.key}"
+SSL_HOSTNAME="${SSL_HOSTNAME:-localhost}"
+if [ ! -s "$SSL_CERT_FILE" ] || [ ! -s "$SSL_KEY_FILE" ]; then
+    echo "[mlsurvey] no hay certificado en ${SSL_CERT_FILE}: se genera uno autofirmado para ${SSL_HOSTNAME}."
+    mkdir -p "$(dirname "$SSL_CERT_FILE")" "$(dirname "$SSL_KEY_FILE")"
+    SAN="DNS:localhost,IP:127.0.0.1"
+    [ "$SSL_HOSTNAME" != "localhost" ] && SAN="DNS:${SSL_HOSTNAME},${SAN}"
+    openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
+        -subj "/CN=${SSL_HOSTNAME}" \
+        -addext "subjectAltName=${SAN}" \
+        -keyout "$SSL_KEY_FILE" -out "$SSL_CERT_FILE" 2>/dev/null
+    chmod 600 "$SSL_KEY_FILE"
+fi
+
+# HTTP -> HTTPS: el puerto 80 redirige a SITE_URL si es https. Ponlo a false
+# si un proxy delante termina el TLS y habla HTTP con el contenedor.
+REDIRECT_CONF=/etc/apache2/mlsurvey-http-redirect.conf
+case "${HTTPS_REDIRECT:-true}:${SITE_URL:-}" in
+    true:https://*)
+        echo "Redirect permanent / ${SITE_URL%/}/" > "$REDIRECT_CONF" ;;
+    *)
+        rm -f "$REDIRECT_CONF" ;;
+esac
 
 # Esperar a la base de datos (el init de MariaDB tarda en cargar modelo_datos.sql).
 echo "[mlsurvey] esperando a MariaDB en ${DB_HOST}:${DB_PORT} ..."
