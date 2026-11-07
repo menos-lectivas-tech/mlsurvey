@@ -200,7 +200,8 @@ abstract class RegistrationView extends View
                         <li>Generaremos la declaración con el NIF o NIE de tu certificado y esa
                             dirección, y AutoFirma te pedirá confirmar la firma. Al confirmarla
                             declaras que eres docente de la enseñanza pública de la Comunidad de
-                            Madrid. Después la enviaremos.</li>
+                            Madrid. Después la enviaremos y, cuando la hayamos aceptado, se
+                            descargará en tu equipo una copia de la declaración firmada.</li>
                     </ol>
                     <div class="ml-participate-doc">
                         <label for="firma_email">Dirección de correo de EducaMadrid</label>
@@ -554,6 +555,19 @@ abstract class RegistrationView extends View
             return true;
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
+    }
+
+    /* En la página del resultado de un registro con declaración: si se ha
+       firmado en el navegador, descarga una copia y muestra el enlace para
+       descargarla (js/declaracion-copia.js). Si se ha subido un PDF no se ve. */
+    protected function showSignedCopy()
+    {
+    ?>
+        <p class="ml-declaracion-copia" id="ml-declaracion-copia" hidden>Se ha descargado una
+            copia de la declaración que has firmado. Si no la encuentras,
+            <a id="ml-declaracion-copia-link" href="#">descárgala aquí</a>.</p>
+        <script src="js/declaracion-copia.js"></script>
+    <?php
     }
 
     private function showUnregister()

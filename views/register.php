@@ -60,6 +60,7 @@ class Register extends RegistrationView
             if ($result === null)
                 return false;
             [$created, $email] = $result;
+            $this->showSignedCopy();
             if (!$created) {
                 $this->alreadyRegistered($email);
                 return true;

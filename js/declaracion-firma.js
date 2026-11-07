@@ -13,7 +13,8 @@
       pedirlo («sticky signatory»).
    5. El PDF firmado se pone en el campo «documento» y se envía el
       formulario, igual que si se hubiera subido: el servidor lo comprueba
-      entero (utils/pdfsign.php).
+      entero (utils/pdfsign.php). Se guarda también en sessionStorage para
+      descargar una copia en la página del resultado (js/declaracion-copia.js).
 
    Sin JavaScript, o si el navegador no permite poner un fichero en el
    campo, la opción no aparece y solo queda subir el PDF.
@@ -43,6 +44,15 @@
     /* Campo de firma vacío del modelo (PDF_FIELD_SIGNATURE en utils/pdfsign.php). */
     var SIGN_PARAMS = "signatureField=Signature\nfilters=nonexpired:";
     var CERT_PARAMS = "filters=nonexpired:";
+    /* Clave de sessionStorage con la declaración firmada (js/declaracion-copia.js). */
+    var COPY_KEY = "ml-declaracion-firmada";
+    /* Si se vuelve a mostrar el formulario es que el envío anterior no valió:
+       su copia no se ofrece. */
+    try {
+        sessionStorage.removeItem (COPY_KEY);
+    }
+    catch (e) {
+    }
 
     var loaded = false;
     var busy = false;
@@ -122,11 +132,25 @@
     }
 
     function submitSigned (signatureB64){
+        var file = base64ToFile (signatureB64);
         var dt = new DataTransfer ();
-        dt.items.add (base64ToFile (signatureB64));
+        dt.items.add (file);
         fileInput.files = dt.files;
         signed = true;
+        /* La copia para el usuario se descarga en la página del resultado
+           (js/declaracion-copia.js): si se descargara aquí, el envío del
+           formulario anularía la descarga al salir de la página. */
+        try {
+            sessionStorage.setItem (COPY_KEY, signatureB64);
+        }
+        catch (e) {
+            /* Sin sessionStorage (o lleno) no hay copia, pero se envía igual. */
+        }
         setStatus ("Declaración firmada. Enviándola…");
+        send ();
+    }
+
+    function send (){
         button.disabled = false;
         if (form.requestSubmit)
             form.requestSubmit (button);

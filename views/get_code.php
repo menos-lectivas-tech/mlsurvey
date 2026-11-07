@@ -166,6 +166,8 @@ class GetCode extends RegistrationView
             $mailer->sendCode($email, $pid, url_base64_encode($code), $mailsurveyname);
             echo ("<p><strong>El enlace para participar en la consulta <em>{$surveyname}</em> " .
                 "ha sido enviado a " . h($email) . ".</strong></p>");
+            if ($withdeclaracion)
+                $this->showSignedCopy();
         } catch (Exception $e) {
             echo ("<p><strong>Error generando código para la consulta <em>{$surveyname}</em></strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} when generating code for survey");

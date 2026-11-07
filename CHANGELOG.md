@@ -26,7 +26,10 @@
   comes from a survey), AutoFirma asks for the certificate, `declaracion_pdf` fills in the model
   with the DNI/NIE of that certificate and the address, AutoFirma signs it (PAdES, in the
   signature field of the model) with the same certificate and the form sends it, checked as an
-  uploaded one. Uploading a signed PDF is still available. Ships `autoscript.js` 1.9 of the
+  uploaded one. Once accepted, the signed declaration is downloaded in
+  the result page (`js/declaracion-copia.js`, through `sessionStorage`), so the participant
+  keeps a copy.
+  Uploading a signed PDF is still available. Ships `autoscript.js` 1.9 of the
   Cliente @firma and its intermediate server (`afirma_storage`, `afirma_retrieve`) for mobile
   devices. Needs qpdf >= 11.
 - The identification with a digital certificate (`cert_login`, `clientcert_*` settings and
