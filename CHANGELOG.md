@@ -8,6 +8,9 @@
   credential, MUFACE certificate and training record are removed, with their settings
   (`pdf_*`, `muface_*`, `nombramiento_*`). New `declaracion_ca_file`,
   `declaracion_revocation` and `declaracion_email_domains` settings. Needs `qpdf`.
+- New declaration model with a hidden, read-only `docid` field ("autodeclaración docente")
+  that identifies it: the signed declaration must have it, besides the title, so PDFs filled
+  in from the previous model are rejected.
 - The declaration can be signed in the form itself, without downloading, filling in and
   uploading the model: the participant writes the email address (already filled in when it
   comes from a survey), AutoFirma asks for the certificate, `declaracion_pdf` fills in the model

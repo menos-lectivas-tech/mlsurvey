@@ -5,7 +5,8 @@ With this project we are trying to develop an online voting system based on the 
   first time, participants download the self-declaration model (`docs/modelo_declaracion.pdf`),
   fill in their DNI/NIE and their EducaMadrid email address and sign it with their own
   personal certificate (FNMT, DNIe...). The signature is checked, the DNI written in the form
-  must be the one of the signer's certificate and the participant is registered with the email
+  must be the one of the signer's certificate, the hidden `docid` field of the model must be
+  there and the participant is registered with the email
   address of the declaration. The participation link is always sent to that address, so it
   must exist.
   The declaration can also be signed right in the registration form: the participant writes the

@@ -28,6 +28,9 @@ const PDF_DECLARACION_TITLE = "autodeclaracion como docente en la educacion publ
 /* Nombres de los campos del formulario del modelo. */
 const PDF_FIELD_DNI = "DNI";
 const PDF_FIELD_EMAIL = "email";
+/* Campo oculto y de solo lectura del modelo que lo identifica, con su valor. */
+const PDF_FIELD_DOCID = "docid";
+const PDF_DECLARACION_DOCID = "autodeclaración docente";
 /* El modelo que se rellena en el servidor para firmarlo desde el navegador. */
 const PDF_DECLARACION_MODEL = "docs/modelo_declaracion.pdf";
 /* Campo de firma vacío del modelo, donde AutoFirma pone la firma visible. */
@@ -240,7 +243,7 @@ function pdfFormFields (string $path): array {
  * - it is signed (the whole file) with a certificate of a trusted authority
  *   (declaracion_ca_file in config.php) in force and not revoked
  *   (declaracion_revocation),
- * - it is the declaration model,
+ * - it is the declaration model (title and hidden docid field),
  * - the DNI of the form is the one of the signer's certificate, and
  * - the email address of the form is of an educamadrid domain
  *   (declaracion_email_domains).
@@ -275,6 +278,11 @@ function checkDeclaracion (string $path): array {
     }
 
     $fields = pdfFormFields ($path);
+    if (!declaracionIsModel ($fields)){
+        logMessage (LOGGER_WARN, "Signed PDF rejected: no docid field of the declaration model.");
+        throw new PdfSignException ("El PDF no es el modelo de declaración vigente: descarga " .
+            "el modelo de nuevo, rellénalo y fírmalo.");
+    }
     /* Se admite el DNI escrito con espacios, puntos o guiones. */
     $dni = strtoupper (preg_replace ('/[\s.\-]+/u', '', $fields[PDF_FIELD_DNI] ?? "") ?? "");
     if (!pdfValidDni ($dni)){
@@ -289,6 +297,15 @@ function checkDeclaracion (string $path): array {
     }
 
     return ["dni" => $dni, "email" => declaracionEmail ($fields[PDF_FIELD_EMAIL] ?? "")];
+}
+
+/**
+ * Tells whether the form fields are the ones of the declaration model: it has
+ * the hidden docid field with its value.
+ */
+function declaracionIsModel (array $fields): bool {
+    return isset ($fields[PDF_FIELD_DOCID]) &&
+        trim ($fields[PDF_FIELD_DOCID]) === PDF_DECLARACION_DOCID;
 }
 
 /**
@@ -407,6 +424,9 @@ function declaracionFill (string $dni, string $email): string {
         $pdf = file_get_contents ($outfile);
         if ($pdf === false || strncmp ($pdf, "%PDF-", 5) != 0)
             throw new Exception ("qpdf didn't write the declaration");
+        /* Lo mismo que se comprobará al recibirla firmada. */
+        if (!declaracionIsModel (pdfFormFields ($outfile)))
+            throw new Exception ("The filled in declaration has no docid field");
         return $pdf;
     }
     finally {
