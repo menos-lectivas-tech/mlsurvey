@@ -111,58 +111,127 @@ function pdfReadFile (string $path): string {
 
 /**
  * Checks that a PDF is digitally signed, that the signature covers the whole
- * file and is not broken, and that the signer's certificate is issued by one
- * of the trusted authorities and is in force today.
+ * file and is not broken, and that the signer's certificate is an official one
+ * in force (see certVerifyOfficial).
  *
  * @param string $path PDF file.
  * @param string $cafile PEM file with the trusted certification authorities.
  *
- * @return OpenSSLCertificate The signer's certificate.
+ * @return array [signer's certificate, its issuer].
  * @throws PdfSignException if the file is not a properly signed PDF.
  */
-function pdfSignerCertificate (string $path, string $cafile): OpenSSLCertificate {
+function pdfSignerCertificate (string $path, string $cafile): array {
     $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
     if (empty ($signatures))
         throw new PdfSignException ("El PDF no está firmado digitalmente o se ha modificado " .
             "después de firmarlo.");
-
-    if (!is_readable ($cafile))
-        throw new Exception ("CA file {$cafile} is not readable");
 
     $reason = "";
     foreach ($signatures as [$content, $signature]){
         $contentfile = tempnam (sys_get_temp_dir (), "mlc");
         $sigfile = tempnam (sys_get_temp_dir (), "mls");
         $signerfile = tempnam (sys_get_temp_dir (), "mlx");
+        $certsfile = tempnam (sys_get_temp_dir (), "mlx");
         try {
             file_put_contents ($contentfile, $content);
             file_put_contents ($sigfile, $signature);
-            /* Sin -no_check_time: el certificado de la persona tiene que
-               estar en vigor hoy, que es cuando se registra.
-               -no-CApath: solo valen las autoridades de $cafile, no las del
-               sistema. */
+            /* Aquí solo la firma (-noverify): el certificado se comprueba
+               después, con la cadena que se arma con los certificados que trae
+               la firma (-certsout) y las intermedias conocidas. */
             [$code, , $err] = pdfRunCommand (["openssl", "cms", "-verify", "-binary",
-                "-inform", "DER", "-in", $sigfile, "-content", $contentfile,
-                "-CAfile", $cafile, "-no-CApath", "-no-CAstore", "-purpose", "any",
-                "-signer", $signerfile, "-out", "/dev/null"]);
+                "-inform", "DER", "-in", $sigfile, "-content", $contentfile, "-noverify",
+                "-signer", $signerfile, "-certsout", $certsfile, "-out", "/dev/null"]);
             if ($code != 0){
                 $reason = trim ($err);
                 continue;
             }
             $cert = openssl_x509_read ((string) file_get_contents ($signerfile));
-            if ($cert !== false)
-                return $cert;
-            $reason = "Signer certificate can't be read.";
+            if ($cert === false){
+                $reason = "Signer certificate can't be read.";
+                continue;
+            }
+            return [$cert, certVerifyOfficial ($cert, $cafile, $certsfile)];
         }
         finally {
             @unlink ($contentfile);
             @unlink ($sigfile);
             @unlink ($signerfile);
+            @unlink ($certsfile);
         }
     }
     logMessage (LOGGER_WARN, "PDF signature rejected. {$reason}");
-    throw new PdfSignException ("La firma digital del PDF no es válida, el certificado está " .
-        "caducado o no es de una autoridad de certificación admitida.");
+    throw new PdfSignException ("La firma digital del PDF no es válida.");
+}
+
+/* QcCompliance (0.4.0.1862.1.1) en DER: el certificado es cualificado según
+   eIDAS, el que tienen los de persona física de la FNMT y el de firma del DNIe. */
+const CERT_QC_COMPLIANCE_DER = "\x06\x06\x04\x00\x8e\x46\x01\x01";
+
+/**
+ * Checks that a certificate is an official signing certificate, so that one
+ * made up by anyone isn't accepted:
+ * - its chain, in force today, ends in one of the CAs of $cafile (the ones of
+ *   the Spanish trusted list, see updatecas.php), even if it is an
+ *   intermediate one: openssl -partial_chain. The intermediates may come from
+ *   the signature ($certsfile) or from declaracion_intermediates_file, but
+ *   they aren't trusted by themselves,
+ * - it is a qualified certificate (qcStatements with QcCompliance), and
+ * - it is for signing (keyUsage digitalSignature or nonRepudiation).
+ *
+ * @param string|null $certsfile PEM file with more certificates for the chain.
+ *
+ * @return OpenSSLCertificate The issuer of the certificate.
+ * @throws PdfSignException if it isn't.
+ */
+function certVerifyOfficial (OpenSSLCertificate $cert, string $cafile,
+        ?string $certsfile = null): OpenSSLCertificate {
+    if (!is_readable ($cafile))
+        throw new Exception ("CA file {$cafile} is not readable");
+    $untrusted = (string) @file_get_contents (Config::PARAMS["declaracion_intermediates_file"] ??
+        "certs/declaracion_intermediates.pem");
+    if ($certsfile !== null)
+        $untrusted .= "\n" . (string) @file_get_contents ($certsfile);
+    $untrustedfile = tempnam (sys_get_temp_dir (), "mlu");
+    $certfile = tempnam (sys_get_temp_dir (), "mlx");
+    [$out, $err, $issuer] = ["", "", null];
+    $info = openssl_x509_parse ($cert);
+    try {
+        file_put_contents ($untrustedfile, $untrusted);
+        openssl_x509_export_to_file ($cert, $certfile);
+        $cmd = ["openssl", "verify", "-no-CApath", "-no-CAstore", "-CAfile", $cafile,
+            "-partial_chain", "-purpose", "any"];
+        if (str_contains ($untrusted, "-----BEGIN CERTIFICATE-----"))
+            array_push ($cmd, "-untrusted", $untrustedfile);
+        $cmd[] = $certfile;
+        [$code, $out, $err] = pdfRunCommand ($cmd);
+        $issuer = $code == 0 && $info !== false ?
+            certFindIssuer ($cert, $info, [$cafile, $untrustedfile]) : null;
+    }
+    finally {
+        @unlink ($untrustedfile);
+        @unlink ($certfile);
+    }
+    if ($issuer === null){
+        logMessage (LOGGER_WARN, "Certificate rejected: " .
+            json_encode ($info["subject"] ?? null, JSON_UNESCAPED_UNICODE) . " issued by " .
+            json_encode ($info["issuer"] ?? null, JSON_UNESCAPED_UNICODE) . ". " .
+            trim (preg_replace ('/\s+/', ' ', $err . " " . $out)));
+        throw new PdfSignException ("El certificado está caducado o no es de un prestador " .
+            "cualificado de servicios de confianza: usa tu DNIe o tu certificado personal " .
+            "(FNMT u otro prestador oficial).");
+    }
+    if (!str_contains ($info["extensions"]["qcStatements"] ?? "", CERT_QC_COMPLIANCE_DER)){
+        logMessage (LOGGER_WARN, "Certificate rejected: not a qualified certificate.");
+        throw new PdfSignException ("El certificado no es un certificado cualificado de firma " .
+            "electrónica: usa tu DNIe o tu certificado personal (FNMT u otro prestador oficial).");
+    }
+    $usage = $info["extensions"]["keyUsage"] ?? "";
+    if (!str_contains ($usage, "Digital Signature") && !str_contains ($usage, "Non Repudiation")){
+        logMessage (LOGGER_WARN, "Certificate rejected: key usage {$usage}.");
+        throw new PdfSignException ("El certificado no es de firma: con el DNIe usa el " .
+            "certificado de firma, no el de autenticación.");
+    }
+    return $issuer;
 }
 
 /**
@@ -256,7 +325,7 @@ function pdfFormFields (string $path): array {
  */
 function checkDeclaracion (string $path): array {
     $cafile = Config::PARAMS["declaracion_ca_file"] ?? "certs/declaracion_ca.pem";
-    $cert = pdfSignerCertificate ($path, $cafile);
+    [$cert, $issuer] = pdfSignerCertificate ($path, $cafile);
     $info = openssl_x509_parse ($cert);
     $signerdni = $info === false ? null : certSubjectDni ($info);
     if ($signerdni === null){
@@ -266,7 +335,7 @@ function checkDeclaracion (string $path): array {
     }
     if (Config::PARAMS["declaracion_revocation"] ?? true){
         try {
-            certCheckRevocation ($cert, $cafile);
+            certCheckRevocation ($cert, $issuer, $cafile);
         } catch (CertRevocationException $e) {
             throw new PdfSignException ($e->getMessage ());
         }
@@ -357,15 +426,7 @@ function declaracionCertDni (string $certb64): string {
     if ($dni === null)
         throw new PdfSignException ("El certificado seleccionado no es de persona física: " .
             "usa tu certificado personal o tu DNIe.");
-    $cafile = Config::PARAMS["declaracion_ca_file"] ?? "certs/declaracion_ca.pem";
-    if (!is_readable ($cafile))
-        throw new Exception ("CA file {$cafile} is not readable");
-    /* Comprueba la cadena hasta las autoridades de $cafile y que esté en vigor. */
-    if (openssl_x509_checkpurpose ($cert, X509_PURPOSE_ANY, [$cafile]) !== true){
-        logMessage (LOGGER_WARN, "Certificate for the declaration rejected: untrusted or expired.");
-        throw new PdfSignException ("El certificado seleccionado está caducado o no es de una " .
-            "autoridad de certificación admitida.");
-    }
+    certVerifyOfficial ($cert, Config::PARAMS["declaracion_ca_file"] ?? "certs/declaracion_ca.pem");
     return $dni;
 }
 

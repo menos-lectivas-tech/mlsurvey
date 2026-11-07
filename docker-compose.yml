@@ -119,6 +119,7 @@ services:
       # confianza para el certificado de la firma, revocacion (false solo para
       # pruebas) y dominios admitidos para el correo, separados por espacios.
       DECLARACION_CA_FILE: ${DECLARACION_CA_FILE:-certs/declaracion_ca.pem}
+      DECLARACION_INTERMEDIATES_FILE: ${DECLARACION_INTERMEDIATES_FILE:-certs/declaracion_intermediates.pem}
       DECLARACION_REVOCATION: ${DECLARACION_REVOCATION:-true}
       DECLARACION_EMAIL_DOMAINS: ${DECLARACION_EMAIL_DOMAINS:-educa.madrid.org}
       # Administrador inicial: se crea al arrancar si no existe.

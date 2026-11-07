@@ -83,12 +83,23 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
-* `declaracion_ca_file` sets the certification authorities (roots and intermediates) trusted
-  for the certificate that signs the declaration, `certs/declaracion_ca.pem` by default. The
-  bundled file has only the FNMT ones (`AC RAIZ FNMT-RCM` + `AC FNMT Usuarios`); add e.g.
-  `AC RAIZ DNIE 2` + the `AC DNIE 00x` for the DNIe. The DNI/NIE of the signer is read from the
-  `serialNumber` of the certificate subject (`IDCES-12345678Z` or `12345678Z`); certificates
-  without a personal DNI (electronic seals, components) are rejected.
+* `declaracion_ca_file` sets the certification authorities trusted for the certificate that
+  signs the declaration, `certs/declaracion_ca.pem` by default. The bundled file has the CAs
+  of the Spanish trusted list (TSL, `https://tsl.digital.gob.es/TSL.xml`) for qualified
+  certificates for electronic signatures (services CA/QC, granted, ForeSignatures): DNIe, FNMT,
+  ACCV, Camerfirma, Izenpe, etc. They are trust anchors even when they are intermediate CAs, so
+  any other CA under the same root (components, seals, web servers) isn't accepted. Regenerate
+  it with `php updatecas.php` when the TSL changes (its next update date is in the header of
+  the file) and review the diff before committing it. The certificate must also be qualified
+  (qcStatements with eIDAS QcCompliance) and for signing (keyUsage digitalSignature or
+  nonRepudiation). The DNI/NIE of the signer is read from the `serialNumber` of the
+  certificate subject (`IDCES-12345678Z` or `12345678Z`); certificates without a personal DNI
+  (electronic seals, components) are rejected.
+* `declaracion_intermediates_file` (`certs/declaracion_intermediates.pem`, also written by
+  `updatecas.php`) has intermediate CAs that may be needed for building the chain and that
+  aren't in the TSL: the `AC DNIE 00x` of the DNIe, whose TSL entry is the root
+  `AC RAIZ DNIE 2`. They aren't trusted by themselves: the chain must end in
+  `declaracion_ca_file`.
 * `declaracion_revocation` checks that the signer's certificate isn't revoked
   (`utils/certrevocation.php`): first with the OCSP responder of the certificate and, if it
   doesn't answer, with its CRL (the FNMT splits it in partitions, so only the one of the
@@ -226,6 +237,7 @@ the database to be ready before serving requests.
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
 | `DECLARACION_CA_FILE` | `certs/declaracion_ca.pem` | PEM file with the certification authorities trusted for the certificate that signs the declaration. |
+| `DECLARACION_INTERMEDIATES_FILE` | `certs/declaracion_intermediates.pem` | PEM file with intermediate CAs (not trusted) for building the chain of that certificate. |
 | `DECLARACION_REVOCATION` | `true` | Check the revocation of that certificate (OCSP, or its CRL if the responder doesn't answer); `false` only for tests. |
 | `DECLARACION_EMAIL_DOMAINS` | `educa.madrid.org` | Space separated domains allowed for the email address of the declaration. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |

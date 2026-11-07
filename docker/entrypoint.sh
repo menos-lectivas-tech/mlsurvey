@@ -70,6 +70,7 @@ define('CONFIG', [
 // (OCSP y, si no responde, la CRL) y dominios admitidos para el correo
 // (separados por espacios).
 "declaracion_ca_file" => getenv('DECLARACION_CA_FILE') ?: 'certs/declaracion_ca.pem',
+"declaracion_intermediates_file" => getenv('DECLARACION_INTERMEDIATES_FILE') ?: 'certs/declaracion_intermediates.pem',
 "declaracion_revocation" => getenv('DECLARACION_REVOCATION') === 'false' ? false : true,
 "declaracion_email_domains" => array_values(array_filter(explode(' ', strtolower(getenv('DECLARACION_EMAIL_DOMAINS') ?: 'educa.madrid.org')))),
 

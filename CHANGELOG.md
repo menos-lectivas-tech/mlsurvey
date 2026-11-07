@@ -11,6 +11,16 @@
 - New declaration model with a hidden, read-only `docid` field ("autodeclaración docente")
   that identifies it: the signed declaration must have it, besides the title, so PDFs filled
   in from the previous model are rejected.
+- The declaration can be signed with the qualified certificate of any official provider
+  (DNIe, FNMT, ACCV, Camerfirma, Izenpe...), but not with a made-up one: `declaracion_ca.pem`
+  now has the CAs of the Spanish trusted list (TSL) for qualified signature certificates,
+  generated with the new `updatecas.php`, and they are trust anchors even if intermediate
+  (`-partial_chain`), so no other CA under the same root is accepted (before, any CA under the
+  FNMT root was, if it came in the signature). The DNIe intermediates, not in the TSL, are in
+  `certs/declaracion_intermediates.pem` (new `declaracion_intermediates_file` setting), only
+  for building the chain. The certificate must also be qualified (eIDAS QcCompliance) and for
+  signing (keyUsage digitalSignature or nonRepudiation). The OCSP check works with the DNIe
+  responders.
 - The declaration can be signed in the form itself, without downloading, filling in and
   uploading the model: the participant writes the email address (already filled in when it
   comes from a survey), AutoFirma asks for the certificate, `declaracion_pdf` fills in the model

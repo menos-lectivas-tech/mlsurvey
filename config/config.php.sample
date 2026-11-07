@@ -59,9 +59,13 @@ const CONFIG = [
  * signed with their own personal certificate. The DNI of the form must be the
  * one of the certificate. It needs the openssl, pdftotext (poppler-utils) and
  * qpdf commands.
- * declaracion_ca_file: PEM file with the certification authorities (roots and
- * intermediates) trusted for the signer's certificate. Only these are
- * trusted, not the system ones.
+ * declaracion_ca_file: PEM file with the certification authorities trusted for
+ * the signer's certificate, even if intermediate: the ones of the Spanish
+ * trusted list for qualified signature certificates (php updatecas.php). Only
+ * these are trusted, not the system ones, and the certificate must also be
+ * qualified (eIDAS QcCompliance) and for signing.
+ * declaracion_intermediates_file: PEM file with intermediate CAs (not
+ * trusted) for building the chain, e.g. the DNIe ones.
  * declaracion_revocation: checks that the signer's certificate isn't revoked,
  * with OCSP and, if the responder doesn't answer, with the CRL of the
  * certificate (see utils/certrevocation.php). Turn it off only for tests.
@@ -70,6 +74,7 @@ const CONFIG = [
  */
 
 "declaracion_ca_file" => 'certs/declaracion_ca.pem',
+"declaracion_intermediates_file" => 'certs/declaracion_intermediates.pem',
 "declaracion_revocation" => true,
 "declaracion_email_domains" => ['educa.madrid.org'],
 

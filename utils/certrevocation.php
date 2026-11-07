@@ -29,20 +29,15 @@ class CertRevocationException extends Exception {}
 /**
  * Checks that the certificate isn't revoked.
  *
- * @param OpenSSLCertificate $cert Certificate, already checked against $cafile.
+ * @param OpenSSLCertificate $cert Certificate, already checked with certVerifyOfficial.
+ * @param OpenSSLCertificate $issuer Its issuer, as certVerifyOfficial returns it.
  * @param string $cafile PEM file with the trusted CAs.
  *
  * @throws CertRevocationException with a message for the participant if it is
  * revoked or its status can't be known.
  */
-function certCheckRevocation (OpenSSLCertificate $cert, string $cafile){
+function certCheckRevocation (OpenSSLCertificate $cert, OpenSSLCertificate $issuer, string $cafile){
     $info = openssl_x509_parse ($cert);
-    $issuer = certFindIssuer ($cert, $info, $cafile);
-    if ($issuer === null){
-        logMessage (LOGGER_ERROR, "Revocation: issuer of the certificate not found in {$cafile}.");
-        throw new CertRevocationException ("No se ha podido comprobar si el certificado " .
-            "digital está revocado.");
-    }
     $certfile = certTempFile ($cert);
     $issuerfile = certTempFile ($issuer);
     try {
@@ -70,11 +65,11 @@ function certCheckRevocation (OpenSSLCertificate $cert, string $cafile){
         "más tarde.");
 }
 
-/* Certificado de $cafile que ha emitido $cert, o null. */
-function certFindIssuer (OpenSSLCertificate $cert, array $info, string $cafile): ?OpenSSLCertificate {
-    $pem = @file_get_contents ($cafile);
-    if ($pem === false)
-        return null;
+/* Certificado de los ficheros PEM $files que ha emitido $cert, o null. */
+function certFindIssuer (OpenSSLCertificate $cert, array $info, array $files): ?OpenSSLCertificate {
+    $pem = "";
+    foreach ($files as $file)
+        $pem .= (string) @file_get_contents ($file);
     preg_match_all ('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m);
     foreach ($m[0] as $block){
         $ca = openssl_x509_read ($block);
@@ -116,6 +111,9 @@ function certOcspStatus (array $info, string $certfile, string $issuerfile, stri
             continue;
         [$code, $out, $err] = pdfRunCommand (["openssl", "ocsp", "-issuer", $issuerfile,
             "-cert", $certfile, "-url", $url, "-no_nonce", "-CAfile", $cafile,
+            /* Las CA de $cafile pueden ser intermedias, y el emisor puede no
+               estar (el DNIe): ya se ha comprobado que encadena con ellas. */
+            "-partial_chain", "-verify_other", $issuerfile,
             "-timeout", (string) CERTREV_OCSP_TIMEOUT]);
         if ($code === 0 && str_contains ($err, "Response verify OK") &&
                 !str_contains ($out . $err, "Status times invalid") &&
