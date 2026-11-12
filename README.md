@@ -29,7 +29,7 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl` and `pdftotext` (poppler-utils) commands, for checking the signed PDF.
+* The `openssl` and poppler-utils (`pdftotext`, `pdfinfo`, `pdftoppm`) commands, for checking the signed PDF, and `tesseract` with the Spanish data (`tesseract-ocr-spa`), for reading with OCR the documents that are a photo or a scan.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 

@@ -6,7 +6,12 @@
  * civil servants), or the digitally signed appointment, nombramiento (interim
  * ones), the service record or the teaching credential on their own.
  *
- * Needs the openssl, pdftotext and pdfinfo (poppler-utils) commands.
+ * The documents can be text or a photo or scan of the paper inside the PDF:
+ * if the text does not say what the document is, the pages are read with OCR.
+ *
+ * Needs the openssl, pdftotext, pdfinfo and pdftoppm (poppler-utils)
+ * commands, and tesseract with the Spanish data (tesseract-ocr-spa) for the
+ * documents that are images.
  */
 require_once 'include/config.php';
 require_once 'utils/logger.php';
@@ -14,8 +19,14 @@ require_once 'utils/logger.php';
 /* Límite del PDF subido: estos documentos ocupan unos cientos de KB. */
 const PDF_MAX_SIZE = 5 * 1024 * 1024;
 const PDF_CMD_TIMEOUT = 20;
+/* El OCR solo mira las primeras páginas: los datos están al principio y cada
+   página tarda unos segundos. */
+const PDF_OCR_PAGES = 3;
+const PDF_OCR_DPI = 300;
 const PDF_TITLE = "EXTRACTO INDIVIDUAL DE RECONOCIMIENTO DE ACTIVIDADES";
 const PDF_MUFACE_TITLE = "CERTIFICADO DE AFILIACIÓN A MUFACE";
+const PDF_NOMBRAMIENTO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
+    'FUNCIONARIO INTERINO/iu';
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
 /* Firmantes del nombramiento, la hoja de servicios y la credencial: la Comunidad de
    Madrid (S7800001E) y los organismos públicos de Madrid, como los centros (NIF Q con
@@ -33,18 +44,27 @@ class PdfSignException extends Exception {}
  * Runs a command without a shell.
  *
  * @param array $cmd Command and arguments.
+ * @param string|null $input What to write to its stdin, or null for nothing.
  *
  * @return array [exit code, stdout, stderr]
  */
-function pdfRunCommand (array $cmd): array {
+function pdfRunCommand (array $cmd, ?string $input = null): array {
     /* max_execution_time no cuenta el tiempo de un proceso externo. */
     $cmd = array_merge (["timeout", (string) PDF_CMD_TIMEOUT], $cmd);
     /* stderr va a un fichero: leyendo dos tuberías en serie el proceso se
        puede quedar bloqueado con la segunda llena. */
     $errfile = tmpfile ();
-    $proc = proc_open ($cmd, [0 => ["file", "/dev/null", "r"], 1 => ["pipe", "w"], 2 => $errfile], $pipes);
+    $stdin = $input === null ? ["file", "/dev/null", "r"] : ["pipe", "r"];
+    $proc = proc_open ($cmd, [0 => $stdin, 1 => ["pipe", "w"], 2 => $errfile], $pipes);
     if ($proc === false)
         throw new Exception ("Can't run {$cmd[2]}");
+    if ($input !== null){
+        /* Los comandos a los que se pasa algo (tesseract) leen toda la
+           entrada antes de escribir nada, así que no se bloquea. Si el
+           comando no existe o falla, se ve en el código de salida. */
+        @fwrite ($pipes[0], $input);
+        fclose ($pipes[0]);
+    }
     $out = stream_get_contents ($pipes[1]);
     fclose ($pipes[1]);
     $code = proc_close ($proc);
@@ -213,6 +233,14 @@ function pdfValidDni (string $dni): bool {
 }
 
 /**
+ * Adds its control letter to a DNI/NIE written without it.
+ */
+function pdfDniWithLetter (string $digits): string {
+    $number = (int) (strtr ($digits[0], "XYZ", "012") . substr ($digits, 1));
+    return $digits . "TRWAGMYFPDXBNJZSQVHLCKE"[$number % 23];
+}
+
+/**
  * Returns the text of a PDF.
  *
  * @param bool $layout Keep the physical layout: needed for reading tables.
@@ -223,6 +251,55 @@ function pdfText (string $path, bool $layout = false): string {
     if ($code != 0)
         throw new Exception ("pdftotext failed ({$code}): " . trim ($err));
     return $text;
+}
+
+/**
+ * Returns the text of the first pages of a PDF read with OCR, for the
+ * documents that are a photo or a scan. The images go from pdftoppm to
+ * tesseract through memory: nothing is written to disk.
+ *
+ * @return string The text, or "" if it could not be read (logged).
+ */
+function pdfOcrText (string $path): string {
+    [$code, $info, $err] = pdfRunCommand (["pdfinfo", $path]);
+    if ($code != 0 || !preg_match ('/^Pages:\s*(\d+)/m', $info, $m)){
+        logMessage (LOGGER_ERROR, "pdfinfo failed ({$code}): " . trim ($err));
+        return "";
+    }
+    $text = "";
+    for ($page = 1; $page <= min ((int) $m[1], PDF_OCR_PAGES); $page++){
+        [$code, $image, $err] = pdfRunCommand (["pdftoppm", "-f", (string) $page, "-l", (string) $page,
+            "-singlefile", "-r", (string) PDF_OCR_DPI, "-gray", "-png", $path]);
+        if ($code != 0 || $image === ""){
+            logMessage (LOGGER_ERROR, "pdftoppm failed ({$code}): " . trim ($err));
+            return "";
+        }
+        [$code, $out, $err] = pdfRunCommand (["tesseract", "stdin", "stdout", "-l", "spa"], $image);
+        if ($code != 0){
+            /* 127: no está instalado. */
+            logMessage (LOGGER_ERROR, "tesseract failed ({$code}): " . trim ($err));
+            return "";
+        }
+        $text .= $out . "\n";
+    }
+    return $text;
+}
+
+/**
+ * Returns the text of a document, with the whitespace collapsed: the one
+ * pdftotext gets or, if $mark is not in it (the document is an image), the
+ * one OCR gets. If $mark is in neither, the pdftotext one.
+ *
+ * @param string $mark Regular expression that only the text of the expected
+ *     document matches.
+ * @param bool $layout Keep the physical layout, as in pdfText.
+ */
+function pdfDocumentText (string $path, string $mark, bool $layout = false): string {
+    $text = preg_replace ('/\s+/u', ' ', pdfText ($path, $layout)) ?? "";
+    if (preg_match ($mark, $text))
+        return $text;
+    $ocr = preg_replace ('/\s+/u', ' ', pdfOcrText ($path)) ?? "";
+    return preg_match ($mark, $ocr) ? $ocr : $text;
 }
 
 /**
@@ -238,10 +315,11 @@ function pdfText (string $path, bool $layout = false): string {
  * @throws PdfSignException if the PDF is not a training record or has no DNI.
  */
 function getPdfDni (string $path): string {
-    $text = preg_replace ('/\s+/u', ' ', pdfText ($path)) ?? "";
+    $text = pdfDocumentText ($path, '/' . preg_quote (PDF_TITLE, '/') . '/iu');
 
     $dni = PDF_DNI;
-    preg_match_all ('/N\.I\.F\.\s*' . $dni . '/iu', $text, $header);
+    /* El OCR puede leer la I como l o 1. */
+    preg_match_all ('/N\.\s?[Il1]\.\s?F\.\s*' . $dni . '/iu', $text, $header);
     /* La frase en la que el registro de formación hace constar de quién es
        el extracto: con el título solo valdría cualquier documento sellado
        que lo mencionase. */
@@ -326,12 +404,13 @@ function pdfCheckIssueDate (string $day, string $month, string $year){
  * @throws PdfSignException if the PDF is not a valid certificate or has no DNI.
  */
 function getMufaceDni (string $path): string {
-    $text = preg_replace ('/\s+/u', ' ', pdfText ($path)) ?? "";
+    $text = pdfDocumentText ($path, '/' . preg_quote (PDF_MUFACE_TITLE, '/') . '/iu');
 
     /* La frase en la que MUFACE certifica quién es mutualista: con el título
        solo valdría cualquier documento sellado que lo mencionase. Los
        beneficiarios (familiares) van en una tabla aparte. */
-    preg_match_all ('/Que D\/D[ªa] [^,]{1,120}, con (?:DNI|NIE|NIF) ' . PDF_DNI .
+    /* La ª el OCR la puede leer como cualquier cosa. */
+    preg_match_all ('/Que D\/D\S? [^,]{1,120}, con (?:DNI|NIE|NIF) ' . PDF_DNI .
         ', figura en el colectivo de esta Mutualidad/iu', $text, $body);
     if (stripos ($text, PDF_MUFACE_TITLE) === false || empty ($body[1])){
         logMessage (LOGGER_WARN, "Signed PDF rejected: it is not a MUFACE certificate.");
@@ -383,9 +462,11 @@ function checkNombramientoSignature (string $path){
  * current school year and gets the holder's DNI/NIE from it. The signature
  * must have been checked before with checkNombramientoSignature.
  *
- * The body of the appointment is a scanned image: the only text with the data
- * is the PDF title, "<name> <DNI with a leading zero> <form> <kind> <yyyy mm dd>",
- * which is covered by the signature too.
+ * There are two formats, both covered by the signature:
+ * - Scanned: the body is an image and the only text with the data is the PDF
+ *   title, "<name> <DNI with a leading zero> <form> <kind> <yyyy mm dd>".
+ * - Text: the body is text, with the heading of the appointment, the NIF in
+ *   "I. DATOS DEL FUNCIONARIO/A" and "FECHA DE NOMBRAMIENTO: dd/mm/yyyy".
  *
  * @param string $path PDF file.
  *
@@ -399,20 +480,21 @@ function getNombramientoDni (string $path): string {
     if ($code != 0)
         throw new Exception ("pdfinfo failed ({$code}): " . trim ($err));
 
-    if (stripos ($text, "gestiona.comunidad.madrid/csv") === false ||
-            !preg_match ('/^Title:\s*(?:__tmp_img__)?\S.*?\s0?([0-9]{8}|[XYZ][0-9]{7})([A-Z]?)\s+\S+\s+\S+\s+' .
-                '(\d{4}) (\d\d) (\d\d)\s*$/mu', $info, $m)){
+    $data = pdfNombramientoFromTitle ($info);
+    if ($data === null){
+        /* El cuerpo en texto, o en una foto si no lo está. */
+        $body = pdfDocumentText ($path, PDF_NOMBRAMIENTO_MARK);
+        $data = pdfNombramientoFromText ($body);
+        $text .= " " . $body;
+    }
+    /* El OCR mete espacios: "gestiona. comunidad. madrid/csv". */
+    if (!preg_match ('/gestiona\W{0,3}comunidad\W{0,3}madri\w?\W{0,3}csv/iu', $text))
+        $data = null;
+    if ($data === null){
         logMessage (LOGGER_WARN, "Signed PDF rejected: it is not an appointment.");
         throw new PdfSignException ("El PDF no es un nombramiento.");
     }
-    /* El DNI viene sin letra: 047036495. */
-    $dni = $m[1];
-    if ($m[2] == ""){
-        $number = (int) (strtr ($dni[0], "XYZ", "012") . substr ($dni, 1));
-        $dni .= "TRWAGMYFPDXBNJZSQVHLCKE"[$number % 23];
-    }
-    else
-        $dni .= $m[2];
+    [$dni, $year, $month, $day] = $data;
     if (!pdfValidDni ($dni)){
         logMessage (LOGGER_WARN, "Appointment rejected: no valid DNI in it.");
         throw new PdfSignException ("No se ha podido leer el DNI en el nombramiento.");
@@ -420,11 +502,11 @@ function getNombramientoDni (string $path): string {
 
     /* El nombramiento tiene que ser del curso actual y estar en vigor hoy: ya
        ha empezado y, como termina como muy tarde el 31 de agosto, sigue en
-       vigor si es de este curso. La fecha de fin que pone el acuerdo solo
-       está en la imagen escaneada. */
-    if (!checkdate ((int) $m[4], (int) $m[5], (int) $m[3]))
+       vigor si es de este curso. En el escaneado la fecha de fin solo está en
+       la imagen. */
+    if (!checkdate ($month, $day, $year))
         throw new PdfSignException ("No se ha podido leer la fecha del nombramiento.");
-    $date = (new DateTimeImmutable ("today"))->setDate ((int) $m[3], (int) $m[4], (int) $m[5]);
+    $date = (new DateTimeImmutable ("today"))->setDate ($year, $month, $day);
     if ($date < pdfCourseStart ()){
         logMessage (LOGGER_WARN, "Appointment rejected: dated {$date->format ('Y-m-d')}.");
         throw new PdfSignException ("El nombramiento tiene que ser del curso actual.");
@@ -434,6 +516,44 @@ function getNombramientoDni (string $path): string {
         throw new PdfSignException ("El nombramiento todavía no está en vigor.");
     }
     return $dni;
+}
+
+/**
+ * Data of a scanned appointment, read from the PDF title (pdfinfo output).
+ *
+ * @return array|null [DNI/NIE, year, month, day], or null if the title is
+ *     not the one of an appointment.
+ */
+function pdfNombramientoFromTitle (string $info): ?array {
+    if (!preg_match ('/^Title:\s*(?:__tmp_img__)?\S.*?\s0?([0-9]{8}|[XYZ][0-9]{7})([A-Z]?)\s+\S+\s+\S+\s+' .
+            '(\d{4}) (\d\d) (\d\d)\s*$/mu', $info, $m))
+        return null;
+    /* El DNI viene sin letra: 047036495. */
+    $dni = $m[2] == "" ? pdfDniWithLetter ($m[1]) : $m[1] . $m[2];
+    return [$dni, (int) $m[3], (int) $m[4], (int) $m[5]];
+}
+
+/**
+ * Data of an appointment whose body is text, or read with OCR.
+ *
+ * @param string $text Text of the PDF with the whitespace collapsed.
+ *
+ * @return array|null [DNI/NIE, year, month, day], or null if it is not an
+ *     appointment or the NIF or the date are not there exactly once.
+ */
+function pdfNombramientoFromText (string $text): ?array {
+    if (!preg_match (PDF_NOMBRAMIENTO_MARK, $text))
+        return null;
+    /* El NIF del funcionario, no otro que pueda salir en el documento. El
+       OCR puede leer la I como l o 1. */
+    preg_match_all ('/DATOS DEL FUNCIONARIO\/A\s*APELLIDOS Y NOMBRE:.{1,200}?\bN\.?[Il1]\.?F\.?:?\s*' .
+        PDF_DNI . '/iu', $text, $nif);
+    $dnis = array_unique (array_map ('strtoupper', $nif[1]));
+    preg_match_all ('/FECHA DE NOMBRAMIENTO:\s*(\d\d)\/(\d\d)\/(\d{4})\b/iu', $text, $date, PREG_SET_ORDER);
+    $dates = array_unique (array_map (fn ($d) => $d[0], $date));
+    if (count ($dnis) != 1 || count ($dates) != 1)
+        return null;
+    return [reset ($dnis), (int) $date[0][3], (int) $date[0][2], (int) $date[0][1]];
 }
 
 function checkHojaServiciosSignature(string $path)
@@ -447,10 +567,10 @@ function checkHojaServiciosSignature(string $path)
 }
 function getHojaServiciosNIF(string $path): string|false
 {
-    $text = preg_replace('/\s+/u', ' ', pdfText($path, true)) ?? "";
     $hojaservicios = "certifica que la presente hoja de servicios está conforme con los datos " .
-        "que a día de hoy pueden consultarse en las bases de datos " . 
+        "que a día de hoy pueden consultarse en las bases de datos " .
         "de Gestión del Profesorado de la Comunidad de Madrid";
+    $text = pdfDocumentText($path, '/' . preg_quote($hojaservicios, '/') . '/iu', true);
     if (
         stristr($text, $hojaservicios)
         === false
@@ -459,7 +579,8 @@ function getHojaServiciosNIF(string $path): string|false
         throw new PdfSignException("El PDF no es una Hoja de Servicios.");
     }
 
-    preg_match_all("/D\.N\.I\.\s*" . PDF_DNI . "/iu", $text, $ids);
+    /* El OCR puede leer la I como l o 1. */
+    preg_match_all("/D\.N\.[Il1]\.\s*" . PDF_DNI . "/iu", $text, $ids);
     $found = array_unique(array_map('strtoupper', $ids[1]));
     if (count($found) != 1 || !pdfValidDni(reset($found))) {
         logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
@@ -505,11 +626,11 @@ function checkCredencialSignature(string $path)
 
 function getCredencialNIF(string $path): string|false
 {
-    $text = preg_replace('/\s+/u', ' ', pdfText($path, true)) ?? "";
-    if (
-        stristr($text, "Este documento acredita a su poseedor su intención de asumir funciones docentes")
-        === false
-    ) {
+    /* Si la credencial es una foto, el OCR lee las dos columnas por
+       separado y la frase queda partida. */
+    $credencial = '/Este documento acredita a su\b.*\bintenci[óo]n de asumir funciones docentes/iu';
+    $text = pdfDocumentText($path, $credencial, true);
+    if (!preg_match($credencial, $text)) {
         logMessage(LOGGER_WARN, "Signed PDF rejected: it is not a Credencial.");
         throw new PdfSignException("El PDF no es una Credencial.");
     }
