@@ -1,3 +1,6 @@
+# 1.5
+- Se añade el poder hacer OCR ya que algunas veces los documentos son escaneos.
+
 # 1.4.1
 - Added privacypolicy.html manage.
 # 1.4
