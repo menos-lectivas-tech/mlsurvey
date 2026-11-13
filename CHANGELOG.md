@@ -1,3 +1,6 @@
+# 1.5.1
+- Se cambia el orden en la PK de Voted para que no sea posible relacionar la participación con el orden de inserción.
+
 # 1.5
 - Se añade el poder hacer OCR ya que algunas veces los documentos son escaneos.
 

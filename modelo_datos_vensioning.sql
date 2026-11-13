@@ -124,7 +124,7 @@ respuesta es de quién.*/
 CREATE TABLE Voted (
 	surveyid INT UNSIGNED NOT NULL,
 	participantid INT UNSIGNED NOT NULL,
-	CONSTRAINT Voted_PK PRIMARY KEY (surveyid,participantid),
+	CONSTRAINT Voted_PK PRIMARY KEY (participantid, surveyid),
 	CONSTRAINT Voted_Participants_FK FOREIGN KEY (participantid) REFERENCES Participants(participantid) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
