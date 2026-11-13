@@ -28,7 +28,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 8;
+$maxversion = 9;
 
 try {
   if (!versionTableExists ()){
@@ -123,6 +123,10 @@ try {
       unregisterdate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp)");
     $db->exec("UPDATE {Version} SET versioncode = 8 WHERE versionid = 1");
     
+  }
+  if ($version < 9){
+    $db->exec("ALTER TABLE {Voted} DROP PRIMARY KEY, ADD PRIMARY KEY (participantid, surveyid)");
+    $db->exec("UPDATE {Version} SET versioncode = 9 WHERE versionid = 1");
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");
