@@ -3,12 +3,12 @@
  * Functions for checking the PDFs asked for participating and getting the
  * holder's DNI from them: the digitally signed training record (extracto de
  * formación) with the digitally signed MUFACE membership certificate (career
- * civil servants), or the digitally signed appointment, nombramiento (interim
- * ones), the service record or the teaching credential on their own.
+ * civil servants), or the appointment, nombramiento (interim ones), the service
+ * record or the teaching credential on their own.
  *
  * The appointment, the service record and the credential are sometimes signed
- * by hand instead: then they are not digitally signed at all (pdfIsSigned)
- * and only their content is checked, with the dates read from the text.
+ * digitally and sometimes by hand, so their signature is not checked: only
+ * their content, with the dates read from the text.
  *
  * The documents can be text or a photo or scan of the paper inside the PDF:
  * if the text does not say what the document is, the pages are read with OCR.
@@ -32,10 +32,6 @@ const PDF_MUFACE_TITLE = "CERTIFICADO DE AFILIACIÓN A MUFACE";
 const PDF_NOMBRAMIENTO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
     'FUNCIONARIO INTERINO/iu';
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
-/* Firmantes del nombramiento, la hoja de servicios y la credencial: la Comunidad de
-   Madrid (S7800001E) y los organismos públicos de Madrid, como los centros (NIF Q con
-   código provincial 28 o 78 a 88). */
-const PDF_EMPLEADO_ORGS = '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/';
 const PDF_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
     "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -133,18 +129,6 @@ function pdfReadFile (string $path): string {
 }
 
 /**
- * Tells whether a PDF has any digital signature, valid or not. The
- * appointment, the service record and the credential that do not have one are
- * signed by hand: they are accepted checking only their content. One with a
- * signature, even a broken one, has to pass the signature check.
- *
- * @throws PdfSignException if it is not a PDF or it is too big.
- */
-function pdfIsSigned (string $path): bool {
-    return preg_match ('/\/ByteRange\s*\[/', pdfReadFile ($path)) === 1;
-}
-
-/**
  * Checks that a PDF is digitally signed, that the signature covers the whole
  * file and is not broken, and that the signer is one of the trusted ones.
  *
@@ -184,8 +168,7 @@ function checkPdfSignature (string $path, string $cafile, array|string $signerid
             file_put_contents ($sigfile, $signature);
             /* -no_check_time: el extracto vale varios años, más que el
                certificado del sello con el que se firmó, y la vigencia del
-               certificado de MUFACE y del nombramiento se comprueba con su
-               fecha.
+               certificado de MUFACE se comprueba con su fecha.
                -no-CApath: solo valen las autoridades de $cafile, no las del
                sistema. */
             [$code, , $err] = pdfRunCommand (["openssl", "cms", "-verify", "-binary",
@@ -366,21 +349,18 @@ function pdfCourseStart (): DateTimeImmutable {
 }
 
 /**
- * Checks that a document was signed in the current school year and not in
- * the future.
+ * Checks that a document is dated in the current school year and not in the
+ * future.
  *
- * @param array $validity What checkPdfSignature returns.
+ * @param DateTimeImmutable $date Date of the document.
  * @param string $docname Name of the document, for the error messages.
  *
- * @throws PdfSignException if the signing date is unknown or out of range.
+ * @throws PdfSignException if the date is out of range.
  */
-function pdfCheckSignedThisCourse (array $validity, string $docname){
-    $signed = $validity["signed"] ?? null;
-    if ($signed === null)
-        throw new PdfSignException ("No se ha podido leer la fecha de firma de {$docname}.");
+function pdfCheckThisCourse (DateTimeImmutable $date, string $docname){
     /* Un día de margen por si el servidor va en otra zona horaria. */
-    if ($signed < pdfCourseStart () || $signed > (new DateTimeImmutable ("today"))->modify ("+1 day")){
-        logMessage (LOGGER_WARN, "PDF rejected: signed on {$signed->format ('Y-m-d')}.");
+    if ($date < pdfCourseStart () || $date > (new DateTimeImmutable ("today"))->modify ("+1 day")){
+        logMessage (LOGGER_WARN, "PDF rejected: dated {$date->format ('Y-m-d')}.");
         throw new PdfSignException (ucfirst ($docname) . " tiene que ser del curso actual.");
     }
 }
@@ -447,53 +427,23 @@ function getMufaceDni (string $path): string {
 }
 
 /**
- * Checks the signature of the appointment (nombramiento), the service record
- * (hoja de servicios) and the teaching credential: they are signed with the
- * personal certificate of a public employee or with the representative
- * certificate of the school, so instead of the signer's NIF the
- * organizationIdentifier of the organization the certificate belongs to is
- * checked (nombramiento_ca_file and nombramiento_signer_orgs in config.php).
- *
- * @return array What checkPdfSignature returns.
- *
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkEmpleadoSignature (string $path): array {
-    return checkPdfSignature ($path, Config::PARAMS["nombramiento_ca_file"] ?? "certs/nombramiento_ca.pem",
-        Config::PARAMS["nombramiento_signer_orgs"] ?? PDF_EMPLEADO_ORGS, "la Comunidad de Madrid",
-        "organizationIdentifier");
-}
-
-/**
- * Checks the signature of an appointment (nombramiento).
- *
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkNombramientoSignature (string $path){
-    checkEmpleadoSignature ($path);
-}
-
-/**
  * Checks that a PDF is an appointment (acuerdo de nombramiento) of the
- * current school year and gets the holder's DNI/NIE from it. The signature
- * must have been checked before with checkNombramientoSignature.
+ * current school year and gets the holder's DNI/NIE from it. Its signature
+ * is not checked: it may be signed digitally or by hand.
  *
- * There are two formats, both covered by the signature:
+ * There are two formats:
  * - Scanned: the body is an image and the only text with the data is the PDF
  *   title, "<name> <DNI with a leading zero> <form> <kind> <yyyy mm dd>".
  * - Text: the body is text, with the heading of the appointment, the NIF in
  *   "I. DATOS DEL FUNCIONARIO/A" and "FECHA DE NOMBRAMIENTO: dd/mm/yyyy".
  *
  * @param string $path PDF file.
- * @param bool $signed Whether it is digitally signed. The ones signed by hand
- *     are not checked to have the CSV of the Comunidad de Madrid.
  *
  * @return string The DNI/NIE, in upper case.
  *
  * @throws PdfSignException if the PDF is not a valid appointment or has no DNI.
  */
-function getNombramientoDni (string $path, bool $signed = true): string {
-    $text = preg_replace ('/\s+/u', ' ', pdfText ($path)) ?? "";
+function getNombramientoDni (string $path): string {
     [$code, $info, $err] = pdfRunCommand (["pdfinfo", "-enc", "UTF-8", $path]);
     if ($code != 0)
         throw new Exception ("pdfinfo failed ({$code}): " . trim ($err));
@@ -503,11 +453,7 @@ function getNombramientoDni (string $path, bool $signed = true): string {
         /* El cuerpo en texto, o en una foto si no lo está. */
         $body = pdfDocumentText ($path, PDF_NOMBRAMIENTO_MARK);
         $data = pdfNombramientoFromText ($body);
-        $text .= " " . $body;
     }
-    /* El OCR mete espacios: "gestiona. comunidad. madrid/csv". */
-    if ($signed && !preg_match ('/gestiona\W{0,3}comunidad\W{0,3}madri\w?\W{0,3}csv/iu', $text))
-        $data = null;
     if ($data === null){
         logMessage (LOGGER_WARN, "PDF rejected: it is not an appointment.");
         throw new PdfSignException ("El PDF no es un nombramiento.");
@@ -574,21 +520,11 @@ function pdfNombramientoFromText (string $text): ?array {
     return [reset ($dnis), (int) $date[0][3], (int) $date[0][2], (int) $date[0][1]];
 }
 
-function checkHojaServiciosSignature(string $path)
-{
-    $validity = checkEmpleadoSignature($path);
-    pdfCheckSignedThisCourse($validity, "la Hoja de Servicios");
-    $maxage = (int) (Config::PARAMS["pdf_max_age_days"] ?? 30);
-    if ($validity["signed"] < (new DateTimeImmutable("today"))->modify("-{$maxage} days"))
-        throw new PdfSignException("El documento tiene que haberse expedido en los últimos " .
-            "{$maxage} días.");
-}
 /**
  * Checks that a PDF is a service record (hoja de servicios) with a service of
- * the current school year and gets the holder's DNI/NIE from it. The signature
- * of the digitally signed ones must have been checked before with
- * checkHojaServiciosSignature; in the ones signed by hand the issue date of
- * the text is checked instead.
+ * the current school year, issued not longer than pdf_max_age_days ago, and
+ * gets the holder's DNI/NIE from it. Its signature is not checked: it may be
+ * signed digitally or by hand.
  *
  * There are two formats: the one the schools print from PDOC ("certifica que
  * la presente hoja de servicios está conforme con los datos...") and the one
@@ -596,13 +532,12 @@ function checkHojaServiciosSignature(string $path)
  * antecedentes..."), where the DNI may come without its letter.
  *
  * @param string $path PDF file.
- * @param bool $signed Whether it is digitally signed.
  *
  * @return string The DNI/NIE, in upper case.
  *
  * @throws PdfSignException if the PDF is not a valid service record.
  */
-function getHojaServiciosNIF(string $path, bool $signed = true): string
+function getHojaServiciosNIF(string $path): string
 {
     $hojaservicios = '/la presente hoja de servicios est[áa] conforme con (los datos que a d[íi]a de hoy ' .
         'pueden consultarse en las bases de datos de Gesti[óo]n del Profesorado|los antecedentes que ' .
@@ -624,14 +559,12 @@ function getHojaServiciosNIF(string $path, bool $signed = true): string
         throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
     }
 
-    if (!$signed) {
-        /* "Se expide en Madrid a 15 de octubre de 2026" o "Se expide la
-           presente en LEGANES a 01 de abril de 2026". */
-        if (!preg_match('/Se expide (?:la presente )?en [^.]{1,60}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
-                $text, $date))
-            throw new PdfSignException("No se ha podido leer la fecha de expedición de la Hoja de Servicios.");
-        pdfCheckIssueDate($date[1], $date[2], $date[3]);
-    }
+    /* "Se expide en Madrid a 15 de octubre de 2026" o "Se expide la presente
+       en LEGANES a 01 de abril de 2026". */
+    if (!preg_match('/Se expide (?:la presente )?en [^.]{1,60}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
+            $text, $date))
+        throw new PdfSignException("No se ha podido leer la fecha de expedición de la Hoja de Servicios.");
+    pdfCheckIssueDate($date[1], $date[2], $date[3]);
 
     /* Tiene que haber un servicio de este curso, es decir, que haya empezado
        o terminado a partir del 1 de septiembre. Cada servicio es
@@ -664,27 +597,19 @@ function getHojaServiciosNIF(string $path, bool $signed = true): string
     return reset($found);
 }
 
-function checkCredencialSignature(string $path)
-{
-    $validity = checkEmpleadoSignature($path);
-    pdfCheckSignedThisCourse($validity, "la Credencial");
-}
-
 /**
  * Checks that a PDF is a teaching credential and gets the holder's DNI/NIE
- * from it. The signature of the digitally signed ones must have been checked
- * before with checkCredencialSignature; in the ones signed by hand the date of
- * the text ("En MADRID, a 2 de septiembre de 2026.") has to be of the current
- * school year.
+ * from it. Its date ("En MADRID, a 2 de septiembre de 2026.") has to be of
+ * the current school year. Its signature is not checked: it may be signed
+ * digitally or by hand.
  *
  * @param string $path PDF file.
- * @param bool $signed Whether it is digitally signed.
  *
  * @return string The DNI/NIE, in upper case.
  *
  * @throws PdfSignException if the PDF is not a valid credential.
  */
-function getCredencialNIF(string $path, bool $signed = true): string
+function getCredencialNIF(string $path): string
 {
     /* Si la credencial es una foto, el OCR lee las dos columnas por
        separado y la frase queda partida. */
@@ -702,20 +627,17 @@ function getCredencialNIF(string $path, bool $signed = true): string
         throw new PdfSignException("No se ha podido leer el NIF en la Credencial.");
     }
 
-    if (!$signed) {
-        preg_match_all('/\bEn [^.,]{1,60}, a (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $dates,
-            PREG_SET_ORDER);
-        $issued = null;
-        foreach ($dates as $date) {
-            $month = array_search(strtolower($date[2]), PDF_MONTHS, true);
-            if ($month !== false && checkdate($month + 1, (int) $date[1], (int) $date[3])) {
-                $issued = (new DateTimeImmutable("today"))->setDate((int) $date[3], $month + 1, (int) $date[1]);
-                break;
-            }
+    preg_match_all('/\bEn [^.,]{1,60}, a (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $dates, PREG_SET_ORDER);
+    $issued = null;
+    foreach ($dates as $date) {
+        $month = array_search(strtolower($date[2]), PDF_MONTHS, true);
+        if ($month !== false && checkdate($month + 1, (int) $date[1], (int) $date[3])) {
+            $issued = (new DateTimeImmutable("today"))->setDate((int) $date[3], $month + 1, (int) $date[1]);
+            break;
         }
-        if ($issued === null)
-            throw new PdfSignException("No se ha podido leer la fecha de la Credencial.");
-        pdfCheckSignedThisCourse(["signed" => $issued], "la Credencial");
     }
+    if ($issued === null)
+        throw new PdfSignException("No se ha podido leer la fecha de la Credencial.");
+    pdfCheckThisCourse($issued, "la Credencial");
     return reset($found);
 }

@@ -1,13 +1,15 @@
 # What's this project?
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
-* Identify participants by digitally signed PDFs, so each person can vote only once. Interim
+* Identify participants by official PDFs, so each person can vote only once. Interim
   teachers upload the appointment (_nombramiento_) of the current school year on its own.
   Career civil servants upload the training record (_extracto de formación_) together with
   the MUFACE membership certificate: the DNI is read from the training record and the one in
   the certificate must be the same. Both can also use the teaching credential (_credencial
   docente_) or the service record (_hoja de servicios_) on their own.
-  The signatures are checked.
+  The digital signatures of the training record and the MUFACE certificate are checked. The
+  appointment, the credential and the service record may be signed by hand, so only their
+  content and dates are checked.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -83,16 +85,8 @@ Every configuration item has a description, you only need to notice:
 * `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
   membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
   electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate can be (30 days by default).
-* `nombramiento_ca_file` and `nombramiento_signer_orgs` set who is trusted for signing the
-  appointment, the service record (hoja de servicios) and the teaching credential: the
-  certification authorities in `certs/nombramiento_ca.pem` (Camerfirma and FNMT) and a regular
-  expression the `organizationIdentifier` of the signer's certificate must match, by default
-  the Comunidad de Madrid (`VATES-S7800001E`) and the public bodies of Madrid (NIF `Q` with
-  province code 28 or 78 to 88). They are signed with the personal certificate of a public
-  employee or the representative certificate of the school, so personal certificates of
-  citizens or certificates of companies are rejected. The appointment's body is a scanned image, so its DNI and date are read from
-  the PDF title, which the signature covers too.
+* `pdf_max_age_days` is how old the MUFACE certificate and the service record (hoja de
+  servicios) can be (30 days by default), counting from the issue date in their text.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -204,9 +198,7 @@ the database to be ready before serving requests.
 | `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
 | `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
 | `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate can be, counting from its issue date. |
-| `NOMBRAMIENTO_CA_FILE` | `certs/nombramiento_ca.pem` | PEM file with the certification authorities trusted for the signature of the appointment, the service record and the teaching credential. |
-| `NOMBRAMIENTO_SIGNER_ORGS` | Comunidad de Madrid and public bodies of Madrid | Regular expression the `organizationIdentifier` of the signer's certificate must match. |
+| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate and the service record can be, counting from their issue date. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

@@ -67,33 +67,23 @@ const CONFIG = [
 
 /**
  * Second PDF asked for participating: the digitally signed MUFACE membership
- * certificate (Clases Pasivas) or the digitally signed appointment,
- * nombramiento (the rest: career civil servants who joined from 2011 on and
- * interim ones).
+ * certificate (Clases Pasivas) or the appointment, nombramiento (the rest:
+ * career civil servants who joined from 2011 on and interim ones).
  * muface_ca_file: PEM file with the certification authorities trusted for the
  * signature of the MUFACE certificate. Only these are trusted, not the system
  * ones.
  * muface_signer_ids: serialNumber (NIF) of the certificates allowed to sign
  * it. Q2861001B is the MUFACE electronic seal.
  * pdf_max_age_days: how old the MUFACE certificate can be, counting from its
- * issue date. The appointment must be of the current school year.
- * nombramiento_ca_file: PEM file with the certification authorities trusted
- * for the signature of the appointment, the service record (hoja de
- * servicios) and the teaching credential.
- * nombramiento_signer_orgs: regular expression the organizationIdentifier of
- * the signer's certificate must match (they are signed with the personal
- * certificate of a public employee or the representative certificate of the
- * school): the Comunidad de Madrid (S7800001E) and the public bodies of Madrid
- * (NIF Q with province code 28 or 78 to 88).
- * The service record and the credential must be signed in the current school
- * year, and the service record not longer than pdf_max_age_days ago.
+ * issue date, and the service record (hoja de servicios) too.
+ * The signature of the appointment, the service record and the teaching
+ * credential is not checked (they may be signed by hand): only their content.
+ * The appointment and the credential must be of the current school year.
  */
 
 "muface_ca_file" => 'certs/muface_ca.pem',
 "muface_signer_ids" => ['Q2861001B'],
 "pdf_max_age_days" => 30,
-"nombramiento_ca_file" => 'certs/nombramiento_ca.pem',
-"nombramiento_signer_orgs" => '/^VATES-(S7800001E|Q(28|7[89]|8[0-8])[0-9]{5}[A-Z])$/',
 
 /**
  * For enabling stress test bypasses

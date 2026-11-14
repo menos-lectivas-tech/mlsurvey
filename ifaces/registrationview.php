@@ -814,24 +814,15 @@ abstract class RegistrationView extends View
         } else {
             try {
                 $checking = $docname;
-                /* Los que vienen con firma manuscrita no tienen firma digital:
-                   de esos solo se comprueba el contenido. */
-                $signed = pdfIsSigned($document);
-                if (!$signed)
-                    logMessage(LOGGER_INFO, "Checking a {$kind} PDF without digital signature.");
-                if ($kind == self::KIND_INTERIM) {
-                    if ($signed)
-                        checkNombramientoSignature($document);
-                    $dni = getNombramientoDni($document, $signed);
-                } else if ($kind == self::KIND_HOJASERVICIOS) {
-                    if ($signed)
-                        checkHojaServiciosSignature($document);
-                    $dni = getHojaServiciosNIF($document, $signed);
-                } else if ($kind == self::KIND_CREDENCIAL) {
-                    if ($signed)
-                        checkCredencialSignature($document);
-                    $dni = getCredencialNIF($document, $signed);
-                }
+                /* Pueden venir firmados digitalmente o a mano: de estos no se
+                   comprueba la firma, solo el contenido. */
+                pdfReadFile($document);
+                if ($kind == self::KIND_INTERIM)
+                    $dni = getNombramientoDni($document);
+                else if ($kind == self::KIND_HOJASERVICIOS)
+                    $dni = getHojaServiciosNIF($document);
+                else if ($kind == self::KIND_CREDENCIAL)
+                    $dni = getCredencialNIF($document);
             } catch (PdfSignException $e) {
                 echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
                 return null;
