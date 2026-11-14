@@ -6,6 +6,10 @@
  * civil servants), or the digitally signed appointment, nombramiento (interim
  * ones), the service record or the teaching credential on their own.
  *
+ * The appointment, the service record and the credential are sometimes signed
+ * by hand instead: then they are not digitally signed at all (pdfIsSigned)
+ * and only their content is checked, with the dates read from the text.
+ *
  * The documents can be text or a photo or scan of the paper inside the PDF:
  * if the text does not say what the document is, the pages are read with OCR.
  *
@@ -126,6 +130,18 @@ function pdfReadFile (string $path): string {
     if ($pdf === false || strncmp ($pdf, "%PDF-", 5) != 0)
         throw new PdfSignException ("El fichero no es un PDF.");
     return $pdf;
+}
+
+/**
+ * Tells whether a PDF has any digital signature, valid or not. The
+ * appointment, the service record and the credential that do not have one are
+ * signed by hand: they are accepted checking only their content. One with a
+ * signature, even a broken one, has to pass the signature check.
+ *
+ * @throws PdfSignException if it is not a PDF or it is too big.
+ */
+function pdfIsSigned (string $path): bool {
+    return preg_match ('/\/ByteRange\s*\[/', pdfReadFile ($path)) === 1;
 }
 
 /**
@@ -469,12 +485,14 @@ function checkNombramientoSignature (string $path){
  *   "I. DATOS DEL FUNCIONARIO/A" and "FECHA DE NOMBRAMIENTO: dd/mm/yyyy".
  *
  * @param string $path PDF file.
+ * @param bool $signed Whether it is digitally signed. The ones signed by hand
+ *     are not checked to have the CSV of the Comunidad de Madrid.
  *
  * @return string The DNI/NIE, in upper case.
  *
  * @throws PdfSignException if the PDF is not a valid appointment or has no DNI.
  */
-function getNombramientoDni (string $path): string {
+function getNombramientoDni (string $path, bool $signed = true): string {
     $text = preg_replace ('/\s+/u', ' ', pdfText ($path)) ?? "";
     [$code, $info, $err] = pdfRunCommand (["pdfinfo", "-enc", "UTF-8", $path]);
     if ($code != 0)
@@ -488,10 +506,10 @@ function getNombramientoDni (string $path): string {
         $text .= " " . $body;
     }
     /* El OCR mete espacios: "gestiona. comunidad. madrid/csv". */
-    if (!preg_match ('/gestiona\W{0,3}comunidad\W{0,3}madri\w?\W{0,3}csv/iu', $text))
+    if ($signed && !preg_match ('/gestiona\W{0,3}comunidad\W{0,3}madri\w?\W{0,3}csv/iu', $text))
         $data = null;
     if ($data === null){
-        logMessage (LOGGER_WARN, "Signed PDF rejected: it is not an appointment.");
+        logMessage (LOGGER_WARN, "PDF rejected: it is not an appointment.");
         throw new PdfSignException ("El PDF no es un nombramiento.");
     }
     [$dni, $year, $month, $day] = $data;
@@ -565,26 +583,54 @@ function checkHojaServiciosSignature(string $path)
         throw new PdfSignException("El documento tiene que haberse expedido en los últimos " .
             "{$maxage} días.");
 }
-function getHojaServiciosNIF(string $path): string|false
+/**
+ * Checks that a PDF is a service record (hoja de servicios) with a service of
+ * the current school year and gets the holder's DNI/NIE from it. The signature
+ * of the digitally signed ones must have been checked before with
+ * checkHojaServiciosSignature; in the ones signed by hand the issue date of
+ * the text is checked instead.
+ *
+ * There are two formats: the one the schools print from PDOC ("certifica que
+ * la presente hoja de servicios está conforme con los datos...") and the one
+ * of the DAT ("Que la presente hoja de servicios está conforme con los
+ * antecedentes..."), where the DNI may come without its letter.
+ *
+ * @param string $path PDF file.
+ * @param bool $signed Whether it is digitally signed.
+ *
+ * @return string The DNI/NIE, in upper case.
+ *
+ * @throws PdfSignException if the PDF is not a valid service record.
+ */
+function getHojaServiciosNIF(string $path, bool $signed = true): string
 {
-    $hojaservicios = "certifica que la presente hoja de servicios está conforme con los datos " .
-        "que a día de hoy pueden consultarse en las bases de datos " .
-        "de Gestión del Profesorado de la Comunidad de Madrid";
-    $text = pdfDocumentText($path, '/' . preg_quote($hojaservicios, '/') . '/iu', true);
-    if (
-        stristr($text, $hojaservicios)
-        === false
-    ) {
-        logMessage(LOGGER_WARN, "Signed PDF rejected: it is not a Hoja de Servicios.");
+    $hojaservicios = '/la presente hoja de servicios est[áa] conforme con (los datos que a d[íi]a de hoy ' .
+        'pueden consultarse en las bases de datos de Gesti[óo]n del Profesorado|los antecedentes que ' .
+        'del Funcionario al que se refiere constan en este\/a COMUNIDAD DE MADRID)/iu';
+    $text = pdfDocumentText($path, $hojaservicios, true);
+    if (!preg_match($hojaservicios, $text)) {
+        logMessage(LOGGER_WARN, "PDF rejected: it is not a Hoja de Servicios.");
         throw new PdfSignException("El PDF no es una Hoja de Servicios.");
     }
 
-    /* El OCR puede leer la I como l o 1. */
-    preg_match_all("/D\.N\.[Il1]\.\s*" . PDF_DNI . "/iu", $text, $ids);
-    $found = array_unique(array_map('strtoupper', $ids[1]));
+    /* El OCR puede leer la I como l o 1. La de la DAT lleva el DNI sin letra y
+       con un cero delante: 050121065. */
+    preg_match_all("/D\.N\.[Il1]\.\s*(?:" . PDF_DNI . "|0?([0-9]{8}|[XYZ][0-9]{7})\b)/iu", $text, $ids,
+        PREG_SET_ORDER);
+    $found = array_unique(array_map(fn ($id) => ($id[1] ?? "") !== "" ? strtoupper($id[1]) :
+        pdfDniWithLetter(strtoupper($id[2])), $ids));
     if (count($found) != 1 || !pdfValidDni(reset($found))) {
         logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
         throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
+    }
+
+    if (!$signed) {
+        /* "Se expide en Madrid a 15 de octubre de 2026" o "Se expide la
+           presente en LEGANES a 01 de abril de 2026". */
+        if (!preg_match('/Se expide (?:la presente )?en [^.]{1,60}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
+                $text, $date))
+            throw new PdfSignException("No se ha podido leer la fecha de expedición de la Hoja de Servicios.");
+        pdfCheckIssueDate($date[1], $date[2], $date[3]);
     }
 
     /* Tiene que haber un servicio de este curso, es decir, que haya empezado
@@ -624,22 +670,52 @@ function checkCredencialSignature(string $path)
     pdfCheckSignedThisCourse($validity, "la Credencial");
 }
 
-function getCredencialNIF(string $path): string|false
+/**
+ * Checks that a PDF is a teaching credential and gets the holder's DNI/NIE
+ * from it. The signature of the digitally signed ones must have been checked
+ * before with checkCredencialSignature; in the ones signed by hand the date of
+ * the text ("En MADRID, a 2 de septiembre de 2026.") has to be of the current
+ * school year.
+ *
+ * @param string $path PDF file.
+ * @param bool $signed Whether it is digitally signed.
+ *
+ * @return string The DNI/NIE, in upper case.
+ *
+ * @throws PdfSignException if the PDF is not a valid credential.
+ */
+function getCredencialNIF(string $path, bool $signed = true): string
 {
     /* Si la credencial es una foto, el OCR lee las dos columnas por
        separado y la frase queda partida. */
     $credencial = '/Este documento acredita a su\b.*\bintenci[óo]n de asumir funciones docentes/iu';
     $text = pdfDocumentText($path, $credencial, true);
     if (!preg_match($credencial, $text)) {
-        logMessage(LOGGER_WARN, "Signed PDF rejected: it is not a Credencial.");
+        logMessage(LOGGER_WARN, "PDF rejected: it is not a Credencial.");
         throw new PdfSignException("El PDF no es una Credencial.");
     }
 
     preg_match_all("/con número de documento\s*" . PDF_DNI . "/iu", $text, $ids);
     $found = array_unique(array_map('strtoupper', $ids[1]));
     if (count($found) != 1 || !pdfValidDni(reset($found))) {
-        logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no single valid NIF in it.");
-        throw new PdfSignException("No se ha podido leer el NIF en la Hoja de Servicios.");
+        logMessage(LOGGER_WARN, "Credencial rejected: no single valid NIF in it.");
+        throw new PdfSignException("No se ha podido leer el NIF en la Credencial.");
+    }
+
+    if (!$signed) {
+        preg_match_all('/\bEn [^.,]{1,60}, a (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $dates,
+            PREG_SET_ORDER);
+        $issued = null;
+        foreach ($dates as $date) {
+            $month = array_search(strtolower($date[2]), PDF_MONTHS, true);
+            if ($month !== false && checkdate($month + 1, (int) $date[1], (int) $date[3])) {
+                $issued = (new DateTimeImmutable("today"))->setDate((int) $date[3], $month + 1, (int) $date[1]);
+                break;
+            }
+        }
+        if ($issued === null)
+            throw new PdfSignException("No se ha podido leer la fecha de la Credencial.");
+        pdfCheckSignedThisCourse(["signed" => $issued], "la Credencial");
     }
     return reset($found);
 }

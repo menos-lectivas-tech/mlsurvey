@@ -1,3 +1,6 @@
+# 1.6
+- Se admiten el nombramiento, la credencial y la hoja de servicios firmados a mano (sin firma digital): de ellos se comprueba solo el contenido y las fechas que aparecen en el texto. También se admite el formato de hoja de servicios de la DAT, con el DNI sin letra.
+
 # 1.5.1
 - Se cambia el orden en la PK de Voted para que no sea posible relacionar la participación con el orden de inserción.
 
