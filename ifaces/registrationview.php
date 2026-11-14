@@ -59,9 +59,10 @@ abstract class RegistrationView extends View
                 'name' => "Nombramiento",
                 'where' => "El PDF que recibiste por correo electrónico al principio de curso.",
                 'url' => "",
-                'info' => "Acuerdo de nombramiento y toma de posesión firmado electrónicamente " .
-                    "por la Comunidad de Madrid.\n\n" .
-                    "Adjunta el PDF tal como lo recibiste. Tiene que ser del curso actual y estar en vigor.",
+                'info' => "Acuerdo de nombramiento y toma de posesión de la Comunidad de Madrid, " .
+                    "firmado electrónicamente o a mano.\n\n" .
+                    "Adjunta el PDF tal como lo recibiste, o escaneado si está firmado a mano. " .
+                    "Tiene que ser del curso actual y estar en vigor.",
                 'needscert' => false,
                 'wait' => false,
                 'tag' => "En tu email",
@@ -74,7 +75,7 @@ abstract class RegistrationView extends View
                 'where' => "La que te dieron en la secretaría de tu centro.",
                 'url' => "",
                 'info' => "Credencial de nombramiento para puesto docente.\n\n" .
-                    "Debe estar firmada electrónicamente y corresponder al curso actual.",
+                    "Debe estar firmada (electrónicamente o a mano) y corresponder al curso actual.",
                 'needscert' => false,
                 'wait' => true,
             ],
@@ -85,8 +86,8 @@ abstract class RegistrationView extends View
                 'name' => "Hoja de servicios",
                 'where' => "La que te dieron en la secretaría de tu centro.",
                 'url' => "",
-                'info' => "Una hoja de servicios del curso actual firmada electrónicamente " .
-                    "en los últimos {$this->maxage} días.",
+                'info' => "Una hoja de servicios del curso actual expedida y firmada " .
+                    "(electrónicamente o a mano) en los últimos {$this->maxage} días.",
                 'needscert' => false,
                 'wait' => true,
             ],
@@ -204,6 +205,7 @@ abstract class RegistrationView extends View
                 <div class="ml-participate-doc">
                     <label for="email">Dirección de correo</label>
                     <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
+                    <small><?= h($this->allowedDomainsText()); ?></small>
                     <small><?= h($texts['emailhint']); ?></small>
                 </div>
                 <div class="ml-participate-row">
@@ -219,14 +221,21 @@ abstract class RegistrationView extends View
         $this->showInfoScript();
     }
 
-    /* Explicación del campo de la dirección de correo, con los dominios
-       autorizados; $extra la completa con lo propio de cada vista. */
-    private function emailInfo(string $extra): string
+    /* Dominios autorizados para la dirección de correo, para mostrarlos
+       junto al campo sin tener que abrir la explicación. */
+    private function allowedDomainsText(): string
     {
         $domains = Config::$alloweddomains == "" ? "cualquiera" :
             str_replace(" ", ", ", Config::$alloweddomains);
-        return "Dominios autorizados: {$domains}.\n\n" .
-            "La dirección queda asociada a tus documentos: en esta y en " .
+        return "Dominios autorizados: {$domains}.";
+    }
+
+    /* Explicación del campo de la dirección de correo; $extra la completa
+       con lo propio de cada vista. Los dominios autorizados ya se ven
+       junto al campo. */
+    private function emailInfo(string $extra): string
+    {
+        return "La dirección queda asociada a tus documentos: en esta y en " .
             "próximas consultas tendrás que usar siempre la misma.\n\n" . $extra;
     }
 
@@ -310,8 +319,8 @@ abstract class RegistrationView extends View
                 <fieldset class="ml-wizard-step" data-step="2" hidden>
                     <legend class="ml-wizard-title" tabindex="-1">¿Con qué documento quieres
                         acreditarte?</legend>
-                    <p class="ml-wizard-help">Elige el que tengas a mano. Tiene que estar firmado
-                        electrónicamente: adjunta el PDF tal como lo recibiste o descargaste.</p>
+                    <p class="ml-wizard-help">Elige el que tengas a mano. Adjunta el PDF tal como lo
+                        recibiste o descargaste; si el documento está firmado a mano, escanéalo en PDF.</p>
                     <div class="ml-choices">
                         <?php foreach ($this->docs as $kind => $d) { ?>
                             <div class="ml-choice" data-regimes="<?= h(implode(" ", $d['regimes'])); ?>">
@@ -364,6 +373,7 @@ abstract class RegistrationView extends View
                         <div class="ml-participate-doc">
                             <label for="email">Dirección de correo</label>
                             <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
+                            <small><?= h($this->allowedDomainsText()); ?></small>
                             <small><?= h($texts['emailhint']); ?></small>
                         </div>
                         <div class="ml-participate-row">
@@ -416,8 +426,9 @@ abstract class RegistrationView extends View
                                     condición de docente de la enseñanza pública</h2>
                                 <div class="ml-legal-body" tabindex="0">
                                     <p>Para comprobar que eres docente en activo en un centro público de la
-                                        Comunidad de Madrid necesitamos algún documento probatorio que
-                                        esté firmado digitalmente:</p>
+                                        Comunidad de Madrid necesitamos algún documento probatorio firmado
+                                        (el nombramiento, la credencial y la hoja de servicios pueden
+                                        estar firmados a mano; el resto, digitalmente):</p>
                                     <ul>
                                         <li>Si eres interino/a: tu nombramiento del curso actual, tu
                                             credencial docente o tu hoja de servicios actualizada.</li>
@@ -803,16 +814,15 @@ abstract class RegistrationView extends View
         } else {
             try {
                 $checking = $docname;
-                if ($kind == self::KIND_INTERIM) {
-                    checkNombramientoSignature($document);
+                /* Pueden venir firmados digitalmente o a mano: de estos no se
+                   comprueba la firma, solo el contenido. */
+                pdfReadFile($document);
+                if ($kind == self::KIND_INTERIM)
                     $dni = getNombramientoDni($document);
-                } else if ($kind == self::KIND_HOJASERVICIOS) {
-                    checkHojaServiciosSignature($document);
+                else if ($kind == self::KIND_HOJASERVICIOS)
                     $dni = getHojaServiciosNIF($document);
-                } else if ($kind == self::KIND_CREDENCIAL) {
-                    checkCredencialSignature($document);
+                else if ($kind == self::KIND_CREDENCIAL)
                     $dni = getCredencialNIF($document);
-                }
             } catch (PdfSignException $e) {
                 echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
                 return null;

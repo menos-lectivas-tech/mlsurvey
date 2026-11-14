@@ -1,3 +1,7 @@
+# 1.6
+- Se deja de comprobar la firma del nombramiento, la credencial y la hoja de servicios, que pueden venir firmados a mano: de ellos se comprueba solo el contenido y las fechas que aparecen en el texto. Se eliminan los parámetros `nombramiento_ca_file` y `nombramiento_signer_orgs` y `certs/nombramiento_ca.pem`.
+- Se admite el formato de hoja de servicios de la DAT, con el DNI sin letra.
+
 # 1.5.1
 - Se cambia el orden en la PK de Voted para que no sea posible relacionar la participación con el orden de inserción.
 
