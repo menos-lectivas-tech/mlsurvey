@@ -204,6 +204,7 @@ abstract class RegistrationView extends View
                 <div class="ml-participate-doc">
                     <label for="email">Dirección de correo</label>
                     <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
+                    <small><?= h($this->allowedDomainsText()); ?></small>
                     <small><?= h($texts['emailhint']); ?></small>
                 </div>
                 <div class="ml-participate-row">
@@ -219,14 +220,21 @@ abstract class RegistrationView extends View
         $this->showInfoScript();
     }
 
-    /* Explicación del campo de la dirección de correo, con los dominios
-       autorizados; $extra la completa con lo propio de cada vista. */
-    private function emailInfo(string $extra): string
+    /* Dominios autorizados para la dirección de correo, para mostrarlos
+       junto al campo sin tener que abrir la explicación. */
+    private function allowedDomainsText(): string
     {
         $domains = Config::$alloweddomains == "" ? "cualquiera" :
             str_replace(" ", ", ", Config::$alloweddomains);
-        return "Dominios autorizados: {$domains}.\n\n" .
-            "La dirección queda asociada a tus documentos: en esta y en " .
+        return "Dominios autorizados: {$domains}.";
+    }
+
+    /* Explicación del campo de la dirección de correo; $extra la completa
+       con lo propio de cada vista. Los dominios autorizados ya se ven
+       junto al campo. */
+    private function emailInfo(string $extra): string
+    {
+        return "La dirección queda asociada a tus documentos: en esta y en " .
             "próximas consultas tendrás que usar siempre la misma.\n\n" . $extra;
     }
 
@@ -364,6 +372,7 @@ abstract class RegistrationView extends View
                         <div class="ml-participate-doc">
                             <label for="email">Dirección de correo</label>
                             <?= $this->infoButton("Dirección de correo", $this->emailInfo($texts['emailinfo'])); ?>
+                            <small><?= h($this->allowedDomainsText()); ?></small>
                             <small><?= h($texts['emailhint']); ?></small>
                         </div>
                         <div class="ml-participate-row">
