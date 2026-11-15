@@ -629,7 +629,9 @@ function getCredencialNIF(string $path): string
         throw new PdfSignException("No se ha podido leer el NIF en la Credencial.");
     }
 
-    preg_match_all('/\bEn [^.,]{1,60}, a (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $dates, PREG_SET_ORDER);
+    /* El sitio puede llevar puntos y comas ("C. Villalba", "Leganés, Madrid"):
+       se toma todo hasta la primera fecha completa, aunque cambie de línea. */
+    preg_match_all('/\bEn .{1,200}?, a (\d{1,2}) de (\p{L}+) de (\d{4})/ius', $text, $dates, PREG_SET_ORDER);
     $issued = null;
     foreach ($dates as $date) {
         $month = array_search(strtolower($date[2]), PDF_MONTHS, true);
