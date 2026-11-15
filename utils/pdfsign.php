@@ -560,8 +560,10 @@ function getHojaServiciosNIF(string $path): string
     }
 
     /* "Se expide en Madrid a 15 de octubre de 2026" o "Se expide la presente
-       en LEGANES a 01 de abril de 2026". */
-    if (!preg_match('/Se expide (?:la presente )?en [^.]{1,60}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
+       en LEGANES a 01 de abril de 2026". El sitio puede ser cualquier cosa
+       (puntos, comas, guiones, cifras: "C. VILLALBA", "IES Nº 1, Madrid,"):
+       se toma todo hasta la primera fecha completa. */
+    if (!preg_match('/Se expide (?:la presente )?en .{1,200}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
             $text, $date))
         throw new PdfSignException("No se ha podido leer la fecha de expedición de la Hoja de Servicios.");
     pdfCheckIssueDate($date[1], $date[2], $date[3]);
@@ -627,7 +629,9 @@ function getCredencialNIF(string $path): string
         throw new PdfSignException("No se ha podido leer el NIF en la Credencial.");
     }
 
-    preg_match_all('/\bEn [^.,]{1,60}, a (\d{1,2}) de (\p{L}+) de (\d{4})/iu', $text, $dates, PREG_SET_ORDER);
+    /* El sitio puede llevar puntos y comas ("C. Villalba", "Leganés, Madrid"):
+       se toma todo hasta la primera fecha completa, aunque cambie de línea. */
+    preg_match_all('/\bEn .{1,200}?, a (\d{1,2}) de (\p{L}+) de (\d{4})/ius', $text, $dates, PREG_SET_ORDER);
     $issued = null;
     foreach ($dates as $date) {
         $month = array_search(strtolower($date[2]), PDF_MONTHS, true);
