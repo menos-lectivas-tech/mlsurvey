@@ -4,11 +4,11 @@
  * holder's DNI from them: the digitally signed training record (extracto de
  * formación) with the digitally signed MUFACE membership certificate (career
  * civil servants), or the appointment, nombramiento (interim ones), the service
- * record or the teaching credential on their own.
+ * record, the teaching credential or the payslip (nómina) on their own.
  *
  * The appointment, the service record and the credential are sometimes signed
  * digitally and sometimes by hand, so their signature is not checked: only
- * their content, with the dates read from the text.
+ * their content, with the dates read from the text. The payslip is not signed.
  *
  * The documents can be text or a photo or scan of the paper inside the PDF:
  * if the text does not say what the document is, the pages are read with OCR.
@@ -643,5 +643,78 @@ function getCredencialNIF(string $path): string
     if ($issued === null)
         throw new PdfSignException("No se ha podido leer la fecha de la Credencial.");
     pdfCheckThisCourse($issued, "la Credencial");
+    return reset($found);
+}
+
+/**
+ * Checks that a PDF is a payslip (nómina) of a teacher of the Comunidad de
+ * Madrid for a recent month and gets the holder's DNI/NIE from it. It is not
+ * signed digitally, so only its content is checked.
+ *
+ * The month paid ("PERÍODO DE LIQUIDACIÓN: OCTUBRE de 2026") must be the
+ * current month or the previous one, and either the body (CUERPO DOCENTE)
+ * must be a teaching one: maestros (infantil and primaria), profesores
+ * (secundaria, formación profesional, escuelas oficiales de idiomas, música,
+ * artes...) or catedráticos; or the link (VINCULACIÓN) must be a teaching
+ * civil servant one ("FUNC. DOCENTE").
+ *
+ * @param string $path PDF file.
+ *
+ * @return string The DNI/NIE, in upper case.
+ *
+ * @throws PdfSignException if the PDF is not a valid payslip.
+ */
+function getNominaNIF(string $path): string
+{
+    /* La cabecera de la nómina de la Comunidad de Madrid, con su CIF. */
+    $nomina = '/PER[ÍI]ODO DE LIQUIDACI[ÓO]N C\.I\.F\. C[ÓO]D\. CTA\. COTIZACI[ÓO]N (\p{L}+) de (\d{4}) ' .
+        'S7800001E\b/iu';
+    $text = pdfDocumentText($path, $nomina, true);
+    if (!preg_match($nomina, $text, $period) ||
+            !preg_match('/CONSEJER[ÍI]A\/ORGANISMO [^\/]{0,80}?\bEDUCACI[ÓO]N\b/iu', $text)) {
+        logMessage(LOGGER_WARN, "PDF rejected: it is not a Nómina.");
+        throw new PdfSignException("El PDF no es una nómina de la Consejería de Educación.");
+    }
+
+    /* El DNI va tras el nombre y puede llevar una cifra de más pegada a la
+       letra: 78745028C0. */
+    preg_match_all('/D\.N\.[Il1]\/C[ÓO]D\. IDENTIFICACI[ÓO]N .{1,150}? ([0-9XYZ][0-9]{7}[A-Z])[0-9]?(?= )/iu',
+        $text, $ids);
+    $found = array_unique(array_map('strtoupper', $ids[1]));
+    if (count($found) != 1 || !pdfValidDni(reset($found))) {
+        logMessage(LOGGER_WARN, "Nómina rejected: no single valid NIF in it.");
+        throw new PdfSignException("No se ha podido leer el NIF en la nómina.");
+    }
+
+    /* Vale si el cuerpo es docente o si la vinculación es de función docente
+       ("FUNC. DOCENTE"). El cuerpo va entre la cabecera de la fila y el número
+       de afiliación a la Seguridad Social (31/010059729/42); la vinculación,
+       tras su cabecera y los valores de grupo, nivel y N.C.D. */
+    $teachingBody = preg_match('/CUERPO DOCENTE N\S{0,2} AFILIACI[ÓO]N S\.S\. (.{1,150}?) ' .
+            '\d{2}\/\d{6,12}\/\d{2}\b/iu', $text, $body) &&
+        preg_match('/^(?:MAESTR[OA]S?|PROFESOR(?:ES|AS?)?|CATEDR[ÁA]TIC[OA]S?)\b/iu', trim($body[1]));
+    $teachingLink = preg_match('/VINCULACI[ÓO]N .{0,80}?\bFUNC(?:\.|IONARI[OA]S?|I[ÓO]N)? ?DOCENTE\b/iu',
+        $text);
+    if (!$teachingBody && !$teachingLink) {
+        logMessage(LOGGER_WARN, "Nómina rejected: not a teaching body: " . ($body[1] ?? "?"));
+        throw new PdfSignException("La nómina no es de un cuerpo docente.");
+    }
+
+    /* La nómina tiene que ser del mes en curso o del anterior: en noviembre
+       valen la de octubre y la de noviembre. */
+    $month = array_search(strtolower($period[1]), PDF_MONTHS, true);
+    if ($month === false)
+        throw new PdfSignException("No se ha podido leer el período de liquidación de la nómina.");
+    $paid = (int) $period[2] * 12 + $month;
+    $today = new DateTimeImmutable("today");
+    $current = (int) $today->format("Y") * 12 + (int) $today->format("n") - 1;
+    /* Un día de margen por si el servidor va en otra zona horaria: el último
+       día del mes ya se acepta la nómina del mes siguiente. */
+    $tomorrow = $today->modify("+1 day");
+    $next = (int) $tomorrow->format("Y") * 12 + (int) $tomorrow->format("n") - 1;
+    if ($paid < $current - 1 || $paid > $next) {
+        logMessage(LOGGER_WARN, "Nómina rejected: period " . $period[2] . "-" . ($month + 1) . ".");
+        throw new PdfSignException("La nómina tiene que ser del mes en curso o del mes anterior.");
+    }
     return reset($found);
 }

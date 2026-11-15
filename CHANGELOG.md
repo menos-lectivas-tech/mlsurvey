@@ -1,3 +1,6 @@
+# 1.7
+- Se admite la nómina de la Consejería de Educación, para interinos y funcionarios de carrera. Se lee el DNI (quitando la cifra que a veces lleva pegada detrás de la letra), se comprueba que el cuerpo docente sea de maestros, profesores o catedráticos o que la vinculación sea de función docente (`FUNC. DOCENTE`), y que el mes liquidado sea el mes en curso o el anterior (en noviembre valen la de octubre y la de noviembre). La nómina no lleva firma: solo se comprueba su contenido.
+
 # 1.6
 - Se deja de comprobar la firma del nombramiento, la credencial y la hoja de servicios, que pueden venir firmados a mano: de ellos se comprueba solo el contenido y las fechas que aparecen en el texto. Se eliminan los parámetros `nombramiento_ca_file` y `nombramiento_signer_orgs` y `certs/nombramiento_ca.pem`.
 - Se admite el formato de hoja de servicios de la DAT, con el DNI sin letra.

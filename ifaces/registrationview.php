@@ -29,6 +29,7 @@ abstract class RegistrationView extends View
     private const KIND_CAREER = "carrera";
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
+    private const KIND_NOMINA = "nomina";
     /* Situación que se elige en el primer paso del asistente de documentos. */
     private const REGIME_INTERIM = "interino";
     private const REGIME_CAREER = "carrera";
@@ -90,6 +91,21 @@ abstract class RegistrationView extends View
                     "(electrónicamente o a mano) en los últimos {$this->maxage} días.",
                 'needscert' => false,
                 'wait' => true,
+            ],
+            self::KIND_NOMINA => [
+                'label' => "Nómina",
+                'desc' => "Tu última nómina de la Consejería de Educación.",
+                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
+                'name' => "Nómina",
+                'where' => "La que descargas cada mes del portal del empleado.",
+                'url' => "",
+                'info' => "Nómina de la Consejería de Educación de un cuerpo docente (maestros, " .
+                    "profesores o catedráticos).\n\n" .
+                    "Adjunta el PDF tal como lo descargaste. Tiene que ser del mes en curso o del " .
+                    "mes anterior.",
+                'needscert' => false,
+                'wait' => false,
+                'tag' => "Se obtiene al momento (certificado)",
             ],
             self::KIND_CAREER => [
                 'label' => "Extracto de formación + certificado de MUFACE",
@@ -428,13 +444,16 @@ abstract class RegistrationView extends View
                                     <p>Para comprobar que eres docente en activo en un centro público de la
                                         Comunidad de Madrid necesitamos algún documento probatorio firmado
                                         (el nombramiento, la credencial y la hoja de servicios pueden
-                                        estar firmados a mano; el resto, digitalmente):</p>
+                                        estar firmados a mano y la nómina no lleva firma; el resto,
+                                        digitalmente):</p>
                                     <ul>
                                         <li>Si eres interino/a: tu nombramiento del curso actual, tu
-                                            credencial docente o tu hoja de servicios actualizada.</li>
+                                            credencial docente, tu hoja de servicios actualizada o tu
+                                            última nómina.</li>
                                         <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
                                             formación junto con tu certificado de afiliación a MUFACE, tu
-                                            credencial docente o tu hoja de servicios actualizada.</li>
+                                            credencial docente, tu hoja de servicios actualizada o tu
+                                            última nómina.</li>
                                     </ul>
                                     <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
                                         para comprobar su autenticidad, que el NIF coincide si son dos y que
@@ -446,7 +465,8 @@ abstract class RegistrationView extends View
                                         esa clave no es posible conocerlo. Solo sirve para impedir que una misma
                                         persona tenga más de una cuenta.</p>
                                     <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                        información de la necesaria, como tu domicilio, tu puesto de trabajo o,
+                                        información de la necesaria, como tu domicilio, tu puesto de trabajo, tus
+                                        retribuciones y datos bancarios en la nómina o,
                                         en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
                                         ni la conservamos.</p>
                                     <h5>Información básica sobre protección de datos</h5>
@@ -767,8 +787,8 @@ abstract class RegistrationView extends View
 
     /* Comprueba la firma del documento subido según lo elegido. El
        certificado de MUFACE va con el extracto de formación, y los dos
-       tienen que ser de la misma persona; el nombramiento, la credencial y
-       la hoja de servicios valen solos.
+       tienen que ser de la misma persona; el nombramiento, la credencial,
+       la hoja de servicios y la nómina valen solos.
        Devuelve el DNI leído, o null (con el motivo ya mostrado) si no vale.
        Los ficheros se quedan en el temporal de la subida: no se guardan. */
     private function getDni(): ?string
@@ -823,6 +843,8 @@ abstract class RegistrationView extends View
                     $dni = getHojaServiciosNIF($document);
                 else if ($kind == self::KIND_CREDENCIAL)
                     $dni = getCredencialNIF($document);
+                else if ($kind == self::KIND_NOMINA)
+                    $dni = getNominaNIF($document);
             } catch (PdfSignException $e) {
                 echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
                 return null;

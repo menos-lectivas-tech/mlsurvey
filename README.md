@@ -6,10 +6,11 @@ With this project we are trying to develop an online voting system based on the 
   Career civil servants upload the training record (_extracto de formación_) together with
   the MUFACE membership certificate: the DNI is read from the training record and the one in
   the certificate must be the same. Both can also use the teaching credential (_credencial
-  docente_) or the service record (_hoja de servicios_) on their own.
+  docente_), the service record (_hoja de servicios_) or a payslip (_nómina_) of a teaching
+  body (maestros, profesores or catedráticos) of the current or previous month on their own.
   The digital signatures of the training record and the MUFACE certificate are checked. The
-  appointment, the credential and the service record may be signed by hand, so only their
-  content and dates are checked.
+  appointment, the credential and the service record may be signed by hand, and the payslip
+  is not signed, so only their content and dates are checked.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -86,7 +87,8 @@ Every configuration item has a description, you only need to notice:
   membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
   electronic seal (`Q2861001B`) by default.
 * `pdf_max_age_days` is how old the MUFACE certificate and the service record (hoja de
-  servicios) can be (30 days by default), counting from the issue date in their text.
+  servicios) can be (30 days by default), counting from the issue date in their text. The
+  payslip (nómina) must be of the current month or the previous one.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
