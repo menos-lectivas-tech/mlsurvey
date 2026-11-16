@@ -283,6 +283,13 @@
     margin: 0 0 16px;
 }
 
+/* Aviso de que el registro pide el certificado digital. */
+.ml-wizard-cert {
+    background: var(--ml-warning-soft);
+    border-radius: var(--ml-radius);
+    padding: 10px 14px;
+}
+
 .ml-choices {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

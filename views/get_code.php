@@ -114,7 +114,8 @@ class GetCode extends RegistrationView
     /**
      * Called with $withdocs false from the email form and true from the documents one.
      * In the first case, if the email address is not in Participants table the method
-     * only shows the documents form.
+     * only shows the documents form, whose submit goes to the URL that asks for the client
+     * certificate (registration_url).
      *
      * In the second case the documents are checked and the participant is looked for
      * or inserted in Participants table by RegistrationView::registerWithDocs.
@@ -137,6 +138,10 @@ class GetCode extends RegistrationView
         $email = $this->getEmail();
         if ($email === null)
             return;
+        if ($withdocs && $this->mustGoToRegistration()) {
+            $this->notRegistrationHost();
+            return;
+        }
         $start_time = microtime(true);
         $surveyname = "";
         try {
@@ -159,11 +164,12 @@ class GetCode extends RegistrationView
             $hashemail = participantHash($email);
             /* Primer paso con una dirección que aún no está registrada: antes
                de enviarle el enlace tiene que acreditarse con los documentos. */
+            $back = getURL() . self::PAGE . "?responseid=" . (int) $surveyid;
             if (!$withdocs && $this->getParticipantId($db, $hashemail) === null) {
                 if (showSurveyHeader($db, $surveyid, true))
                     $this->showDocsForm($surveyid, $email, [
                         'action' => self::PAGE,
-                        'back' => self::PAGE . "?responseid=" . (int) $surveyid,
+                        'back' => $back,
                         'title' => "Primera vez: acredita que eres docente",
                         'intro' => "no ha participado antes. Sigue estos pasos para acreditarte y te " .
                             "enviaremos a esa dirección un enlace para participar.",

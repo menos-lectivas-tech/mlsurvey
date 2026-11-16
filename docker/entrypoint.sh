@@ -24,6 +24,30 @@ for d in files img/appicon log; do
     chown www-data:www-data "${APP_DIR}/${d}" 2>/dev/null || true
 done
 
+# HTTPS: certificado del servidor y CA admitidas para el certificado de cliente.
+# Se guardan en /etc/ssl/mlsurvey (volumen): monta ahi tu server.crt/server.key
+# y no se genera el autofirmado.
+SSL_DIR=/etc/ssl/mlsurvey
+mkdir -p "$SSL_DIR"
+if [ ! -f "$SSL_DIR/server.crt" ] || [ ! -f "$SSL_DIR/server.key" ]; then
+    echo "[mlsurvey] generando certificado autofirmado del servidor."
+    openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=localhost" \
+        -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" -addext "basicConstraints=critical,CA:FALSE" \
+        -keyout "$SSL_DIR/server.key" -out "$SSL_DIR/server.crt" 2>/dev/null
+    chmod 600 "$SSL_DIR/server.key"
+fi
+# La lista de CA cambia de vez en cuando: para regenerarla, borra el fichero y
+# reinicia, o ejecuta buildclientca.php y "apache2ctl graceful".
+if [ ! -s "$SSL_DIR/client_ca.pem" ]; then
+    echo "[mlsurvey] generando las CA admitidas desde la TSL (tarda unos segundos)."
+    if ! ( cd "$APP_DIR" && php buildclientca.php "$SSL_DIR/client_ca.pem" "" ${CLIENT_CA_EXTRA:+"$CLIENT_CA_EXTRA"} ); then
+        # Sin fichero Apache no arranca: provisionalmente, las CA del sistema.
+        echo "[mlsurvey] AVISO: no se ha podido descargar la TSL; el registro no aceptara" \
+            "certificados espanoles hasta regenerar $SSL_DIR/client_ca.pem."
+        cp /etc/ssl/certs/ca-certificates.crt "$SSL_DIR/client_ca.pem"
+    fi
+fi
+
 # config/config.php se genera leyendo el entorno: si montas el tuyo propio, se respeta.
 if [ -f "$CONFIG_FILE" ] && ! grep -q "$MARKER" "$CONFIG_FILE" 2>/dev/null; then
     echo "[mlsurvey] config/config.php propio detectado, no se sobreescribe."
@@ -44,6 +68,8 @@ define('CONFIG', [
 
 // URL publica del sitio: con ella se construyen los enlaces de los correos.
 "site_url"=>getenv('SITE_URL') ?: '',
+// URL del registro, la unica que pide el certificado electronico.
+"registration_url"=>getenv('REGISTRATION_URL') ?: '',
 
 "log_level"=>(int) (getenv('LOG_LEVEL') !== false ? getenv('LOG_LEVEL') : 0),
 
@@ -67,6 +93,13 @@ define('CONFIG', [
 
 // Antiguedad maxima de la hoja de servicios.
 "pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
+
+// Certificado electronico al registrarse: lo pide y verifica el HTTPS del
+// contenedor (docker/apache-sites.conf), que lo pasa en SSL_CLIENT_*. Con un
+// proxy TLS delante, las cabeceras donde lo pase (ver config.php.sample).
+"client_cert_enabled" => getenv('CLIENT_CERT_ENABLED') === 'false' ? false : true,
+"client_cert_verify_var" => getenv('CLIENT_CERT_VERIFY_VAR') ?: 'SSL_CLIENT_VERIFY',
+"client_cert_var" => getenv('CLIENT_CERT_VAR') ?: 'SSL_CLIENT_CERT',
 
 "ml_stresstest" => false,
 // Por defecto sin restringir, como en config.php.sample.
@@ -102,6 +135,20 @@ if [ -n "$ADMIN_USER" ] && [ -n "$ADMIN_PASSWORD" ]; then
     echo "[mlsurvey] comprobando usuario administrador '${ADMIN_USER}'."
     ( cd "$APP_DIR" && php addusercmd.php "$ADMIN_USER" "$ADMIN_PASSWORD" ) || \
         echo "[mlsurvey] el usuario administrador ya existia o no se pudo crear."
+fi
+
+# HTTP -> HTTPS (docker/apache-sites.conf): a la URL publica, que lleva el
+# puerto de fuera del contenedor. Sin SITE_URL https:// no se redirige.
+SITE_URL_VALUE="${SITE_URL:-}"
+if [ "${HTTPS_REDIRECT:-true}" != "false" ] && [ "$1" = "apache2-foreground" ]; then
+    case "$SITE_URL_VALUE" in
+        https://*)
+            export HTTPS_REDIRECT_URL="${SITE_URL_VALUE%/}/"
+            set -- "$@" -DHTTPS_REDIRECT
+            echo "[mlsurvey] HTTP redirige a ${HTTPS_REDIRECT_URL}" ;;
+        *)
+            echo "[mlsurvey] AVISO: SITE_URL no es https://, HTTP no redirige a HTTPS." ;;
+    esac
 fi
 
 exec "$@"

@@ -13,6 +13,8 @@ function startSession (){
         session_set_cookie_params ([
             'lifetime' => 0,
             'path' => '/',
+            /* La del registro tiene que llegar también a su URL. */
+            'domain' => sessionCookieDomain (),
             'secure' => isHttps (),
             'httponly' => true,
             'samesite' => 'Lax',

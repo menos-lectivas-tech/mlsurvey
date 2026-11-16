@@ -32,6 +32,12 @@ class Register extends RegistrationView
     public function show()
     {
         if ($this->isDocsSubmit()) {
+            /* El envío va a la URL del registro, que pide el certificado. */
+            if ($this->mustGoToRegistration()) {
+                $this->notRegistrationHost();
+                $this->showWizard(true);
+                return;
+            }
             if ($this->checkSubmit() && $this->register())
                 return;
             $this->showWizard(true);

@@ -68,6 +68,11 @@ services:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-8080}:80"
+      # HTTPS del sitio (HTTP redirige a SITE_URL).
+      - "${WEB_SSL_PORT:-8443}:443"
+      # HTTPS del registro: el unico que pide el certificado electronico, al
+      # recibir el envio final del asistente.
+      - "${WEB_REG_PORT:-8444}:444"
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -82,7 +87,10 @@ services:
       APACHE_LISTEN_BACKLOG: ${APACHE_LISTEN_BACKLOG:-1024}
       # URL publica del sitio, tal como la ven las participantes. Los enlaces
       # de los correos se construyen con ella, no con la cabecera Host.
-      SITE_URL: ${SITE_URL:-http://localhost:${WEB_PORT:-8080}/}
+      SITE_URL: ${SITE_URL:-https://localhost:${WEB_SSL_PORT:-8443}/}
+      # URL del registro, la unica que pide el certificado electronico (el
+      # puerto 444 del contenedor; en produccion, p. ej. https://registro.dominio/).
+      REGISTRATION_URL: ${REGISTRATION_URL:-https://localhost:${WEB_REG_PORT:-8444}/}
       # 0: error, 1: warn, 2: info, 3: debug. En produccion 0.
       LOG_LEVEL: ${LOG_LEVEL:-0}
       # Envio de correo (antes en la base de datos, ahora en config/config.php).
@@ -107,6 +115,17 @@ services:
       PARTICIPANT_HMAC_KEY: ${PARTICIPANT_HMAC_KEY:-6f7e874a8d9798107bc29aae835ffede3f922e03ad9c2d3f0631db3d87c6977e}
       # Antiguedad maxima de la hoja de servicios.
       PDF_MAX_AGE_DAYS: ${PDF_MAX_AGE_DAYS:-30}
+      # Certificado electronico al registrarse (ver .env.dev): lo pide el
+      # HTTPS del contenedor. Con un proxy TLS delante, las cabeceras donde
+      # lo pase.
+      CLIENT_CERT_ENABLED: ${CLIENT_CERT_ENABLED:-true}
+      # HTTP redirige a SITE_URL si es https://. false con un proxy TLS que
+      # llegue al contenedor por HTTP.
+      HTTPS_REDIRECT: ${HTTPS_REDIRECT:-true}
+      CLIENT_CERT_VERIFY_VAR: ${CLIENT_CERT_VERIFY_VAR:-SSL_CLIENT_VERIFY}
+      CLIENT_CERT_VAR: ${CLIENT_CERT_VAR:-SSL_CLIENT_CERT}
+      # PEM opcional con CA raiz que la TSL no trae (ver buildclientca.php).
+      CLIENT_CA_EXTRA: ${CLIENT_CA_EXTRA:-}
       # Administrador inicial: se crea al arrancar si no existe.
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
@@ -115,6 +134,8 @@ services:
       SURVEY_EDIT_RESTRIC: ${SURVEY_EDIT_RESTRIC:-false}
     volumes:
       - uploads:/var/www/html/files
+      # Certificado del servidor HTTPS y CA admitidas del certificado de cliente.
+      - ssl:/etc/ssl/mlsurvey
       # Para desarrollo, descomenta para editar el codigo sin reconstruir la imagen:
       - ./:/var/www/html
       # Sin esto, el montaje anterior tapa el vendor/ que instala composer
@@ -124,4 +145,5 @@ services:
 volumes:
   db_data:
   uploads:
+  ssl:
   mail_data:

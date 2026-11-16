@@ -16,6 +16,19 @@ const CONFIG = [
  */
 "site_url"=>"",
 
+/**
+ * URL of the registration (e.g. "https://registro.consultas.example.org/"):
+ * the only virtual host that asks for the client certificate (see
+ * client_cert_*), so it is not asked when voting. It serves the same
+ * application: the documents wizard is shown in site_url and only its final
+ * submit (document and email address) goes there, so the browser asks for the
+ * certificate at that moment. It must be the host of site_url in another port
+ * or a subdomain of it (the session cookie has to reach both). Empty:
+ * registering is done in site_url, which then has to ask for the certificate
+ * itself.
+ */
+"registration_url"=>"",
+
 
 /**
  * For logging
@@ -65,6 +78,23 @@ const CONFIG = [
  */
 
 "pdf_max_age_days" => 30,
+
+/**
+ * Client certificate (certificado digital: FNMT, DNI electronico...) asked
+ * when registering: the DNI of the uploaded document must be the one of the
+ * certificate. Only the registration_url virtual host should ask for it. The web server verifies the certificate chain (SSLVerifyClient
+ * with the CAs accepted in SSLCACertificateFile) and passes the result and the
+ * certificate in these $_SERVER variables. Make the CA file, with every
+ * qualified CA of the Spanish Trusted List, with buildclientca.php. By default the ones of Apache
+ * mod_ssl with "SSLOptions +StdEnvVars +ExportCertData". Behind a TLS proxy
+ * use the headers it sets, e.g. HTTP_X_SSL_CLIENT_VERIFY and
+ * HTTP_X_SSL_CLIENT_CERT (PEM or URL-encoded PEM): the proxy must always
+ * overwrite them, or anyone could send their own.
+ * client_cert_enabled: set it to false only for development.
+ */
+"client_cert_enabled" => true,
+"client_cert_verify_var" => "SSL_CLIENT_VERIFY",
+"client_cert_var" => "SSL_CLIENT_CERT",
 
 /**
  * For enabling stress test bypasses
