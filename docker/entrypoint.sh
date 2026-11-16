@@ -65,15 +65,7 @@ define('CONFIG', [
 // Clave del HMAC del correo y el DNI de las participantes: obligatoria y fija.
 "participant_hmac_key" => getenv('PARTICIPANT_HMAC_KEY') ?: '',
 
-// Firma del extracto de formacion: autoridades de confianza y NIF de los
-// sellos admitidos (separados por comas).
-"pdf_ca_file" => getenv('PDF_CA_FILE') ?: 'certs/extracto_ca.pem',
-"pdf_signer_ids" => array_map('trim', explode(',', getenv('PDF_SIGNER_IDS') ?: 'S7800001E')),
-
-// Documento que acredita el regimen (Clases Pasivas o resto): sello de MUFACE admitido para el
-// certificado de afiliacion (separados por comas) y antiguedad maxima del PDF.
-"muface_ca_file" => getenv('MUFACE_CA_FILE') ?: 'certs/muface_ca.pem',
-"muface_signer_ids" => array_map('trim', explode(',', getenv('MUFACE_SIGNER_IDS') ?: 'Q2861001B')),
+// Antiguedad maxima de la hoja de servicios.
 "pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
 
 "ml_stresstest" => false,

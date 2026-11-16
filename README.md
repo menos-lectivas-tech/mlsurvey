@@ -2,13 +2,10 @@
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
 * Identify participants by official PDFs, so each person can vote only once. Interim
-  teachers upload the appointment (_nombramiento_) of the current school year on its own.
-  Career civil servants upload the training record (_extracto de formación_) together with
-  the MUFACE membership certificate: the DNI is read from the training record and the one in
-  the certificate must be the same. Both can also use the teaching credential (_credencial
+  teachers can upload the appointment (_nombramiento_) of the current school year. Both
+  interim teachers and career civil servants can use the teaching credential (_credencial
   docente_), the service record (_hoja de servicios_) or a payslip (_nómina_) of a teaching
-  body (maestros, profesores or catedráticos) of the current or previous month on their own.
-  The digital signatures of the training record and the MUFACE certificate are checked. The
+  body (maestros, profesores or catedráticos) of the current or previous month. The
   appointment, the credential and the service record may be signed by hand, and the payslip
   is not signed, so only their content and dates are checked.
 * The system needs to be as anonymous as possible.
@@ -32,7 +29,7 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl` and poppler-utils (`pdftotext`, `pdfinfo`, `pdftoppm`) commands, for checking the signed PDF, and `tesseract` with the Spanish data (`tesseract-ocr-spa`), for reading with OCR the documents that are a photo or a scan.
+* The poppler-utils (`pdftotext`, `pdfinfo`, `pdftoppm`) commands, for reading the PDF, and `tesseract` with the Spanish data (`tesseract-ocr-spa`), for reading with OCR the documents that are a photo or a scan.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -80,15 +77,9 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
-* `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
-  PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
-  electronic seal (`S7800001E`) by default.
-* `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
-  membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
-  electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate and the service record (hoja de
-  servicios) can be (30 days by default), counting from the issue date in their text. The
-  payslip (nómina) must be of the current month or the previous one.
+* `pdf_max_age_days` is how old the service record (hoja de servicios) can be (30 days by
+  default), counting from the issue date in its text. The payslip (nómina) must be of the
+  current month or the previous one.
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -196,11 +187,7 @@ the database to be ready before serving requests.
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
-| `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
-| `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
-| `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
-| `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate and the service record can be, counting from their issue date. |
+| `PDF_MAX_AGE_DAYS` | `30` | How old the service record can be, counting from its issue date. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

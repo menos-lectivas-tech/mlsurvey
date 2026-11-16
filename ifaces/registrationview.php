@@ -26,16 +26,12 @@ abstract class RegistrationView extends View
     /* Segundo paso: envío de los documentos de quien aún no está registrado. */
     private const ACTION_DOCS = "Documentos";
     private const KIND_INTERIM = "interino";
-    private const KIND_CAREER = "carrera";
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
     private const KIND_NOMINA = "nomina";
     /* Situación que se elige en el primer paso del asistente de documentos. */
     private const REGIME_INTERIM = "interino";
     private const REGIME_CAREER = "carrera";
-    /* Páginas en las que se descarga cada documento. */
-    private const URL_EXTRACTO = "https://gestiona.comunidad.madrid/gifp_web";
-    private const URL_MUFACE = "https://sede.muface.gob.es/sedeclave/public/servicio.htm?idServicio=11";
     private const PRIVACY_POLICY_FILE = "privacypolicy.html";
     private array $docs = array();
 
@@ -46,10 +42,9 @@ abstract class RegistrationView extends View
         /* Documentos con los que se puede acreditar cada situación, en el
            orden en que se ofrecen. label y desc son los de la tarjeta del
            segundo paso del asistente; name, info, where y url los del
-           fichero que se adjunta en el tercero. needscert indica si va
-           acompañado del extracto de formación y wait si hay que pedirlo
-           (y puede tardar) en lugar de descargarlo al momento; tag sustituye
-           a la etiqueta "Al momento" de los que no hay que pedir. */
+           fichero que se adjunta en el tercero. wait indica si hay que
+           pedirlo (y puede tardar) en lugar de descargarlo al momento; tag
+           sustituye a la etiqueta "Al momento" de los que no hay que pedir. */
         $centro = "Si aún no la tienes, pídela cuanto antes en la secretaría: puede " .
             "tardar unos días en llegarte.";
         $this->docs = [
@@ -64,7 +59,6 @@ abstract class RegistrationView extends View
                     "firmado electrónicamente o a mano.\n\n" .
                     "Adjunta el PDF tal como lo recibiste, o escaneado si está firmado a mano. " .
                     "Tiene que ser del curso actual y estar en vigor.",
-                'needscert' => false,
                 'wait' => false,
                 'tag' => "En tu email",
             ],
@@ -77,7 +71,6 @@ abstract class RegistrationView extends View
                 'url' => "",
                 'info' => "Credencial de nombramiento para puesto docente.\n\n" .
                     "Debe estar firmada (electrónicamente o a mano) y corresponder al curso actual.",
-                'needscert' => false,
                 'wait' => true,
             ],
             self::KIND_HOJASERVICIOS => [
@@ -89,7 +82,6 @@ abstract class RegistrationView extends View
                 'url' => "",
                 'info' => "Una hoja de servicios del curso actual expedida y firmada " .
                     "(electrónicamente o a mano) en los últimos {$this->maxage} días.",
-                'needscert' => false,
                 'wait' => true,
             ],
             self::KIND_NOMINA => [
@@ -103,26 +95,6 @@ abstract class RegistrationView extends View
                     "profesores o catedráticos).\n\n" .
                     "Adjunta el PDF tal como lo descargaste. Tiene que ser del mes en curso o del " .
                     "mes anterior.",
-                'needscert' => false,
-                'wait' => false,
-                'tag' => "Se obtiene al momento (certificado)",
-            ],
-            self::KIND_CAREER => [
-                'label' => "Extracto de formación + certificado de MUFACE",
-                'desc' => "Utiliza esta opción si no tienes los anteriores.   
-                     Los dos se descargan al momento con certificado digital o Cl@ve.",
-                'links' => [
-                    "Extracto de formación" => self::URL_EXTRACTO,
-                    "Certificado de MUFACE" => self::URL_MUFACE,
-                ],
-                'regimes' => [self::REGIME_CAREER],
-                'name' => "Certificado de afiliación a MUFACE",
-                'where' => "Se descarga en la sede electrónica de MUFACE.",
-                'url' => self::URL_MUFACE,
-                'info' => "Se descarga en la sede electrónica de MUFACE.\n\n" .
-                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente) y " .
-                    "expedido en los últimos {$this->maxage} días.",
-                'needscert' => true,
                 'wait' => false,
                 'tag' => "Se obtiene al momento (certificado)",
             ],
@@ -347,7 +319,6 @@ abstract class RegistrationView extends View
                                         data-where="<?= h($d['where']); ?>"
                                         data-url="<?= h($d['url']); ?>"
                                         data-info="<?= h($d['info']); ?>"
-                                        data-cert="<?= $d['needscert'] ? "1" : "0"; ?>"
                                         <?= ($selected['tipo'] ?? null) === $kind ? "checked" : ""; ?>>
                                     <span class="ml-choice__body">
                                         <span class="ml-choice__title"><?= h($d['label']); ?>
@@ -360,14 +331,6 @@ abstract class RegistrationView extends View
                                         <span class="ml-choice__desc"><?= h($d['desc']); ?></span>
                                     </span>
                                 </label>
-                                <?php if (!empty($d['links'])) { ?>
-                                    <p class="ml-choice__links">
-                                        <?php foreach ($d['links'] as $text => $url) { ?>
-                                            <a href="<?= h($url); ?>" target="_blank"
-                                                rel="noopener noreferrer">Obtener <?= h(lcfirst($text)); ?></a>
-                                        <?php } ?>
-                                    </p>
-                                <?php } ?>
                             </div>
                         <?php } ?>
                     </div>
@@ -397,23 +360,6 @@ abstract class RegistrationView extends View
                                 value="<?= h($selected['email'] ?? ""); ?>">
                         </div>
                     <?php } ?>
-                    <div id="extractodiv">
-                        <div class="ml-participate-doc">
-                            <label for="extracto">Extracto de formación</label>
-                            <?= $this->infoButton(
-                                "Extracto de formación",
-                                "Se descarga en el portal de la Comunidad de Madrid.\n\n" .
-                                    "Adjunta el PDF tal como lo descargaste (firmado digitalmente)."
-                            ); ?>
-                            <small>Se descarga al momento en el portal de la Comunidad de Madrid:
-                                <a href="<?= self::URL_EXTRACTO; ?>" target="_blank"
-                                    rel="noopener noreferrer">obtener aquí</a>.</small>
-                        </div>
-                        <div class="ml-participate-row">
-                            <input type="file" name="extracto" id="extracto"
-                                accept="application/pdf,.pdf">
-                        </div>
-                    </div>
                     <div class="ml-participate-doc">
                         <label for="documento" id="documento-name"></label>
                         <?= $this->infoButton("", "", "documento-info"); ?>
@@ -442,21 +388,20 @@ abstract class RegistrationView extends View
                                     condición de docente de la enseñanza pública</h2>
                                 <div class="ml-legal-body" tabindex="0">
                                     <p>Para comprobar que eres docente en activo en un centro público de la
-                                        Comunidad de Madrid necesitamos algún documento probatorio firmado
+                                        Comunidad de Madrid necesitamos algún documento probatorio
                                         (el nombramiento, la credencial y la hoja de servicios pueden
-                                        estar firmados a mano y la nómina no lleva firma; el resto,
-                                        digitalmente):</p>
+                                        estar firmados digitalmente o a mano; la nómina no lleva
+                                        firma):</p>
                                     <ul>
                                         <li>Si eres interino/a: tu nombramiento del curso actual, tu
                                             credencial docente, tu hoja de servicios actualizada o tu
                                             última nómina.</li>
-                                        <li>Si eres funcionario/a de carrera o en prácticas: tu extracto de
-                                            formación junto con tu certificado de afiliación a MUFACE, tu
+                                        <li>Si eres funcionario/a de carrera o en prácticas: tu
                                             credencial docente, tu hoja de servicios actualizada o tu
                                             última nómina.</li>
                                     </ul>
                                     <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
-                                        para comprobar su autenticidad, que el NIF coincide si son dos y que
+                                        para comprobar su autenticidad y que
                                         figuras en servicio activo en la Consejería de Educación. Se procesan en
                                         memoria y se eliminan en cuanto termina la comprobación. No guardamos los
                                         documentos ni ningún dato extraído de ellos.</p>
@@ -466,8 +411,7 @@ abstract class RegistrationView extends View
                                         persona tenga más de una cuenta.</p>
                                     <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
                                         información de la necesaria, como tu domicilio, tu puesto de trabajo, tus
-                                        retribuciones y datos bancarios en la nómina o,
-                                        en el certificado de MUFACE, los datos de tus beneficiarios. No la leemos
+                                        retribuciones y datos bancarios en la nómina. No la leemos
                                         ni la conservamos.</p>
                                     <h5>Información básica sobre protección de datos</h5>
                                     <ul>
@@ -522,8 +466,6 @@ abstract class RegistrationView extends View
                 var steps = form.querySelectorAll(".ml-wizard-step");
                 var progress = document.querySelectorAll("#ml-wizard-progress li");
                 var choices = form.querySelectorAll(".ml-choice[data-regimes]");
-                var extractodiv = document.getElementById("extractodiv");
-                var extracto = document.getElementById("extracto");
                 var file = document.getElementById("documento");
                 var info = document.getElementById("documento-info");
                 var url = document.getElementById("documento-url");
@@ -584,17 +526,12 @@ abstract class RegistrationView extends View
                     document.getElementById("documento-where").textContent = data.where;
                     url.hidden = data.url == "";
                     url.href = data.url || "#";
-                    var cert = data.cert == "1";
-                    extractodiv.hidden = !cert;
-                    extracto.required = cert;
                     info.dataset.title = data.name;
                     info.setAttribute("aria-label", "Más información: " + data.name);
                     info.dataset.info = data.info;
                     /* Los ficheros elegidos eran los de otro documento. */
-                    if (clear) {
+                    if (clear)
                         file.value = "";
-                        extracto.value = "";
-                    }
                 }
 
                 /* «Continuar» solo se activa cuando hay algo elegido en el paso. */
@@ -785,12 +722,10 @@ abstract class RegistrationView extends View
         return $file['tmp_name'];
     }
 
-    /* Comprueba la firma del documento subido según lo elegido. El
-       certificado de MUFACE va con el extracto de formación, y los dos
-       tienen que ser de la misma persona; el nombramiento, la credencial,
-       la hoja de servicios y la nómina valen solos.
+    /* Comprueba el documento subido según lo elegido: el nombramiento, la
+       credencial, la hoja de servicios o la nómina.
        Devuelve el DNI leído, o null (con el motivo ya mostrado) si no vale.
-       Los ficheros se quedan en el temporal de la subida: no se guardan. */
+       El fichero se queda en el temporal de la subida: no se guarda. */
     private function getDni(): ?string
     {
         $kind = $_REQUEST['tipo'] ?? null;
@@ -798,57 +733,28 @@ abstract class RegistrationView extends View
             echo ("<p><strong>Hay que indicar la documentación con la que te validas..</strong></p>");
             return null;
         }
-        $thedoc = $this->docs[$kind];
-        $docname = $thedoc["name"];
-        $extracto = null;
-        if ($thedoc["needscert"]) {
-            $extracto = $this->getUpload('extracto', "extracto de formación");
-            if ($extracto === null)
-                return null;
-        }
+        $docname = $this->docs[$kind]["name"];
 
         $document = $this->getUpload('documento', $docname);
         if ($document === null)
             return null;
 
         $dni = "";
-        if ($thedoc["needscert"]) {
-            /* Para que el mensaje de error diga de qué fichero habla. */
-            $checking = "extracto de formación";
-            try {
-                checkExtractoSignature($extracto);
-                $dni = getPdfDni($extracto);
-                $checking = $docname;
-                checkMufaceSignature($document);
-                $documentdni = getMufaceDni($document);
-            } catch (PdfSignException $e) {
-                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
-                return null;
-            }
-            if (!hash_equals($dni, $documentdni)) {
-                echo ("<p><strong>El DNI del {$docname} no coincide con el del extracto de " .
-                    "formación.</strong></p>");
-                logMessage(LOGGER_WARN, "PDF rejected: the DNI is not the one in the training record.");
-                return null;
-            }
-        } else {
-            try {
-                $checking = $docname;
-                /* Pueden venir firmados digitalmente o a mano: de estos no se
-                   comprueba la firma, solo el contenido. */
-                pdfReadFile($document);
-                if ($kind == self::KIND_INTERIM)
-                    $dni = getNombramientoDni($document);
-                else if ($kind == self::KIND_HOJASERVICIOS)
-                    $dni = getHojaServiciosNIF($document);
-                else if ($kind == self::KIND_CREDENCIAL)
-                    $dni = getCredencialNIF($document);
-                else if ($kind == self::KIND_NOMINA)
-                    $dni = getNominaNIF($document);
-            } catch (PdfSignException $e) {
-                echo ("<p><strong>" . ucfirst($checking) . ": " . h($e->getMessage()) . "</strong></p>");
-                return null;
-            }
+        try {
+            /* Pueden venir firmados digitalmente o a mano: no se comprueba
+               la firma, solo el contenido. */
+            pdfReadFile($document);
+            if ($kind == self::KIND_INTERIM)
+                $dni = getNombramientoDni($document);
+            else if ($kind == self::KIND_HOJASERVICIOS)
+                $dni = getHojaServiciosNIF($document);
+            else if ($kind == self::KIND_CREDENCIAL)
+                $dni = getCredencialNIF($document);
+            else if ($kind == self::KIND_NOMINA)
+                $dni = getNominaNIF($document);
+        } catch (PdfSignException $e) {
+            echo ("<p><strong>" . ucfirst($docname) . ": " . h($e->getMessage()) . "</strong></p>");
+            return null;
         }
         return $dni === "" ? null : $dni;
     }

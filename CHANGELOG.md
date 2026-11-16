@@ -1,4 +1,5 @@
 # 1.7
+- Se quita la opción de acreditarse con el extracto de formación y el certificado de afiliación a MUFACE. Se eliminan los parámetros `pdf_ca_file`, `pdf_signer_ids`, `muface_ca_file` y `muface_signer_ids`, `certs/extracto_ca.pem` y `certs/muface_ca.pem`, y la dependencia de `openssl`.
 - Se admite la nómina de la Consejería de Educación, para interinos y funcionarios de carrera. Se lee el DNI (quitando la cifra que a veces lleva pegada detrás de la letra), se comprueba que el cuerpo docente sea de maestros, profesores o catedráticos o que la vinculación sea de función docente (`FUNC. DOCENTE`), y que el mes liquidado sea el mes en curso o el anterior (en noviembre valen la de octubre y la de noviembre). La nómina no lleva firma: solo se comprueba su contenido.
 
 # 1.6

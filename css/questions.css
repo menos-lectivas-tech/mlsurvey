@@ -357,15 +357,6 @@
     font-size: 0.9375rem;
 }
 
-.ml-choice__links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
-    margin: -8px 0 0;
-    padding: 0 16px 14px 46px;
-    font-size: 0.9375rem;
-}
-
 .ml-tag {
     display: block;
     width: fit-content;

@@ -1,10 +1,10 @@
 FROM php:8.3-apache
 
 # Dependencias de sistema: composer necesita git/unzip para descargar los paquetes;
-# openssl y poppler-utils comprueban la firma de los documentos PDF y leen su texto;
+# poppler-utils lee el texto de los documentos PDF;
 # tesseract lee con OCR los que son una foto o un escaneo.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git unzip openssl poppler-utils \
+    && apt-get install -y --no-install-recommends git unzip poppler-utils \
         tesseract-ocr tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/* \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql opcache \
