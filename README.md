@@ -2,14 +2,17 @@
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
 * Identify participants by official PDFs, so each person can vote only once. Interim
-  teachers upload the appointment (_nombramiento_) of the current school year on its own.
-  Career civil servants upload the training record (_extracto de formación_) together with
-  the MUFACE membership certificate: the DNI is read from the training record and the one in
-  the certificate must be the same. Both can also use the teaching credential (_credencial
-  docente_) or the service record (_hoja de servicios_) on their own.
-  The digital signatures of the training record and the MUFACE certificate are checked. The
-  appointment, the credential and the service record may be signed by hand, so only their
-  content and dates are checked.
+  teachers can upload the appointment (_nombramiento_) of the current school year. Both
+  interim teachers and career civil servants can use the teaching credential (_credencial
+  docente_), the service record (_hoja de servicios_) or a payslip (_nómina_) of a teaching
+  body (maestros, profesores or catedráticos) of the current or previous month. The
+  appointment, the credential and the service record may be signed by hand, and the payslip
+  is not signed, so only their content and dates are checked.
+* When registering, participants identify themselves with their client certificate
+  (_certificado electrónico_): the DNI electrónico, the FNMT one, the public employee one or
+  any other qualified certificate of a natural person of the Spanish Trusted List (ACCV,
+  Izenpe, Camerfirma, notaries...). The DNI of the uploaded document
+  must be the one of the certificate, so nobody can register with someone else's documents.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -31,7 +34,8 @@ This application needs a LAMP server:
 * Apache + PHP >=8.3 with PDO and PDO_mysql
 * MariaDB >=11.4
 * Composer
-* The `openssl` and poppler-utils (`pdftotext`, `pdfinfo`, `pdftoppm`) commands, for checking the signed PDF, and `tesseract` with the Spanish data (`tesseract-ocr-spa`), for reading with OCR the documents that are a photo or a scan.
+* HTTPS with client certificate authentication (`SSLVerifyClient`), see below.
+* The poppler-utils (`pdftotext`, `pdfinfo`, `pdftoppm`) commands, for reading the PDF, and `tesseract` with the Spanish data (`tesseract-ocr-spa`), for reading with OCR the documents that are a photo or a scan.
 
 MariaDB must be initialized and configured with an user and a database for the application.
 
@@ -79,14 +83,59 @@ Every configuration item has a description, you only need to notice:
 "email_from" => "no-reply@domain.com", //Sender address
 "email_encryption" => "", //ssl or tls for starttls.
 ```
-* `pdf_ca_file` and `pdf_signer_ids` set who is trusted for signing the training record
-  PDF: the certification authorities in `certs/extracto_ca.pem` and the Comunidad de Madrid
-  electronic seal (`S7800001E`) by default.
-* `muface_ca_file` and `muface_signer_ids` set who is trusted for signing the MUFACE
-  membership certificate: the certification authorities in `certs/muface_ca.pem` and the MUFACE
-  electronic seal (`Q2861001B`) by default.
-* `pdf_max_age_days` is how old the MUFACE certificate and the service record (hoja de
-  servicios) can be (30 days by default), counting from the issue date in their text.
+* `pdf_max_age_days` is how old the service record (hoja de servicios) can be (30 days by
+  default), counting from the issue date in its text. The payslip (nómina) must be of the
+  current month or the previous one.
+* `client_cert_enabled` (`true` by default) asks for the client certificate when
+  registering, and only then: not for voting. The browser only asks for it during the
+  TLS handshake, so registering is served by its own virtual host, `registration_url`
+  (e.g. `https://registro.example.org/`, with the same `DocumentRoot`). The documents
+  wizard is shown in the site and only its final submit (document and email address) goes
+  there, so the browser asks for the certificate at that moment. It must be the host of
+  `site_url` in another port or a subdomain of it: the CAPTCHA and the form token are kept
+  in the session, and its cookie must reach both. Only that virtual host asks for the
+  certificate; with Apache mod_ssl:
+  ```apache
+  <VirtualHost *:443>
+      ServerName registro.example.org
+      DocumentRoot /var/www/mlsurvey
+      # ... SSLEngine, server certificate ...
+      # The CAs accepted, made by buildclientca.php (see below).
+      SSLCACertificateFile /etc/ssl/mlsurvey/client_ca.pem
+      SSLVerifyClient optional_no_ca
+      SSLVerifyDepth 4
+      SSLOptions +StdEnvVars +ExportCertData
+  </VirtualHost>
+  ```
+  `optional_no_ca` lets an expired certificate or one of another CA through as `FAILED`, so
+  the application explains the reason instead of the browser showing a TLS error; only
+  `SUCCESS` is accepted. Asking for it only in some paths of the main site (`<Location>`)
+  doesn't work: it needs TLS renegotiation, which TLS 1.3 and HTTP/2 don't support. Behind a TLS proxy, set `client_cert_verify_var` and `client_cert_var` to
+  the headers where it passes the result and the certificate (e.g.
+  `HTTP_X_SSL_CLIENT_VERIFY` and `HTTP_X_SSL_CLIENT_CERT`), and make sure the proxy always
+  overwrites them. The certificate and its DNI are not stored. Revocation is not checked
+  by the application: configure it in the server (`SSLOCSPEnable`) if needed.
+
+  The DNI/NIE is read from the `serialNumber` of the subject (`12345678Z`,
+  `IDCES-12345678Z`...), from the `subjectAltName` of the FNMT and public employee
+  profiles, or from the CN (`... - 12345678Z`, `... - NIF 12345678Z`,
+  `12345678Z NAME (R: B12345678)`); certificates without the DNI/NIE of a natural person
+  (seals, components, foreign ones) are rejected.
+
+  `buildclientca.php` makes the CA file from the Spanish Trusted List (TSL,
+  `https://tsl.digital.gob.es/TSL.xml`): the qualified CAs for electronic signatures in
+  force, with the subordinate CAs of the DNIe root and the issuers needed up to the roots
+  (taken from the TSL, the CAs of the system or their AIA). Run it regularly, as the TSL
+  changes, and reload the web server:
+  ```sh
+  php buildclientca.php /etc/ssl/mlsurvey/client_ca.pem && systemctl reload apache2
+  ```
+  It warns about the CAs whose root it could not find: download those roots from the
+  provider's website and pass them in a PEM file as third argument
+  (`php buildclientca.php out.pem "" extra_roots.pem`).
+
+  Cl@ve PIN and Cl@ve permanente are not certificates: they can't be used this way (they
+  need integrating with Cl@ve, only available to public administrations).
 * If you plan to use a fake participant for testing the server you must set
 ```php
 "ml_stresstest" => true,
@@ -173,8 +222,16 @@ no need to run `composer` by hand.
    docker compose up -d --build
    ```
 
-3. Open `http://localhost:8080` (or whichever port you set in `WEB_PORT`) and log in with
-   the administrator account defined by `ADMIN_USER` / `ADMIN_PASSWORD`.
+3. Open `https://localhost:8443` (or whichever port you set in `WEB_SSL_PORT`) and log in
+   with the administrator account defined by `ADMIN_USER` / `ADMIN_PASSWORD`. The server
+   certificate is self-signed, so the browser warns about it the first time; mount your own
+   `server.crt` and `server.key` in the `ssl` volume (`/etc/ssl/mlsurvey`) for production.
+   Plain HTTP (`WEB_PORT`, 8080) redirects to `SITE_URL` (see `HTTPS_REDIRECT`).
+   The final submit of the registration wizard goes to `https://localhost:8444`
+   (`WEB_REG_PORT`, `REGISTRATION_URL`), the only port that asks for the client
+   certificate: the browser asks for it when the document and the email address are sent. It only offers the
+   certificates it has installed (Firefox: Settings → Certificates; Chrome/Edge: the ones of
+   the system) and, for the DNIe, its reader and driver must be installed.
 
 The first start takes a while: MariaDB loads the schema and the `web` container waits for
 the database to be ready before serving requests.
@@ -183,22 +240,25 @@ the database to be ready before serving requests.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `WEB_PORT` | `8080` | Host port the application is published on. |
+| `WEB_PORT` | `8080` | Host port of plain HTTP, which redirects to `SITE_URL`. |
+| `WEB_SSL_PORT` | `8443` | Host port of HTTPS: the site, without client certificate. |
+| `WEB_REG_PORT` | `8444` | Host port of the registration HTTPS, which asks for the client certificate. |
+| `REGISTRATION_URL` | `https://localhost:${WEB_REG_PORT}/` | Public URL of the registration (port 444 of the container). |
 | `DB_NAME` | `mlsurvey` | Database name. |
 | `DB_USER` | `mlsurvey` | Database user. |
 | `DB_PASSWORD` | `mlsurvey` | Password for that user. |
 | `DB_ROOT_PASSWORD` | `mlsurvey-root` | MariaDB `root` password. |
 | `DB_PREFIX` | *(empty)* | Optional prefix for table names. |
-| `SITE_URL` | `http://localhost:${WEB_PORT}/` | Public URL of the site (scheme, host, port and path). The participation links sent by email are built from it, never from the request's `Host` header. |
+| `SITE_URL` | `https://localhost:${WEB_SSL_PORT}/` | Public URL of the site (scheme, host, port and path). The participation links sent by email are built from it, never from the request's `Host` header. |
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
-| `PDF_CA_FILE` | `certs/extracto_ca.pem` | PEM file with the certification authorities trusted for the signature of the training record PDF. |
-| `PDF_SIGNER_IDS` | `S7800001E` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign the PDF. |
-| `MUFACE_CA_FILE` | `certs/muface_ca.pem` | PEM file with the certification authorities trusted for the signature of the MUFACE membership certificate. |
-| `MUFACE_SIGNER_IDS` | `Q2861001B` | Comma separated `serialNumber` (NIF) of the certificates allowed to sign it. |
-| `PDF_MAX_AGE_DAYS` | `30` | How old the MUFACE certificate and the service record can be, counting from their issue date. |
+| `PDF_MAX_AGE_DAYS` | `30` | How old the service record can be, counting from its issue date. |
+| `CLIENT_CERT_ENABLED` | `true` | Ask for the client certificate when registering (only in port 444, see `docker/apache-sites.conf`). The accepted CAs are made from the TSL by `buildclientca.php` on the first start and kept in the `ssl` volume; to refresh them run `docker compose exec web sh -c 'php buildclientca.php /etc/ssl/mlsurvey/client_ca.pem && apache2ctl graceful'`. Set it to `false` only for development. |
+| `CLIENT_CERT_VERIFY_VAR`, `CLIENT_CERT_VAR` | `SSL_CLIENT_VERIFY`, `SSL_CLIENT_CERT` | `$_SERVER` variables with the verification result (`SUCCESS`) and the certificate. With a TLS proxy in front that verifies it, the headers where it passes them (e.g. `HTTP_X_SSL_CLIENT_VERIFY`, PEM or URL-encoded PEM); the proxy must always overwrite them. |
+| `HTTPS_REDIRECT` | `true` | Redirect plain HTTP to `SITE_URL` (only if it is `https://`). Set it to `false` when a TLS proxy reaches the container over HTTP. |
+| `CLIENT_CA_EXTRA` | *(empty)* | PEM file (path inside the container) with root CAs the TSL doesn't bring, see `buildclientca.php`. |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `admin` / `admin` | Initial administrator; created on startup if it does not exist yet. |
 
 The entrypoint generates `config/config.php` from these variables on every start. If you

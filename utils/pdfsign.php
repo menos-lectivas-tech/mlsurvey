@@ -1,21 +1,19 @@
 <?php
 /**
  * Functions for checking the PDFs asked for participating and getting the
- * holder's DNI from them: the digitally signed training record (extracto de
- * formación) with the digitally signed MUFACE membership certificate (career
- * civil servants), or the appointment, nombramiento (interim ones), the service
- * record or the teaching credential on their own.
+ * holder's DNI from them: the appointment, nombramiento (interim ones), the
+ * service record, the teaching credential or the payslip (nómina).
  *
  * The appointment, the service record and the credential are sometimes signed
  * digitally and sometimes by hand, so their signature is not checked: only
- * their content, with the dates read from the text.
+ * their content, with the dates read from the text. The payslip is not signed.
  *
  * The documents can be text or a photo or scan of the paper inside the PDF:
  * if the text does not say what the document is, the pages are read with OCR.
  *
- * Needs the openssl, pdftotext, pdfinfo and pdftoppm (poppler-utils)
- * commands, and tesseract with the Spanish data (tesseract-ocr-spa) for the
- * documents that are images.
+ * Needs the pdftotext, pdfinfo and pdftoppm (poppler-utils) commands, and
+ * tesseract with the Spanish data (tesseract-ocr-spa) for the documents that
+ * are images.
  */
 require_once 'include/config.php';
 require_once 'utils/logger.php';
@@ -27,8 +25,6 @@ const PDF_CMD_TIMEOUT = 20;
    página tarda unos segundos. */
 const PDF_OCR_PAGES = 3;
 const PDF_OCR_DPI = 300;
-const PDF_TITLE = "EXTRACTO INDIVIDUAL DE RECONOCIMIENTO DE ACTIVIDADES";
-const PDF_MUFACE_TITLE = "CERTIFICADO DE AFILIACIÓN A MUFACE";
 const PDF_NOMBRAMIENTO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
     'FUNCIONARIO INTERINO/iu';
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
@@ -75,45 +71,6 @@ function pdfRunCommand (array $cmd, ?string $input = null): array {
 }
 
 /**
- * Returns the signatures of a PDF that cover the whole file.
- * Each one is [signed bytes, DER signature, signing date or null].
- */
-function pdfWholeFileSignatures (string $pdf): array {
-    $signatures = [];
-    $size = strlen ($pdf);
-    if (!preg_match_all ('/\/ByteRange\s*\[\s*(\d{1,10})\s+(\d{1,10})\s+(\d{1,10})\s+(\d{1,10})\s*\]/',
-            $pdf, $matches, PREG_SET_ORDER))
-        return $signatures;
-    foreach (array_slice ($matches, 0, 8) as $m){
-        [$start, $len1, $start2, $len2] = array_map ('intval', array_slice ($m, 1));
-        /* Lo firmado tiene que ser el fichero entero menos el hueco de la
-           propia firma: si quedase algo fuera (por ejemplo una revisión
-           añadida después de firmar) se podría cambiar el contenido sin
-           romper la firma. */
-        if ($start != 0 || $len1 == 0 || $start2 <= $len1 || $start2 + $len2 != $size)
-            continue;
-        $hole = substr ($pdf, $len1, $start2 - $len1);
-        $hex = substr ($hole, 1, -1);
-        if ($hole[0] != '<' || substr ($hole, -1) != '>' || strlen ($hex) % 2 != 0 || !ctype_xdigit ($hex))
-            continue;
-        /* La fecha de firma es la /M del diccionario de la firma, que queda
-           dentro de lo firmado: desde el "obj" que lo abre hasta el "endobj". */
-        $from = max (0, $len1 - 4096);
-        $open = strrpos (substr ($pdf, $from, $len1 - $from), " obj");
-        $close = strpos ($pdf, "endobj", $start2);
-        $dict = ($open === false ? "" : substr ($pdf, $from + $open, $len1 - $from - $open)) .
-            ($close === false ? "" : substr ($pdf, $start2, min ($close - $start2, 4096)));
-        $signed = null;
-        if (preg_match ('/\/M\s*\(D:(\d{4})(\d\d)(\d\d)/', $dict, $m) &&
-                checkdate ((int) $m[2], (int) $m[3], (int) $m[1]))
-            $signed = (new DateTimeImmutable ("today"))->setDate ((int) $m[1], (int) $m[2], (int) $m[3]);
-        /* Los ceros de relleno del final no molestan al analizar el DER. */
-        $signatures[] = [substr ($pdf, 0, $len1) . substr ($pdf, $start2), hex2bin ($hex), $signed];
-    }
-    return $signatures;
-}
-
-/**
  * Reads an uploaded file checking that it looks like a PDF.
  *
  * @throws PdfSignException if it is not a PDF or it is too big.
@@ -126,99 +83,6 @@ function pdfReadFile (string $path): string {
     if ($pdf === false || strncmp ($pdf, "%PDF-", 5) != 0)
         throw new PdfSignException ("El fichero no es un PDF.");
     return $pdf;
-}
-
-/**
- * Checks that a PDF is digitally signed, that the signature covers the whole
- * file and is not broken, and that the signer is one of the trusted ones.
- *
- * @param string $path PDF file.
- * @param string $cafile PEM file with the trusted certification authorities.
- * @param array|string $signerids Values of $signerfield allowed (by default
- *     the serialNumber (NIF) of the certificates allowed to sign), or a
- *     regular expression they must match.
- * @param string $issuer Who issues the document, for the error message.
- * @param string $signerfield Field of the signer's subject that must be one
- *     of $signerids.
- *
- * @return array The validity of the signer's certificate, "from" and "to" in
- *     format "YYMMddhhmmssZ", and "signed", the signing date
- *     (DateTimeImmutable) or null if the PDF does not say it.
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkPdfSignature (string $path, string $cafile, array|string $signerids, string $issuer,
-        string $signerfield = "serialNumber")
-    : array {
-    $signatures = pdfWholeFileSignatures (pdfReadFile ($path));
-    if (empty ($signatures))
-        throw new PdfSignException ("El PDF no está firmado digitalmente o se ha modificado " .
-            "después de firmarlo.");
-
-    if (!is_readable ($cafile))
-        throw new Exception ("CA file {$cafile} is not readable");
-
-    $reason = "";
-    $validity = array ();
-    foreach ($signatures as [$content, $signature, $signed]){
-        $contentfile = tempnam (sys_get_temp_dir (), "mlc");
-        $sigfile = tempnam (sys_get_temp_dir (), "mls");
-        $signerfile = tempnam (sys_get_temp_dir (), "mlx");
-        try {
-            file_put_contents ($contentfile, $content);
-            file_put_contents ($sigfile, $signature);
-            /* -no_check_time: el extracto vale varios años, más que el
-               certificado del sello con el que se firmó, y la vigencia del
-               certificado de MUFACE se comprueba con su fecha.
-               -no-CApath: solo valen las autoridades de $cafile, no las del
-               sistema. */
-            [$code, , $err] = pdfRunCommand (["openssl", "cms", "-verify", "-binary",
-                "-inform", "DER", "-in", $sigfile, "-content", $contentfile,
-                "-CAfile", $cafile, "-no-CApath", "-no-CAstore", "-purpose", "any",
-                "-no_check_time", "-signer", $signerfile, "-out", "/dev/null"]);
-            if ($code != 0){
-                $reason = trim ($err);
-                continue;
-            }
-            $signer = openssl_x509_parse ((string) file_get_contents ($signerfile));
-            $validity["from"] = $signer['validFrom'];
-            $validity["to"] = $signer['validTo'];
-            $validity["signed"] = $signed;
-            $id = $signer === false ? null : ($signer["subject"][$signerfield] ?? null);
-            if (is_string ($id) && (is_string ($signerids) ? preg_match ($signerids, $id) === 1 :
-                    in_array ($id, $signerids, true)))
-                return $validity;
-            $reason = "Signer not allowed: " . ($signer === false ? "?" : $signer["name"]);
-        }
-        finally {
-            @unlink ($contentfile);
-            @unlink ($sigfile);
-            @unlink ($signerfile);
-        }
-    }
-    logMessage (LOGGER_WARN, "PDF signature rejected. {$reason}");
-    throw new PdfSignException ("La firma digital del PDF no es válida o no es de {$issuer}.");
-}
-
-/**
- * Checks the signature of a training record (pdf_ca_file and pdf_signer_ids
- * in config.php).
- *
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkExtractoSignature (string $path){
-    checkPdfSignature ($path, Config::PARAMS["pdf_ca_file"] ?? "certs/extracto_ca.pem",
-        Config::PARAMS["pdf_signer_ids"] ?? ["S7800001E"], "la entidad que emite los extractos");
-}
-
-/**
- * Checks the signature of a MUFACE membership certificate (muface_ca_file
- * and muface_signer_ids in config.php).
- *
- * @throws PdfSignException if the file is not a properly signed PDF.
- */
-function checkMufaceSignature (string $path){
-    checkPdfSignature ($path, Config::PARAMS["muface_ca_file"] ?? "certs/muface_ca.pem",
-        Config::PARAMS["muface_signer_ids"] ?? ["Q2861001B"], "MUFACE");
 }
 
 /**
@@ -302,43 +166,6 @@ function pdfDocumentText (string $path, string $mark, bool $layout = false): str
 }
 
 /**
- * Checks that a PDF is a training record and gets the holder's DNI/NIE from
- * it. The signature must have been checked before with checkExtractoSignature:
- * the seal that signs the training records signs other documents too, so a
- * good signature is not enough.
- *
- * @param string $path PDF file.
- *
- * @return string The DNI/NIE, in upper case.
- *
- * @throws PdfSignException if the PDF is not a training record or has no DNI.
- */
-function getPdfDni (string $path): string {
-    $text = pdfDocumentText ($path, '/' . preg_quote (PDF_TITLE, '/') . '/iu');
-
-    $dni = PDF_DNI;
-    /* El OCR puede leer la I como l o 1. */
-    preg_match_all ('/N\.\s?[Il1]\.\s?F\.\s*' . $dni . '/iu', $text, $header);
-    /* La frase en la que el registro de formación hace constar de quién es
-       el extracto: con el título solo valdría cualquier documento sellado
-       que lo mencionase. */
-    preg_match_all ('/con n[úu]mero de identificaci[óo]n fiscal\s*' . $dni . '\s*,?\s*figura en el ' .
-        'Registro General de Formaci[óo]n Permanente del profesorado/iu', $text, $body);
-    if (stripos ($text, PDF_TITLE) === false || empty ($body[1])){
-        logMessage (LOGGER_WARN, "Signed PDF rejected: it is not a training record.");
-        throw new PdfSignException ("El PDF no es un extracto de formación.");
-    }
-
-    $found = array_unique (array_map ('strtoupper', array_merge ($header[1], $body[1])));
-    /* Tiene que aparecer en la cabecera y en la frase, y ser siempre el mismo. */
-    if (empty ($header[1]) || count ($found) != 1 || !pdfValidDni (reset ($found))){
-        logMessage (LOGGER_WARN, "Training record rejected: no single valid DNI in it.");
-        throw new PdfSignException ("No se ha podido leer el DNI en el extracto de formación.");
-    }
-    return reset ($found);
-}
-
-/**
  * Returns the first day of the current school year, which starts on
  * September 1st.
  */
@@ -385,45 +212,6 @@ function pdfCheckIssueDate (string $day, string $month, string $year){
         throw new PdfSignException ("El documento tiene que haberse expedido en los últimos " .
             "{$maxage} días.");
     }
-}
-
-/**
- * Checks that a PDF is a MUFACE membership certificate still in force and
- * gets the holder's DNI/NIE from it. The signature must have been checked
- * before with checkMufaceSignature: the seal that signs the certificates signs
- * other documents too, so a good signature is not enough.
- *
- * @param string $path PDF file.
- *
- * @return string The DNI/NIE, in upper case.
- *
- * @throws PdfSignException if the PDF is not a valid certificate or has no DNI.
- */
-function getMufaceDni (string $path): string {
-    $text = pdfDocumentText ($path, '/' . preg_quote (PDF_MUFACE_TITLE, '/') . '/iu');
-
-    /* La frase en la que MUFACE certifica quién es mutualista: con el título
-       solo valdría cualquier documento sellado que lo mencionase. Los
-       beneficiarios (familiares) van en una tabla aparte. */
-    /* La ª el OCR la puede leer como cualquier cosa. */
-    preg_match_all ('/Que D\/D\S? [^,]{1,120}, con (?:DNI|NIE|NIF) ' . PDF_DNI .
-        ', figura en el colectivo de esta Mutualidad/iu', $text, $body);
-    if (stripos ($text, PDF_MUFACE_TITLE) === false || empty ($body[1])){
-        logMessage (LOGGER_WARN, "Signed PDF rejected: it is not a MUFACE certificate.");
-        throw new PdfSignException ("El PDF no es un certificado de afiliación a MUFACE.");
-    }
-    $found = array_unique (array_map ('strtoupper', $body[1]));
-    if (count ($found) != 1 || !pdfValidDni (reset ($found))){
-        logMessage (LOGGER_WARN, "MUFACE certificate rejected: no single valid DNI in it.");
-        throw new PdfSignException ("No se ha podido leer el DNI en el certificado de MUFACE.");
-    }
-
-    /* El propio certificado dice que vale 30 días desde su expedición. */
-    if (!preg_match ('/expido el presente certificado en [^.]{1,60}? a (\d{1,2}) de (\p{L}+) de (\d{4})/iu',
-            $text, $date))
-        throw new PdfSignException ("No se ha podido leer la fecha de expedición del documento.");
-    pdfCheckIssueDate ($date[1], $date[2], $date[3]);
-    return reset ($found);
 }
 
 /**
@@ -643,5 +431,78 @@ function getCredencialNIF(string $path): string
     if ($issued === null)
         throw new PdfSignException("No se ha podido leer la fecha de la Credencial.");
     pdfCheckThisCourse($issued, "la Credencial");
+    return reset($found);
+}
+
+/**
+ * Checks that a PDF is a payslip (nómina) of a teacher of the Comunidad de
+ * Madrid for a recent month and gets the holder's DNI/NIE from it. It is not
+ * signed digitally, so only its content is checked.
+ *
+ * The month paid ("PERÍODO DE LIQUIDACIÓN: OCTUBRE de 2026") must be the
+ * current month or the previous one, and either the body (CUERPO DOCENTE)
+ * must be a teaching one: maestros (infantil and primaria), profesores
+ * (secundaria, formación profesional, escuelas oficiales de idiomas, música,
+ * artes...) or catedráticos; or the link (VINCULACIÓN) must be a teaching
+ * civil servant one ("FUNC. DOCENTE").
+ *
+ * @param string $path PDF file.
+ *
+ * @return string The DNI/NIE, in upper case.
+ *
+ * @throws PdfSignException if the PDF is not a valid payslip.
+ */
+function getNominaNIF(string $path): string
+{
+    /* La cabecera de la nómina de la Comunidad de Madrid, con su CIF. */
+    $nomina = '/PER[ÍI]ODO DE LIQUIDACI[ÓO]N C\.I\.F\. C[ÓO]D\. CTA\. COTIZACI[ÓO]N (\p{L}+) de (\d{4}) ' .
+        'S7800001E\b/iu';
+    $text = pdfDocumentText($path, $nomina, true);
+    if (!preg_match($nomina, $text, $period) ||
+            !preg_match('/CONSEJER[ÍI]A\/ORGANISMO [^\/]{0,80}?\bEDUCACI[ÓO]N\b/iu', $text)) {
+        logMessage(LOGGER_WARN, "PDF rejected: it is not a Nómina.");
+        throw new PdfSignException("El PDF no es una nómina de la Consejería de Educación.");
+    }
+
+    /* El DNI va tras el nombre y puede llevar una cifra de más pegada a la
+       letra: 78745028C0. */
+    preg_match_all('/D\.N\.[Il1]\/C[ÓO]D\. IDENTIFICACI[ÓO]N .{1,150}? ([0-9XYZ][0-9]{7}[A-Z])[0-9]?(?= )/iu',
+        $text, $ids);
+    $found = array_unique(array_map('strtoupper', $ids[1]));
+    if (count($found) != 1 || !pdfValidDni(reset($found))) {
+        logMessage(LOGGER_WARN, "Nómina rejected: no single valid NIF in it.");
+        throw new PdfSignException("No se ha podido leer el NIF en la nómina.");
+    }
+
+    /* Vale si el cuerpo es docente o si la vinculación es de función docente
+       ("FUNC. DOCENTE"). El cuerpo va entre la cabecera de la fila y el número
+       de afiliación a la Seguridad Social (31/010059729/42); la vinculación,
+       tras su cabecera y los valores de grupo, nivel y N.C.D. */
+    $teachingBody = preg_match('/CUERPO DOCENTE N\S{0,2} AFILIACI[ÓO]N S\.S\. (.{1,150}?) ' .
+            '\d{2}\/\d{6,12}\/\d{2}\b/iu', $text, $body) &&
+        preg_match('/^(?:MAESTR[OA]S?|PROFESOR(?:ES|AS?)?|CATEDR[ÁA]TIC[OA]S?)\b/iu', trim($body[1]));
+    $teachingLink = preg_match('/VINCULACI[ÓO]N .{0,80}?\bFUNC(?:\.|IONARI[OA]S?|I[ÓO]N)? ?DOCENTE\b/iu',
+        $text);
+    if (!$teachingBody && !$teachingLink) {
+        logMessage(LOGGER_WARN, "Nómina rejected: not a teaching body: " . ($body[1] ?? "?"));
+        throw new PdfSignException("La nómina no es de un cuerpo docente.");
+    }
+
+    /* La nómina tiene que ser del mes en curso o del anterior: en noviembre
+       valen la de octubre y la de noviembre. */
+    $month = array_search(strtolower($period[1]), PDF_MONTHS, true);
+    if ($month === false)
+        throw new PdfSignException("No se ha podido leer el período de liquidación de la nómina.");
+    $paid = (int) $period[2] * 12 + $month;
+    $today = new DateTimeImmutable("today");
+    $current = (int) $today->format("Y") * 12 + (int) $today->format("n") - 1;
+    /* Un día de margen por si el servidor va en otra zona horaria: el último
+       día del mes ya se acepta la nómina del mes siguiente. */
+    $tomorrow = $today->modify("+1 day");
+    $next = (int) $tomorrow->format("Y") * 12 + (int) $tomorrow->format("n") - 1;
+    if ($paid < $current - 1 || $paid > $next) {
+        logMessage(LOGGER_WARN, "Nómina rejected: period " . $period[2] . "-" . ($month + 1) . ".");
+        throw new PdfSignException("La nómina tiene que ser del mes en curso o del mes anterior.");
+    }
     return reset($found);
 }

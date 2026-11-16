@@ -283,6 +283,13 @@
     margin: 0 0 16px;
 }
 
+/* Aviso de que el registro pide el certificado digital. */
+.ml-wizard-cert {
+    background: var(--ml-warning-soft);
+    border-radius: var(--ml-radius);
+    padding: 10px 14px;
+}
+
 .ml-choices {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -294,6 +301,8 @@
 .ml-choice {
     display: flex;
     flex-direction: column;
+    /* Sin esto, la tarjeta crece con su contenido y se sale de la rejilla. */
+    min-width: 0;
     background: var(--ml-surface);
     border: 2px solid var(--ml-border);
     border-radius: var(--ml-radius);
@@ -339,24 +348,19 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .ml-choice__title {
+    min-width: 0;
     font-weight: 700;
     color: var(--ml-text);
 }
 
 .ml-choice__desc {
     color: var(--ml-text-soft);
-    font-size: 0.9375rem;
-}
-
-.ml-choice__links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
-    margin: -8px 0 0;
-    padding: 0 16px 14px 46px;
     font-size: 0.9375rem;
 }
 
@@ -369,7 +373,13 @@
     font-size: 0.75rem;
     font-weight: 600;
     vertical-align: 2px;
-    white-space: nowrap;
+    /* Las etiquetas largas pasan a otra línea en vez de salirse de la tarjeta:
+       el padding cuenta dentro del 100% y se permite partir el texto. */
+    box-sizing: border-box;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+    line-height: 1.35;
 }
 
 .ml-tag--now {
