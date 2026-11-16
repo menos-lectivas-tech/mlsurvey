@@ -466,12 +466,22 @@ function getNominaNIF(string $path): string
 
     /* El DNI va tras el nombre y puede llevar una cifra de más pegada a la
        letra: 78745028C0. */
-    preg_match_all('/D\.N\.[Il1]\/C[ÓO]D\. IDENTIFICACI[ÓO]N .{1,150}? ([0-9XYZ][0-9]{7}[A-Z])[0-9]?(?= )/iu',
+    preg_match_all(
+        '/D\.N\.[Il1]\/C[ÓO]D\. IDENTIFICACI[ÓO]N(?s:.){1,200}?\b([0-9XYZ][0-9]{1,7}[TRWAGMYFPDXBNJZSQVHLCKE])/iu',
         $text, $ids);
     $found = array_unique(array_map('strtoupper', $ids[1]));
-    if (count($found) != 1 || !pdfValidDni(reset($found))) {
+    if (count($found) != 1) {
         logMessage(LOGGER_WARN, "Nómina rejected: no single valid NIF in it.");
         throw new PdfSignException("No se ha podido leer el NIF en la nómina.");
+    }
+    $dni = reset ($found);
+    if (strlen($dni) < 9) {
+        $zeroes = str_repeat("0", 9 - strlen($dni));
+        $dni = $zeroes . $dni;
+    }
+    if (!pdfValidDni($dni)){
+        logMessage(LOGGER_WARN, "Nómina rejected: wrong NIF number.");
+        throw new PdfSignException("El NIF de tu nómina no es correcto.");
     }
 
     /* Vale si el cuerpo es docente o si la vinculación es de función docente
@@ -504,5 +514,5 @@ function getNominaNIF(string $path): string
         logMessage(LOGGER_WARN, "Nómina rejected: period " . $period[2] . "-" . ($month + 1) . ".");
         throw new PdfSignException("La nómina tiene que ser del mes en curso o del mes anterior.");
     }
-    return reset($found);
+    return $dni;
 }
