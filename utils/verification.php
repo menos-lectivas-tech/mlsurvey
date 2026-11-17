@@ -58,6 +58,22 @@ function verificationRecentlySent(PDO $db, int $participantid): bool
 }
 
 /**
+ * Seconds left until another verification link can be sent to the participant
+ * (0 if it can be sent now).
+ */
+function secondsUntilResend(PDO $db, int $participantid): int
+{
+    $query = $db->prepare("SELECT GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), " .
+        "DATE_ADD(requestdate, INTERVAL " . VERIFY_WAIT_MINUTES . " MINUTE))) " .
+        "FROM {Verifications} WHERE participantid = :pid");
+    $query->bindParam(":pid", $participantid, PDO::PARAM_INT);
+    $query->execute();
+    $seconds = $query->fetchColumn();
+    $query->closeCursor();
+    return $seconds === false ? 0 : (int) $seconds;
+}
+
+/**
  * Generates a new verification code for a participant not verified yet, and
  * stores its hash replacing the previous one, which stops working.
  *
