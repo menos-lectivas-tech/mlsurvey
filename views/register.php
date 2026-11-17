@@ -20,6 +20,19 @@ class Register extends RegistrationView
         return ML_MENU_GROUP_REGISTER;
     }
 
+    /* El asistente se muestra ya en la URL del registro, la que pide el
+       certificado electrónico: allí se genera su token y su CAPTCHA, y allí
+       llega su envío con la misma sesión. Si se mandara desde el sitio, el
+       navegador podría no enviar a la URL del registro (otro puerto) la
+       cookie de sesión del sitio. */
+    public function doInit()
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'GET' && $this->mustGoToRegistration()) {
+            header("Location: " . $this->registrationAction(self::PAGE), true, 302);
+            exit;
+        }
+    }
+
     /**
      * The page is the documents wizard itself: the email address is asked for in
      * its last step, together with the PDFs.
