@@ -10,22 +10,20 @@ const CONFIG = [
 
 /**
  * Public URL of the site, as participants reach it (scheme, host, port and
- * path, e.g. "https://consultas.example.org/mlsurvey/"). The participation
- * links sent by email are built from it. It is mandatory: the Host header of
+ * path, e.g. "https://consultas.example.org/mlsurvey/"). The account
+ * verification links sent by email are built from it. It is mandatory: the Host header of
  * the request can't be trusted for that.
  */
 "site_url"=>"",
 
 /**
- * URL of the registration (e.g. "https://registro.consultas.example.org/"):
+ * URL of the registration and voting (e.g. "https://registro.consultas.example.org/"):
  * the only virtual host that asks for the client certificate (see
- * client_cert_*), so it is not asked when voting. It serves the same
- * application: the documents wizard is shown in site_url and only its final
- * submit (document and email address) goes there, so the browser asks for the
- * certificate at that moment. It must be the host of site_url in another port
- * or a subdomain of it (the session cookie has to reach both). Empty:
- * registering is done in site_url, which then has to ask for the certificate
- * itself.
+ * client_cert_*), which identifies the participant when registering and when
+ * voting. It serves the same application. It must be the host of site_url in
+ * another port or a subdomain of it (the session cookie has to reach both).
+ * Empty: registering and voting are done in site_url, which then has to ask
+ * for the certificate itself.
  */
 "registration_url"=>"",
 
@@ -81,8 +79,8 @@ const CONFIG = [
 
 /**
  * Client certificate (certificado digital: FNMT, DNI electronico...) asked
- * when registering: the DNI of the uploaded document must be the one of the
- * certificate. Only the registration_url virtual host should ask for it. The web server verifies the certificate chain (SSLVerifyClient
+ * when registering, where the DNI of the uploaded document must be the one of
+ * the certificate, and when voting, where it identifies the participant. Only the registration_url virtual host should ask for it. The web server verifies the certificate chain (SSLVerifyClient
  * with the CAs accepted in SSLCACertificateFile) and passes the result and the
  * certificate in these $_SERVER variables. Make the CA file, with every
  * qualified CA of the Spanish Trusted List, with buildclientca.php. By default the ones of Apache

@@ -88,49 +88,31 @@ class MLMailer extends PHPMailer {
     }
 
     /**
-     * Sends the message with the link for participating.
-     * Creates the link with the parameters.
+     * Sends the message with the link that verifies the account of a participant
+     * who has just registered. Until it is opened the participant can't vote.
      * The message is hardcoded, but must be configurable in the future.
-     * 
+     *
      * @param string $recipient Recipient's mail address
-     * @param string $pid Participation table id.
-     * @param string $code Base64 code for participating
-     * @param string $surveyname Survey name.
-     * 
+     * @param string $code url_base64 code of the link.
+     * @param int $minutes How long the link is valid, in minutes.
+     *
      * @throws Exception with the error info.
      */
-    public function sendCode (#[\SensitiveParameter] string $recipient, $pid,
-        #[\SensitiveParameter] string $code, $surveyname){
-        $theurl = rtrim (getURL (), "/") . "/participate?pid=" . $pid . "&auth=" . $code;
-        logMessage (LOGGER_DEBUG, "Participation URL for survey {$surveyname}: {$theurl}");
-        $this->setFrom ($this->m_from);
-        $this->addAddress ($recipient);
-        $this->Subject = "Dirección para opinar en la consulta {$surveyname}";
-        $this->Body = "La dirección para opinar en la consulta {$surveyname} es:\n{$theurl}";
-        if (!$this->send ()){
-            throw new Exception("Error {$this->ErrorInfo} sending code email.");
-        }
-    }
-
-    /**
-     * Sends the message confirming that the address has been registered as participant.
-     * The message is hardcoded, but must be configurable in the future.
-     * 
-     * @param string $recipient Recipient's mail address
-     * 
-     * @throws Exception with the error info.
-     */
-    public function sendRegistered (#[\SensitiveParameter] string $recipient){
-        $theurl = rtrim (getURL (), "/") . "/surveys";
+    public function sendVerification (#[\SensitiveParameter] string $recipient,
+        #[\SensitiveParameter] string $code, int $minutes){
+        $theurl = rtrim (getURL (), "/") . "/verify?code=" . $code;
         $sitename = Config::$sitename != "" ? Config::$sitename : "mlsurvey";
         $this->setFrom ($this->m_from);
         $this->addAddress ($recipient);
-        $this->Subject = "Registro completado en {$sitename}";
-        $this->Body = "Te has registrado correctamente en {$sitename} con esta dirección de correo.\n\n" .
-            "A partir de ahora, para participar en una consulta solo tendrás que indicar " .
-            "esta dirección. Las consultas activas están en:\n{$theurl}";
+        $this->Subject = "Activa tu cuenta en {$sitename}";
+        $this->Body = "Te has registrado en {$sitename} con esta dirección de correo.\n\n" .
+            "Para activar tu cuenta abre este enlace, que caduca en {$minutes} minutos:\n{$theurl}\n\n" .
+            "Una vez activada, para participar en las consultas te identificarás con tu " .
+            "certificado electrónico: no te enviaremos más mensajes para votar.\n\n" .
+            "Si no te has registrado tú, ignora este mensaje.";
+        logMessage (LOGGER_DEBUG, "Verification URL: {$theurl}");
         if (!$this->send ()){
-            throw new Exception("Error {$this->ErrorInfo} sending registration email.");
+            throw new Exception("Error {$this->ErrorInfo} sending verification email.");
         }
     }
 

@@ -19,6 +19,7 @@
 require_once 'include/config.php';
 require_once 'utils/logger.php';
 require_once 'utils/pdfsign.php';
+require_once 'utils/host.php';
 
 /**
  * The message is meant to be shown to the participant.
@@ -30,6 +31,23 @@ class ClientCertException extends Exception {}
  */
 function clientCertEnabled (): bool {
     return (bool) (Config::PARAMS["client_cert_enabled"] ?? true);
+}
+
+/**
+ * The page $page in the URL that asks for the client certificate
+ * (registration_url), where registering and voting are done. Just $page if the
+ * certificate isn't asked or there is no such URL.
+ */
+function certURL (string $page): string {
+    return clientCertEnabled () && getRegistrationURL () != "" ? getRegistrationURL () . $page : $page;
+}
+
+/**
+ * true if the request needs the client certificate and hasn't reached the URL
+ * that asks for it: the user has to go there.
+ */
+function mustGoToCertHost (): bool {
+    return clientCertEnabled () && !isRegistrationHost ();
 }
 
 /**
@@ -63,8 +81,8 @@ function getClientCertDni (): string {
     }
     if ($verify === "" || $verify === "NONE" || $pem === "" || $pem === "(null)"){
         logMessage (LOGGER_INFO, "Registration without client certificate.");
-        throw new ClientCertException ("No se ha recibido tu certificado electrónico. Para " .
-            "registrarte tienes que identificarte con él (DNI electrónico, certificado de la FNMT, " .
+        throw new ClientCertException ("No se ha recibido tu certificado electrónico. Tienes " .
+            "que identificarte con él (DNI electrónico, certificado de la FNMT, " .
             "de empleado/a público/a...): cierra el navegador, vuelve a abrir la página y elige tu " .
             "certificado cuando te lo pida. Con el DNI electrónico, conecta antes el lector.");
     }

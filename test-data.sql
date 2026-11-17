@@ -51,7 +51,7 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
 
 /* 2: Actividades extraescolares del proximo curso */
 INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby, showpartial) VALUES
-    (2, 'Actividades extraescolares del proximo curso', '<p>Consulta <strong>abierta</strong>: se puede solicitar codigo y participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 27 DAY), 1, 1, true);
+    (2, 'Actividades extraescolares del proximo curso', '<p>Consulta <strong>abierta</strong>: se puede participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 27 DAY), 1, 1, true);
 INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
     (2, 1, '<p>&iquest;Que actividad te interesa mas?</p>', 0, 0, NULL);
 INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
@@ -84,7 +84,7 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
 
 /* 4: Formacion permanente del profesorado */
 INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby) VALUES
-    (4, 'Formacion permanente del profesorado', '<p>Consulta <strong>abierta</strong> y aun sin respuestas: se puede solicitar codigo y participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 20 DAY), 1, 1);
+    (4, 'Formacion permanente del profesorado', '<p>Consulta <strong>abierta</strong> y aun sin respuestas: se puede participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 20 DAY), 1, 1);
 INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
     (4, 1, '<p>&iquest;Que modalidad de formacion prefieres?</p>', 0, 0, NULL);
 INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
@@ -124,35 +124,21 @@ INSERT INTO Participants (participantid, participant) VALUES
 INSERT INTO Participants (participantid, participant) VALUES
     (7, 'd6e04c9db9ed1abfd7cb7cc5c07a51759fe357af715550d97af07c2168b41faf');
 
-/* ---------- Codigos de participacion ---------- */
-/* Los codigos de la consulta 2 siguen siendo validos. Enlaces de participacion
-   (anteponer la URL del servidor, p.ej. http://localhost:8080):
-     fatima.pendiente@example.com
-       /participate?pid=6&auth=G9_lruqApCrLtmQjCgn_049t1fD8kIUPiddGMrKYo_E
-     gorka.pendiente@example.com
-       /participate?pid=7&auth=fig4g3FhTi4oLJQBIwKlpAhbrJvODPEOCFyO6jDjGIY
-*/
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (1, 1, '6b8f8aac529cc53d9a7fad0d7616981ca98a269fbfdda9fb845fc3414c1816c8', 'M2YydlAvRTFRTUNpRlczUXViRVdKbVBzcTcwdE50dXNwKy83VVNBZ2Y5ST0=', DATE_SUB(NOW(), INTERVAL 25 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (2, 1, '0149159c2994e832971dee53ab885c679567716f156756a2362a9db6433adebc', 'RHQzenpjdVZqaGo1MkszYlpNKzU3ZVRucUI4NlhCOTBWTUpCUWNjc0ZQbz0=', DATE_SUB(NOW(), INTERVAL 25 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (3, 1, 'bed870572185ecadf4a1971e38cd2dcbd3b24bbd1a82e8ae8a64059f6198d31c', 'Q2tqV1VTV1YvU2lzbnVJQSs3R3BFR1djVzg2dHVLN1czd2laZ2U5dE0yUT0=', DATE_SUB(NOW(), INTERVAL 25 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (4, 1, '85bdd7dcb8a8b7d88e1c86c4d6571b679ebed25cbb5f9d5c27dda08bf6f7d03a', 'Qm9HNlltSkVBVkN3K1lFRVh2K0dOcUUzUXV1U01tN1M0dWtIQUI2TkhBST0=', DATE_SUB(NOW(), INTERVAL 25 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (5, 1, '061e77d917bf60f8af6e4128b5edc408e70baedb96f00b8b263e0d69254cb470', 'S2ZTM3FoTnIyZEF1UnJCK0RyYUZSaUNhZWg5Qm0wMW40LzduMWpkdnZxbz0=', DATE_SUB(NOW(), INTERVAL 25 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (6, 2, 'abe8950e69a04e27acd086d94c43c42e833229e9705a6fd256cede0bb80e174a', 'dkpJZHV4ODcwUTl6a1hnT2NPZmhmSkQ4cWNEQWpNV3U3RTF6cWR6TVJKdz0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (7, 2, '52a37853a33877db86653f55f24851e444207e8108dace15c7575b242d866d88', 'TkdDdWFtMTkvR2pXdmRUQTU5TEZGaC9PZVgwakV1bStUdG1Sc2NQSXBVcz0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
-/* Participaciones ya usadas en la consulta 2 (ana, bruno y carla ya han respondido). */
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (8, 2, '3109c9550b750695cf2a68c9b574ec50f08272ec52e7aeb23963ddcb456dd1c7', 'L0Fod0taWUhuVFdrZ0VHOHlpcGp4L2FjWU1oUzFkZ21tZGlPY2FkUWw2WT0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (9, 2, '8bbcf252eb14078507b91a588f166a83c485d8fb89e6575bbb0ec4ae521f9ced', 'WlloOVZ0TTV0dGJ4NlRjdm43bVJFdzVzSTc5RzJMNTZ5a1dYbFd1d0d4RT0=', DATE_SUB(NOW(), INTERVAL 2 DAY));
-INSERT INTO Participation (participationid, surveyid, participationkey, participant, participationdate) VALUES
-    (10, 2, '5d1347fb5f918494f3f5730381c39be19f7d115e84dcc9f907b79b9fb6c833b2', 'OEU3bWk4a0Z6RHgvRHEwT3l3QWZ1Q0FucS8zby9pQkx5eDZQVUM1bWwvZz0=', DATE_SUB(NOW(), INTERVAL 1 DAY));
+/* Con DNI, para votar (las de arriba son anteriores a los documentos y no
+   pueden). Sin certificado (CLIENT_CERT_ENABLED=false) participate pide el DNI.
+   8: hugo.verificado@example.com, DNI 00000000T, cuenta verificada. */
+INSERT INTO Participants (participantid, participant, dnihashed) VALUES
+    (8, 'eafa6a7545f3268c94603af76ed48b1317a019494a34270c3c52f8a0d55dd1eb',
+     '84a5930e9bd68cfab9bd595cffc74ac1630f2e2ff56c14cb1d9cfaf2e265604b');
+INSERT INTO Verifications (participantid, verifykey, verified) VALUES (8, NULL, 1);
+/* 9: irene.pendiente@example.com, DNI 00000001R, sin verificar. Enlace de
+   verificacion, valido 30 minutos desde que se carga este fichero:
+     /verify?code=e2-URDw4rYPsC9pnVuTBsCMQdsJvNvviWBCebxKrp00_ */
+INSERT INTO Participants (participantid, participant, dnihashed) VALUES
+    (9, 'a1e0915f817c7f38f234be9ec298347dd021721b52fa3c973dfceac91b1b53b0',
+     '067e216e89fe8f307d5ce641c8ab9acae2905eb9323a826962625130a37b668b');
+INSERT INTO Verifications (participantid, verifykey, verified) VALUES
+    (9, 'aa0035141c5d321a934392597a46e3ef0bc1d4bd170010978e0eca8d5315d805', 0);
 
 /* ---------- Respuestas de la consulta 1 ---------- */
 INSERT INTO Responses (surveyid, response, responsedate) VALUES

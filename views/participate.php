@@ -10,11 +10,14 @@ require_once 'utils/token.php';
 require_once 'utils/crypt.php';
 require_once 'include/fileparams.php';
 require_once 'utils/showsurvey.php';
+require_once 'utils/clientcert.php';
+require_once 'utils/verification.php';
 
 class Participate extends View {
     public const ACTION = "Enviar";
     public const PID = "pid";
     public const KEY = "auth";
+    public const SID = "sid";
     public bool $istest = false;
     //This const should be remove in non alpha versions.
     private const TESTID = 0;
@@ -24,7 +27,6 @@ class Participate extends View {
     private const PARTICIPATIONS = "participations";
     private const FORM_FIELD = "participation";
     private const PARTICIPATIONS_MAX = 20;
-    private string $email = "";
     private int $surveyid = -1;
 
     function getMenuGroup (){
@@ -45,11 +47,11 @@ class Participate extends View {
 
     /**
      * Depending on the request parameters, this method takes different actions.
-     * - If they don't meet the requirements, the method shows the main page.
-     * - If the are from an own submit then the responses are stored.
-     * - If the request matches a valid record of the Patcicipation table (or the StressTest),
-     * shows the responses form. Otherwise shows an error.
-     * 
+     * - If it's the submit of the survey form, stores the vote.
+     * - In a stress test, the request must match a record of the StressTest table.
+     * - Otherwise (participate?sid=N), identifies the participant by the DNI of the
+     *   client certificate: they must be registered with it, their account verified
+     *   and they must not have voted yet. Then shows the survey form.
      */
     public function show (){
         startSession ();
@@ -58,73 +60,65 @@ class Participate extends View {
             return;
         }
 
-        if (!isset ($_REQUEST[self::PID]) || !isset ($_REQUEST[self::KEY])){
+        /* Pruebas de carga: el enlace lleva el código de la tabla StressTest. */
+        if (!empty (Config::PARAMS['ml_stresstest']) && !empty ($_REQUEST["t"])
+                && isset ($_REQUEST[self::PID]) && isset ($_REQUEST[self::KEY])){
+            $this->istest = true;
+            $this->showTest ($_REQUEST[self::PID], $_REQUEST[self::KEY]);
+            return;
+        }
+
+        $surveyid = $_GET[self::SID] ?? null;
+        if (!is_string ($surveyid) || !ctype_digit ($surveyid)){
             showMain ();
             return;
         }
-        
+        $surveyid = (int) $surveyid;
+        /* Se vota en la URL que pide el certificado electrónico. */
+        if (mustGoToCertHost ()){
+            echo ("<p><strong>Para votar tienes que identificarte con tu certificado " .
+                "electrónico.</strong></p>");
+            echo ("<p><a class='button-3' href='" . h (certURL ("participate?sid={$surveyid}")) .
+                "'>Continuar</a></p>");
+            return;
+        }
 
-        $pid = $_REQUEST[self::PID];
-        $key = $_REQUEST[self::KEY];
-
-        /**
-         * Are we in a stress test?
-         */
-        if (isset (Config::PARAMS['ml_stresstest']) && Config::PARAMS['ml_stresstest']
-             && !empty ($_REQUEST["t"]))
-            $this->istest = true;
-
+        $dni = $this->getVoterDni ($surveyid);
+        if ($dni === null)
+            return;
 
         try {
-            $code = url_base64_decode ($key);
             $db = dbConn ();
-            
-            /*
-            Gets the email from the Participation table using the key in the request
-            */
-            if (!$this->getEmail ($db, $pid, $code) && !$this->istest){
-                echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
+            if (!$this->isActive ($db, $surveyid)){
+                echo ("<p><strong>La consulta no existe o no está abierta.</strong></p>");
                 return;
             }
-            else if ($this->istest){
-                if (!$this->getTestSurvey ($db, $pid, $code)){
-                    echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
-                    return;
-                }
-                $formid = $this->saveParticipation ($this->surveyid, self::TESTID);
-                $this->showSurvey ($db, $this->surveyid, $formid);
+            $participantid = $this->participantByDni ($db, $dni);
+            if ($participantid === null){
+                echo ("<p><strong>No hay ninguna cuenta registrada con el DNI de tu " .
+                    "certificado electrónico.</strong></p>");
+                echo ("<p>Para participar en las consultas tienes que registrarte antes: " .
+                    "<a href='register'>Regístrate</a>.</p>");
                 return;
             }
-            
-
-            $hashemail = participantHash ($this->email);
-
-            $participants = $db->prepare ("SELECT participantid " .
-                "FROM {Participants} WHERE participant = :part ORDER BY participantid LIMIT 1");
-
-            $participants->bindParam (":part", $hashemail, PDO::PARAM_STR);
-            $participants->execute ();
-            if ($participants->rowCount () == 0){
-                $this->securityError ();
+            if (!isVerified ($db, $participantid)){
+                echo ("<p><strong>Tu cuenta aún no está verificada.</strong></p>");
+                echo ("<p>Abre el enlace que te enviamos por correo al registrarte (mira también " .
+                    "en la carpeta de correo no deseado). Si no te ha llegado o ha caducado, " .
+                    "puedes pedir otro en <a href='register'>Regístrate</a>.</p>");
                 return;
             }
-            $participant = $participants->fetch ();
-            $participantid = $participant["participantid"];
-            $participants->closeCursor ();
-            if (hasParticipated ($db, $participantid, $this->surveyid)){
-                ?>
-                <p><strong>Ya se ha votado en esta consulta con esta dirección de correo.</strong></p>
-                <?php
+            if (hasParticipated ($db, $participantid, $surveyid)){
+                echo ("<p><strong>Ya has votado en esta consulta.</strong></p>");
                 return;
             }
-            if (checkUnsubscribe($db, $participantid)){
+            if (checkUnsubscribe ($db, $participantid)){
                 echo "<p><strong>No puedes participar en la consulta porque has confirmado
                     la solicitud de baja del registro de participantes.</strong></p>";
                 return;
             }
-            $formid = $this->saveParticipation ($this->surveyid, $participantid);
-            $this->showSurvey ($db, $this->surveyid, $formid);
-
+            $formid = $this->saveParticipation ($surveyid, $participantid);
+            $this->showSurvey ($db, $surveyid, $formid);
         }
         catch (Exception $e){
             echo ("<p><strong>Error recuperando los datos para la participación</strong></p>");
@@ -133,9 +127,77 @@ class Participate extends View {
         }
     }
 
+    /* Pruebas de carga: muestra la consulta si el enlace es de la tabla StressTest. */
+    private function showTest ($pid, $key){
+        try {
+            $db = dbConn ();
+            if (!is_string ($key) || !$this->getTestSurvey ($db, $pid, url_base64_decode ($key))){
+                echo ("<p><em>La solicitud proporcionada no existe o ha caducado.</em></p>");
+                return;
+            }
+            $formid = $this->saveParticipation ($this->surveyid, self::TESTID);
+            $this->showSurvey ($db, $this->surveyid, $formid);
+        }
+        catch (Exception $e){
+            echo ("<p><strong>Error recuperando los datos para la participación</strong></p>");
+            logMessage (LOGGER_ERROR, "Error {$e} when getting data for a stress test.");
+        }
+    }
+
+    /**
+     * DNI of the person who votes: the one of the client certificate. Without
+     * client_cert_enabled (only for development) it is asked in a form, so
+     * anybody can vote as anybody.
+     *
+     * @return string|null The DNI, or null (with the reason or the form already shown).
+     */
+    private function getVoterDni (int $surveyid): ?string {
+        if (clientCertEnabled ()){
+            try {
+                return getClientCertDni ();
+            }
+            catch (ClientCertException $e){
+                echo ("<p><strong>Para votar tienes que identificarte con un certificado " .
+                    "electrónico válido.</strong></p>");
+                echo ("<p>" . h ($e->getMessage ()) . "</p>");
+                return null;
+            }
+        }
+        $dni = isset ($_GET['dni']) && is_string ($_GET['dni']) ? strtoupper (trim ($_GET['dni'])) : "";
+        if ($dni !== "" && pdfValidDni ($dni))
+            return $dni;
+        if ($dni !== "")
+            echo ("<p><strong>El DNI no es válido.</strong></p>");
+        ?>
+        <section class="ml-participate-card">
+            <h3>Participar en la consulta</h3>
+            <p><strong>Modo de desarrollo:</strong> el certificado electrónico está desactivado
+                (<code>client_cert_enabled</code>), así que se pide el DNI. No lo uses en producción.</p>
+            <form method="GET" action="participate">
+                <input type="hidden" name="<?= self::SID; ?>" value="<?= $surveyid; ?>">
+                <label for="dni">DNI/NIE</label>
+                <input type="text" name="dni" id="dni" required>
+                <button type="submit" class="button-3">Continuar</button>
+            </form>
+        </section>
+        <?php
+        return null;
+    }
+
+    /* Id de la participante registrada con ese DNI, o null si no hay. */
+    private function participantByDni ($db, #[\SensitiveParameter] string $dni): ?int {
+        $hashdni = participantHash ($dni);
+        $query = $db->prepare ("SELECT participantid FROM {Participants} WHERE dnihashed = :dni LIMIT 1");
+        $query->bindParam (":dni", $hashdni, PDO::PARAM_STR);
+        $query->execute ();
+        $id = $query->fetchColumn ();
+        $query->closeCursor ();
+        return $id === false ? null : (int) $id;
+    }
+
     private function securityError (){
         ?>
-        <p><strong>El código para participar no es correcto</strong></p>
+        <p><strong>No se ha podido comprobar tu identidad. Vuelve a entrar en la consulta e identifícate con tu certificado electrónico.</strong></p>
         <?php
     }
 
@@ -208,6 +270,19 @@ class Participate extends View {
         }
         $surveyid = $participation['surveyid'];
         $participantid = $participation['participantid'];
+        /* Quien envía tiene que seguir siendo quien abrió el formulario. */
+        if ($participantid != self::TESTID && clientCertEnabled ()){
+            try {
+                $sameperson = $this->participantByDni (dbConn (), getClientCertDni ()) === (int) $participantid;
+            }
+            catch (ClientCertException $e){
+                $sameperson = false;
+            }
+            if (!$sameperson){
+                $this->securityError ();
+                return;
+            }
+        }
 
         try {
             $responsearray = array (); 
@@ -279,8 +354,7 @@ class Participate extends View {
                     $lock->closeCursor ();
                     if (hasParticipated ($db, $participantid, $surveyid)){
                         $db->rollBack ();
-                        echo ("<p><strong>Ya se ha participado en la consulta desde la " .
-                            "dirección de correo indicada.</strong></p>");
+                        echo ("<p><strong>Ya has votado en esta consulta.</strong></p>");
                         return;
                     }
                     $voted = $db->prepare ("INSERT INTO {Voted} (surveyid, participantid) " .
@@ -313,36 +387,6 @@ class Participate extends View {
             return;
         }
     }
-
-    /**
-     * Decrypts the participant email stored in the Participation table and
-     * stores it in $email private variable.
-     * 
-     * @param PDO $db PDO database object.
-     * @param int $pid The participation id.
-     * @param string $code The key for decrypting the email.
-     * 
-     * @return bool
-     */
-    private function getEmail ($db, $pid, $code){
-        $hcode = hash ('sha256', $code);
-        /* El enlace caduca en una hora y solo sirve mientras la consulta está abierta. */
-        $query = $db->prepare ("SELECT p.surveyid, p.participant FROM {Participation} p " .
-            "JOIN {Surveys} s ON s.surveyid = p.surveyid " .
-            "WHERE p.participationid = :pid AND p.participationkey = :pk " .
-            "AND p.participationdate > DATE_SUB(NOW(), INTERVAL 1 HOUR) " .
-            "AND s.startdate < NOW() AND s.enddate > NOW()");
-        $query->bindParam (":pid", $pid, PDO::PARAM_INT);
-        $query->bindParam (":pk", $hcode, PDO::PARAM_STR);
-        $query->execute ();
-        if ($query->rowCount () == 0)
-            return false;
-        $row = $query->fetch ();
-        $this->email = decrypt (base64_decode ($row['participant']), $code);
-        $this->surveyid = $row['surveyid'];
-        return true;
-    }
-
 
     private function getOptionIds ($db, $surveyid, $questionid): array {
         $options = $db->prepare ("SELECT optionid FROM {Options} " .

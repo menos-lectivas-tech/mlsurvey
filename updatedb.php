@@ -28,7 +28,7 @@ function createVersionTable (){
   $db->exec ("INSERT INTO {Version} values (1, 1)");
 }
 
-$maxversion = 9;
+$maxversion = 10;
 
 try {
   if (!versionTableExists ()){
@@ -127,6 +127,28 @@ try {
   if ($version < 9){
     $db->exec("ALTER TABLE {Voted} DROP PRIMARY KEY, ADD PRIMARY KEY (participantid, surveyid)");
     $db->exec("UPDATE {Version} SET versioncode = 9 WHERE versionid = 1");
+  }
+  if ($version < 10){
+    /* Se vota identificándose con el certificado electrónico y el correo solo
+       sirve para verificar la cuenta: hasta que se abre el enlace que se envía
+       al registrarse no se puede votar. */
+    $db->exec ("CREATE TABLE IF NOT EXISTS {Verifications} (
+      participantid INT UNSIGNED NOT NULL,
+      verifykey CHAR(64) NULL,
+      requestdate DATETIME NOT NULL DEFAULT current_timestamp,
+      verified BOOL NOT NULL DEFAULT 0,
+      CONSTRAINT {Verifications}_PK PRIMARY KEY (participantid),
+      CONSTRAINT {Verifications}_Participants_FK FOREIGN KEY (participantid)
+        REFERENCES {Participants}(participantid) ON DELETE CASCADE ON UPDATE RESTRICT)");
+    $db->exec ("CREATE UNIQUE INDEX IF NOT EXISTS Verifications_verifykey_IDX USING BTREE
+      ON {Verifications} (verifykey)");
+    /* Quien ya estaba registrado con sus documentos (y su DNI) ya recibía los
+       enlaces para votar en esa dirección: se da por verificado. Las filas sin
+       DNI no pueden votar con el certificado. */
+    $db->exec ("INSERT IGNORE INTO {Verifications} (participantid, verifykey, verified)
+      SELECT participantid, NULL, 1 FROM {Participants}
+      WHERE dnihashed IS NOT NULL AND participantid <> 0");
+    $db->exec("UPDATE {Version} SET versioncode = 10 WHERE versionid = 1");
   }
   if ($version < $maxversion){
     $query = $db->prepare ("UPDATE {Version} SET versioncode = :ver WHERE versionid = 1");

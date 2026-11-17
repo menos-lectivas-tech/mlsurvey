@@ -68,7 +68,7 @@ define('CONFIG', [
 
 // URL publica del sitio: con ella se construyen los enlaces de los correos.
 "site_url"=>getenv('SITE_URL') ?: '',
-// URL del registro, la unica que pide el certificado electronico.
+// URL del registro y la votacion, la unica que pide el certificado electronico.
 "registration_url"=>getenv('REGISTRATION_URL') ?: '',
 
 "log_level"=>(int) (getenv('LOG_LEVEL') !== false ? getenv('LOG_LEVEL') : 0),
@@ -94,7 +94,7 @@ define('CONFIG', [
 // Antiguedad maxima de la hoja de servicios.
 "pdf_max_age_days" => (int) (getenv('PDF_MAX_AGE_DAYS') ?: 30),
 
-// Certificado electronico al registrarse: lo pide y verifica el HTTPS del
+// Certificado electronico al registrarse y al votar: lo pide y verifica el HTTPS del
 // contenedor (docker/apache-sites.conf), que lo pasa en SSL_CLIENT_*. Con un
 // proxy TLS delante, las cabeceras donde lo pase (ver config.php.sample).
 "client_cert_enabled" => getenv('CLIENT_CERT_ENABLED') === 'false' ? false : true,

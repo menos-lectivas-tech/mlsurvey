@@ -13,6 +13,13 @@ With this project we are trying to develop an online voting system based on the 
   any other qualified certificate of a natural person of the Spanish Trusted List (ACCV,
   Izenpe, Camerfirma, notaries...). The DNI of the uploaded document
   must be the one of the certificate, so nobody can register with someone else's documents.
+* The email address is only used to verify the account: when registering, a link with a
+  verification code is sent to it (valid for 30 minutes, only its SHA-256 is stored in
+  `Verifications`). Once the account is verified, participants vote identifying themselves
+  with the same client certificate: no email is sent for voting. Until the link is opened
+  they can ask for another one (or fix a mistyped address) in «Regístrate», identifying
+  themselves with the certificate; if it expires, the DNI and the address can be registered
+  again.
 * The system needs to be as anonymous as possible.
 
 To archieve this the DNI and the email address are stored with a deterministic Hash function
@@ -69,7 +76,7 @@ and restric permissions as it contains sensible information.
 
 Every configuration item has a description, you only need to notice:
 * `site_url` is mandatory: it is the public URL of the site and the participation
-  links sent by email are built from it.
+  account verification links sent by email are built from it.
 * `participant_hmac_key` is mandatory: the key of the HMAC that hashes the email
   addresses and DNIs of the participants. Generate it once (`openssl rand -hex 32`)
   and keep it: with another key no registered participant is recognized.
@@ -87,11 +94,13 @@ Every configuration item has a description, you only need to notice:
   default), counting from the issue date in its text. The payslip (nómina) must be of the
   current month or the previous one.
 * `client_cert_enabled` (`true` by default) asks for the client certificate when
-  registering, and only then: not for voting. The browser only asks for it during the
-  TLS handshake, so registering is served by its own virtual host, `registration_url`
-  (e.g. `https://registro.example.org/`, with the same `DocumentRoot`). The documents
-  wizard is shown in the site and only its final submit (document and email address) goes
-  there, so the browser asks for the certificate at that moment. It must be the host of
+  registering and when voting. The browser only asks for it during the
+  TLS handshake, so registering and voting are served by their own virtual host, `registration_url`
+  (e.g. `https://registro.example.org/`, with the same `DocumentRoot`). The rest of the
+  site (the surveys, the results, the account verification link) doesn't ask for it: the
+  «Participar en la consulta» button of each survey goes to `participate?sid=N` there.
+  Without it (only for development) voting asks for the DNI in a form, so anybody can vote
+  as anybody. It must be the host of
   `site_url` in another port or a subdomain of it: the CAPTCHA and the form token are kept
   in the session, and its cookie must reach both. Only that virtual host asks for the
   certificate; with Apache mod_ssl:
@@ -163,7 +172,8 @@ proof of work captcha that needs no external service: the widget is served from
 
 ### Configure the mail bounce checker
 For avoiding conflicts with a wrong typed email address the application comes with a script 
-(`checkbounce.php`) that cleans the `Participats`.
+(`checkbounce.php`) that cleans the `Participats`: when the account verification message
+bounces, the registration is deleted and the DNI can be registered again.
 You need to feed the script with a bouced email and the script deletes the row.
 
 These are the steps for doing it with postfix (maybe you need to change users, account names
@@ -227,9 +237,10 @@ no need to run `composer` by hand.
    certificate is self-signed, so the browser warns about it the first time; mount your own
    `server.crt` and `server.key` in the `ssl` volume (`/etc/ssl/mlsurvey`) for production.
    Plain HTTP (`WEB_PORT`, 8080) redirects to `SITE_URL` (see `HTTPS_REDIRECT`).
-   The registration page («Regístrate») is served at `https://localhost:8444`
+   The registration page («Regístrate») and the voting page are served at `https://localhost:8444`
    (`WEB_REG_PORT`, `REGISTRATION_URL`), the only port that asks for the client
-   certificate: the browser asks for it when the page is opened, before the wizard is shown.
+   certificate: the browser asks for it when the page is opened, before the wizard or the
+   survey is shown.
    «Regístrate» on the site first warns in a dialog that a personal certificate will be asked
    for, whose DNI must match the one of the document, and goes there if accepted.
    Without a valid certificate the page shows an error and goes back to the site. It only offers the
@@ -245,20 +256,20 @@ the database to be ready before serving requests.
 | --- | --- | --- |
 | `WEB_PORT` | `8080` | Host port of plain HTTP, which redirects to `SITE_URL`. |
 | `WEB_SSL_PORT` | `8443` | Host port of HTTPS: the site, without client certificate. |
-| `WEB_REG_PORT` | `8444` | Host port of the registration HTTPS, which asks for the client certificate. |
-| `REGISTRATION_URL` | `https://localhost:${WEB_REG_PORT}/` | Public URL of the registration (port 444 of the container). |
+| `WEB_REG_PORT` | `8444` | Host port of the registration and voting HTTPS, which asks for the client certificate. |
+| `REGISTRATION_URL` | `https://localhost:${WEB_REG_PORT}/` | Public URL of the registration and voting (port 444 of the container). |
 | `DB_NAME` | `mlsurvey` | Database name. |
 | `DB_USER` | `mlsurvey` | Database user. |
 | `DB_PASSWORD` | `mlsurvey` | Password for that user. |
 | `DB_ROOT_PASSWORD` | `mlsurvey-root` | MariaDB `root` password. |
 | `DB_PREFIX` | *(empty)* | Optional prefix for table names. |
-| `SITE_URL` | `https://localhost:${WEB_SSL_PORT}/` | Public URL of the site (scheme, host, port and path). The participation links sent by email are built from it, never from the request's `Host` header. |
+| `SITE_URL` | `https://localhost:${WEB_SSL_PORT}/` | Public URL of the site (scheme, host, port and path). The account verification links sent by email are built from it, never from the request's `Host` header. |
 | `LOG_LEVEL` | `0` | Log level: `0` error, `1` warning, `2` info, `3` debug. Use `0` in production. |
 | `ALTCHA_ENABLED` | `true` | ALTCHA captcha on the participation request form. Set it to `false` when the site is served over plain HTTP: the proof of work needs Web Crypto, only available on secure contexts (HTTPS or `localhost`). |
 | `ALTCHA_HMAC_KEY` | *(empty)* | Key used to sign the captcha challenges. When empty, a key is generated for each session. |
 | `PARTICIPANT_HMAC_KEY` | `cambiame` | Key of the HMAC that hashes the email addresses and DNIs of the participants. The default is the development value the hashes of `test-data.sql` are computed with: in production set your own (`openssl rand -hex 32`) once and never change it. |
 | `PDF_MAX_AGE_DAYS` | `30` | How old the service record can be, counting from its issue date. |
-| `CLIENT_CERT_ENABLED` | `true` | Ask for the client certificate when registering (only in port 444, see `docker/apache-sites.conf`). The accepted CAs are made from the TSL by `buildclientca.php` on the first start and kept in the `ssl` volume; to refresh them run `docker compose exec web sh -c 'php buildclientca.php /etc/ssl/mlsurvey/client_ca.pem && apache2ctl graceful'`. Set it to `false` only for development. |
+| `CLIENT_CERT_ENABLED` | `true` | Ask for the client certificate when registering and voting (only in port 444, see `docker/apache-sites.conf`). The accepted CAs are made from the TSL by `buildclientca.php` on the first start and kept in the `ssl` volume; to refresh them run `docker compose exec web sh -c 'php buildclientca.php /etc/ssl/mlsurvey/client_ca.pem && apache2ctl graceful'`. Set it to `false` only for development: voting then asks for the DNI (`test-data.sql` has a verified participant with DNI `00000000T`). |
 | `CLIENT_CERT_VERIFY_VAR`, `CLIENT_CERT_VAR` | `SSL_CLIENT_VERIFY`, `SSL_CLIENT_CERT` | `$_SERVER` variables with the verification result (`SUCCESS`) and the certificate. With a TLS proxy in front that verifies it, the headers where it passes them (e.g. `HTTP_X_SSL_CLIENT_VERIFY`, PEM or URL-encoded PEM); the proxy must always overwrite them. |
 | `HTTPS_REDIRECT` | `true` | Redirect plain HTTP to `SITE_URL` (only if it is `https://`). Set it to `false` when a TLS proxy reaches the container over HTTP. |
 | `CLIENT_CA_EXTRA` | *(empty)* | PEM file (path inside the container) with root CAs the TSL doesn't bring, see `buildclientca.php`. |

@@ -1,9 +1,8 @@
 <?php
 
 /**
- * Base class for the views that register participants: GetCode (which also sends
- * the participation URL) and Register.
- * It has the two forms (email address and documents), the checks of the uploaded
+ * Base class for the view that registers participants (Register).
+ * It has the forms (email address and documents), the checks of the uploaded
  * PDFs and the insertion in Participants table.
  */
 
@@ -18,6 +17,7 @@ require_once 'utils/altcha.php';
 require_once 'utils/pdfsign.php';
 require_once 'utils/clientcert.php';
 require_once 'utils/host.php';
+require_once 'utils/verification.php';
 require_once 'include/icons.php';
 
 abstract class RegistrationView extends View
@@ -139,7 +139,7 @@ abstract class RegistrationView extends View
        petición no ha llegado allí: el envío de los documentos no vale. */
     protected function mustGoToRegistration(): bool
     {
-        return clientCertEnabled() && !isRegistrationHost();
+        return mustGoToCertHost();
     }
 
     /* La página $page en la URL del registro, la que pide el certificado
@@ -148,7 +148,7 @@ abstract class RegistrationView extends View
        comprueban con la misma sesión. */
     protected function registrationAction(string $page): string
     {
-        return clientCertEnabled() && getRegistrationURL() != "" ? getRegistrationURL() . $page : $page;
+        return certURL($page);
     }
 
     /* Respuesta a un envío de documentos que no ha llegado a la URL del
@@ -251,8 +251,9 @@ abstract class RegistrationView extends View
        junto al campo. */
     private function emailInfo(string $extra): string
     {
-        return "La dirección queda asociada a tus documentos: en esta y en " .
-            "próximas consultas tendrás que usar siempre la misma.\n\n" . $extra;
+        return "La dirección queda asociada a tus documentos y solo se usa para " .
+            "verificar tu cuenta: te enviaremos un enlace para activarla. Para votar te " .
+            "identificarás con tu certificado electrónico.\n\n" . $extra;
     }
 
     /* Segundo paso, solo para direcciones que aún no están registradas: un
@@ -721,7 +722,7 @@ abstract class RegistrationView extends View
      * If the DNI and email are not in Parciciants table the method stores the hashed
      * email address (participant) and the hashed DNI (dnihashed) in Participants table.
      */
-    private function insertParticipant($db, $hashdni, $hashemail)
+    protected function insertParticipant($db, $hashdni, $hashemail)
     {
         $query = $db->prepare("INSERT into {Participants} (participant, dnihashed) " .
             "values (:part, :dni)");
@@ -847,6 +848,8 @@ abstract class RegistrationView extends View
     private function findOrCreateParticipant($db, $hashdni, $hashemail, &$created = false)
     {
         $created = false;
+        /* Un registro que no se verificó a tiempo deja libres su DNI y su correo. */
+        purgeExpiredUnverified($db, $hashdni, $hashemail);
         $participants = $db->prepare("SELECT participantid, participant, dnihashed From {Participants} " .
             "WHERE participant = :participant OR dnihashed = :dni");
         $participants->bindParam(":participant", $hashemail, PDO::PARAM_STR);
@@ -891,7 +894,7 @@ abstract class RegistrationView extends View
         return (int) $participantid;
     }
 
-    private function emailInUse()
+    protected function emailInUse()
     {
         echo ("<p><strong>La dirección de correo indicada ya se ha usado con los documentos " .
             "de otra persona.</strong></p>");
