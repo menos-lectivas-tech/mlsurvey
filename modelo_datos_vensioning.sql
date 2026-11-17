@@ -88,6 +88,18 @@ CREATE UNIQUE INDEX Participants_participant_IDX USING BTREE ON Participants (pa
 /*Los mismos documentos no se pueden usar desde varias direcciones, ni una dirección con varios.*/
 CREATE UNIQUE INDEX Participants_dnihashed_IDX USING BTREE ON Participants (dnihashed);
 
+/*Verificación de la cuenta: el enlace que se envía al registrarse. Solo se guarda
+el hash (SHA-256) de su código; hasta que se abre no se puede votar.*/
+CREATE TABLE Verifications (
+	participantid INT UNSIGNED NOT NULL,
+	verifykey CHAR(64) NULL, /*sha256 of the code of the link; NULL once verified*/
+	requestdate DATETIME NOT NULL DEFAULT current_timestamp,
+	verified BOOL NOT NULL DEFAULT 0,
+	CONSTRAINT Verifications_PK PRIMARY KEY (participantid),
+	CONSTRAINT Verifications_Participants_FK FOREIGN KEY (participantid) REFERENCES Participants(participantid) ON DELETE CASCADE ON UPDATE RESTRICT
+);
+CREATE UNIQUE INDEX Verifications_verifykey_IDX USING BTREE ON Verifications (verifykey);
+
 CREATE TABLE Participation (
 	participationid INT UNSIGNED auto_increment NOT NULL,
 	surveyid INT UNSIGNED,
@@ -149,7 +161,7 @@ CREATE TABLE IF NOT EXISTS Unsubscriptions (
       confirmed INT UNSIGNED DEFAULT 0,
       unregisterdate DATETIME NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp
 );
-INSERT INTO Version values (1, 8);
+INSERT INTO Version values (1, 10);
 
 DELIMITER $$
 CREATE TRIGGER Responses_no_update

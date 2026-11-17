@@ -11,6 +11,7 @@ require_once 'include/mlmailer.php';
 require_once 'utils/crypt.php';
 require_once 'utils/clientcert.php';
 require_once 'utils/host.php';
+require_once 'utils/verification.php';
 
 class Register extends RegistrationView
 {
@@ -22,8 +23,11 @@ class Register extends RegistrationView
     /* Motivo por el que no vale el certificado electrónico, o null si vale
        (o no se pide). */
     private ?string $certerror = null;
-    /* true si el DNI del certificado ya está registrado. */
-    private bool $dniregistered = false;
+    /* DNI del certificado electrónico, si se pide y es válido. */
+    private ?string $certdni = null;
+    /* Participante ya registrada con el DNI del certificado (participantid,
+       participant), o null si no hay. */
+    private ?array $dniparticipant = null;
 
     function getMenuGroup()
     {
@@ -43,7 +47,8 @@ class Register extends RegistrationView
            certificado). */
         if (clientCertEnabled() && !$this->mustGoToRegistration()) {
             try {
-                $this->dniregistered = $this->isDniRegistered(getClientCertDni());
+                $this->certdni = getClientCertDni();
+                $this->dniparticipant = $this->findByDni($this->certdni);
             } catch (ClientCertException $e) {
                 $this->certerror = $e->getMessage();
                 $site = $this->siteURL();
@@ -53,23 +58,68 @@ class Register extends RegistrationView
         }
     }
 
-    /* true si ya hay una participante registrada con ese DNI. Si falla la
+    /* La participante registrada con ese DNI, o null si no hay. Si falla la
        consulta se deja seguir: el registro lo vuelve a comprobar. */
-    private function isDniRegistered(string $dni): bool
+    private function findByDni(string $dni): ?array
     {
         try {
-            return $this->getParticipantIdByDni(dbConn(), participantHash($dni)) !== null;
+            return $this->participantByDni(dbConn(), participantHash($dni));
         } catch (Exception $e) {
             logMessage(LOGGER_ERROR, "Error {$e} checking if the DNI is registered");
-            return false;
+            return null;
         }
     }
 
+    private function participantByDni(PDO $db, string $hashdni): ?array
+    {
+        $query = $db->prepare("SELECT participantid, participant FROM {Participants} " .
+            "WHERE dnihashed = :dni LIMIT 1");
+        $query->bindParam(":dni", $hashdni, PDO::PARAM_STR);
+        $query->execute();
+        $row = $query->fetch();
+        $query->closeCursor();
+        return $row === false ? null : $row;
+    }
+
+    /* El DNI del certificado ya tiene una cuenta: si está verificada solo
+       queda votar; si no, se ofrece enviar otra vez el enlace. */
     private function showDniRegistered()
     {
-        echo ("<p><strong>Ya hay un usuario registrado con el DNI de tu certificado " .
-            "electrónico.</strong></p>");
-        $this->showSurveysLink();
+        try {
+            $verified = isVerified(dbConn(), (int) $this->dniparticipant['participantid']);
+        } catch (Exception $e) {
+            echo ("<p><strong>Error al consultar tu registro.</strong></p>");
+            logMessage(LOGGER_ERROR, "Error {$e} checking if the account is verified");
+            return;
+        }
+        if ($verified) {
+            echo ("<p><strong>Ya estás registrado/a con el DNI de tu certificado electrónico " .
+                "y tu cuenta está verificada.</strong></p>");
+            $this->showSurveysLink();
+            return;
+        }
+        $this->showPendingVerification();
+    }
+
+    private function showPendingVerification()
+    {
+        echo ("<p><strong>Ya te has registrado con el DNI de tu certificado electrónico, pero tu " .
+            "cuenta aún no está verificada: abre el enlace que te enviamos por correo.</strong></p>");
+        $this->showEmailForm(null, [
+            'action' => self::PAGE,
+            'title' => "Activa tu cuenta",
+            'infotitle' => "Activar la cuenta",
+            'info' => "Para poder votar tienes que abrir el enlace que te enviamos al registrarte. " .
+                "Mira también en la carpeta de correo no deseado.\n\n" .
+                "Si no te ha llegado o ha caducado (vale " . VERIFY_MINUTES . " minutos), indica tu " .
+                "dirección de correo y te enviaremos uno nuevo; el anterior deja de funcionar. " .
+                "Entre un envío y el siguiente tienen que pasar " . VERIFY_WAIT_MINUTES . " minutos.\n\n" .
+                "Si al registrarte te equivocaste al escribir la dirección, indica la correcta: " .
+                "sustituirá a la anterior.",
+            'emailinfo' => "Revísala bien antes de enviar: ahí recibirás el enlace.",
+            'emailhint' => "Ahí recibirás el enlace para activar tu cuenta.",
+            'button' => "Enviar el enlace",
+        ]);
     }
 
     /* URL del sitio, sin certificado, o null si no está configurada. */
@@ -138,7 +188,13 @@ class Register extends RegistrationView
             $this->showCertError();
             return;
         }
-        if ($this->dniregistered) {
+        if ($this->dniparticipant !== null) {
+            /* El formulario para volver a enviar el enlace. */
+            if ($this->isSubmit() && !$this->isDocsSubmit()) {
+                if (!$this->checkSubmit() || !$this->resendVerification())
+                    $this->showPendingVerification();
+                return;
+            }
             $this->showDniRegistered();
             return;
         }
@@ -175,12 +231,12 @@ class Register extends RegistrationView
             'action' => self::PAGE,
             'title' => "Regístrate",
             'intro' => "Acredita que eres docente de la enseñanza pública en tres pasos. " .
-                "Al final indicarás tu dirección de correo y te enviaremos la confirmación " .
-                "del registro. Una vez registrado/a, para participar en una consulta solo " .
-                "tendrás que indicar esa dirección.",
+                "Al final indicarás tu dirección de correo y te enviaremos un enlace para " .
+                "activar tu cuenta. Una vez activada, para participar en una consulta solo " .
+                "tendrás que identificarte con tu certificado electrónico.",
             'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
-                "los enlaces para participar y ya no podrás registrarte con otra.",
-            'emailhint' => "Revísala bien: ahí recibirás la confirmación.",
+                "el enlace para activar tu cuenta.",
+            'emailhint' => "Revísala bien: ahí recibirás el enlace para activar tu cuenta.",
         ], $selected);
     }
 
@@ -188,8 +244,8 @@ class Register extends RegistrationView
      * Checks the address and the documents and registers the participant: the
      * address must be valid, of an allowed domain and not registered yet; then
      * the documents are checked and the participant is inserted in Participants
-     * table by RegistrationView::registerWithDocs, and the confirmation email is
-     * sent.
+     * table by RegistrationView::registerWithDocs, and the email with the link
+     * that verifies the account is sent.
      *
      * @return bool true if it's done (registered, or the address already was), false
      * (with the reason already shown) if the wizard should be shown again.
@@ -205,38 +261,167 @@ class Register extends RegistrationView
             $db = dbConn();
             if (!$this->checkDomain($db, $email))
                 return false;
-            /* Antes de mirar los documentos: no hace falta procesarlos. */
-            if ($this->getParticipantId($db, participantHash($email)) !== null) {
+            /* Antes de mirar los documentos: no hace falta procesarlos. Una
+               dirección que no se verificó a tiempo se puede volver a usar. */
+            $existing = $this->getParticipantId($db, participantHash($email));
+            if ($existing !== null && !isExpiredUnverified($db, $existing)) {
                 $this->alreadyRegistered();
                 return true;
             }
-            $created = $this->registerWithDocs($db, $email, fn($participantid, $created) => $created);
+            $participantid = null;
+            $created = $this->registerWithDocs($db, $email,
+                function ($id, $created) use (&$participantid) {
+                    $participantid = $id;
+                    return $created;
+                });
             if ($created === null)
                 return false;
             if (!$created) {
                 $this->alreadyRegistered();
                 return true;
             }
+            /* El registro ya está hecho: si falla el correo se puede pedir
+               otro enlace volviendo a «Regístrate». */
+            $this->sendVerificationEmail($db, $participantid, $email,
+                "Te has registrado correctamente.");
         } catch (Exception $e) {
             echo ("<p><strong>Error al registrar la dirección de correo.</strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} when registering participant");
             return false;
         }
-        /* El registro ya está hecho y la tabla no admite borrados: si falla
-           el correo no se puede deshacer, así que solo se avisa. */
+        return true;
+    }
+
+    /**
+     * Sends again the link that verifies the account of the DNI of the client
+     * certificate, which is registered but not verified. If the address isn't
+     * the registered one, it replaces it (the certificate proves who they are):
+     * the participant is deleted and inserted again with the new address, as
+     * Participants doesn't allow updates.
+     *
+     * @return bool true if it's done, false (with the reason already shown) if
+     * the form should be shown again.
+     */
+    private function resendVerification(): bool
+    {
+        $email = $this->getEmail();
+        if ($email === null)
+            return false;
+        try {
+            $db = dbConn();
+            if (!$this->checkDomain($db, $email))
+                return false;
+            $hashdni = participantHash($this->certdni);
+            $hashemail = participantHash($email);
+            if (!lockParticipant($db, $hashdni)) {
+                echo ("<p><strong>Hay otra petición en curso con el DNI de tu certificado. " .
+                    "Inténtalo de nuevo en unos segundos.</strong></p>");
+                return false;
+            }
+            try {
+                if (!$this->lockEmail($db, $hashemail))
+                    return false;
+                try {
+                    $participantid = $this->replaceUnverified($db, $hashdni, $hashemail);
+                } finally {
+                    unlockParticipant($db, $hashemail);
+                }
+            } finally {
+                unlockParticipant($db, $hashdni);
+            }
+            if ($participantid === null)
+                return false;
+            $this->sendVerificationEmail($db, $participantid, $email, "");
+        } catch (Exception $e) {
+            echo ("<p><strong>Error al enviar el enlace para activar la cuenta.</strong></p>");
+            logMessage(LOGGER_ERROR, "Error {$e} resending verification");
+            return false;
+        }
+        return true;
+    }
+
+    /* Con los bloqueos del DNI y del correo cogidos: la participante del DNI
+       con la dirección indicada, cambiándosela si es otra. Devuelve su id, o
+       null (con el motivo ya mostrado). */
+    private function replaceUnverified(PDO $db, string $hashdni, string $hashemail): ?int
+    {
+        $row = $this->participantByDni($db, $hashdni);
+        if ($row === null) {
+            echo ("<p><strong>No hay ningún registro con el DNI de tu certificado.</strong> " .
+                "<a href='" . self::PAGE . "'>Regístrate</a>.</p>");
+            return null;
+        }
+        $participantid = (int) $row['participantid'];
+        if (isVerified($db, $participantid)) {
+            echo ("<p><strong>Tu cuenta ya está verificada.</strong></p>");
+            $this->showSurveysLink();
+            return null;
+        }
+        if (hash_equals($row['participant'], $hashemail))
+            return $participantid;
+
+        /* Otra dirección. Sin esperar entre envíos se podría mandar el
+           enlace a una dirección tras otra. */
+        if (verificationRecentlySent($db, $participantid)) {
+            $this->waitToResend();
+            return null;
+        }
+        $other = $this->getParticipantId($db, $hashemail);
+        if ($other !== null) {
+            if (!isExpiredUnverified($db, $other)) {
+                $this->emailInUse();
+                return null;
+            }
+            deleteParticipant($db, $other);
+        }
+        $db->beginTransaction();
+        try {
+            deleteParticipant($db, $participantid);
+            $participantid = (int) $this->insertParticipant($db, $hashdni, $hashemail);
+            $db->commit();
+        } catch (Exception $e) {
+            if ($db->inTransaction())
+                $db->rollBack();
+            throw $e;
+        }
+        logMessage(LOGGER_INFO, "Address of an unverified participant replaced.");
+        return $participantid;
+    }
+
+    /* Genera un enlace de verificación nuevo y lo envía. $done es lo que ya
+       se ha hecho (el registro), para empezar el mensaje. */
+    private function sendVerificationEmail(PDO $db, int $participantid, string $email, string $done)
+    {
+        $code = newVerificationCode($db, $participantid);
+        if ($code === null) {
+            if ($done !== "")
+                echo ("<p><strong>" . h($done) . "</strong></p>");
+            $this->waitToResend();
+            return;
+        }
         try {
             $mailer = new MlMailer();
             $mailer->configure();
-            $mailer->sendRegistered($email);
-            echo ("<p><strong>Te has registrado correctamente. Hemos enviado un mensaje de " .
-                "confirmación a la dirección indicada.</strong></p>");
+            $mailer->sendVerification($email, url_base64_encode($code), VERIFY_MINUTES);
+            echo ("<p><strong>" . h($done === "" ? "" : $done . " ") .
+                "Te hemos enviado a " . h($email) . " un enlace para activar tu cuenta, que " .
+                "caduca en " . VERIFY_MINUTES . " minutos.</strong></p>");
+            echo ("<p>Hasta que no lo abras no podrás votar. Si no te llega, mira en la carpeta " .
+                "de correo no deseado o vuelve a «Regístrate» para pedir otro.</p>");
         } catch (Exception $e) {
-            echo ("<p><strong>Te has registrado correctamente, pero no se ha podido enviar " .
-                "el mensaje de confirmación.</strong></p>");
-            logMessage(LOGGER_ERROR, "Error {$e} sending registration email");
+            echo ("<p><strong>" . h($done === "" ? "" : $done . " ") .
+                "No se ha podido enviar el mensaje con el enlace para activar tu cuenta.</strong></p>");
+            echo ("<p>Vuelve a «Regístrate» dentro de " . VERIFY_WAIT_MINUTES .
+                " minutos para pedir otro.</p>");
+            logMessage(LOGGER_ERROR, "Error {$e} sending verification email");
         }
-        $this->showSurveysLink();
-        return true;
+    }
+
+    private function waitToResend()
+    {
+        echo ("<p><strong>Ya te hemos enviado un enlace hace menos de " . VERIFY_WAIT_MINUTES .
+            " minutos.</strong> Mira en tu correo (también en la carpeta de correo no deseado) o " .
+            "espera para pedir otro.</p>");
     }
 
     private function alreadyRegistered()
@@ -247,7 +432,7 @@ class Register extends RegistrationView
 
     private function showSurveysLink()
     {
-        echo ("<p>Ya puedes participar en las <a href='surveys'>consultas activas</a> " .
-            "indicando solo tu dirección de correo.</p>");
+        echo ("<p>Para participar en las <a href='" . h(($this->siteURL() ?? "") . "surveys") . "'>consultas " .
+            "activas</a> entra en cada una e identifícate con tu certificado electrónico.</p>");
     }
 }

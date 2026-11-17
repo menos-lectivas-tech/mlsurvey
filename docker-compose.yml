@@ -70,8 +70,8 @@ services:
       - "${WEB_PORT:-8080}:80"
       # HTTPS del sitio (HTTP redirige a SITE_URL).
       - "${WEB_SSL_PORT:-8443}:443"
-      # HTTPS del registro: el unico que pide el certificado electronico, al
-      # recibir el envio final del asistente.
+      # HTTPS del registro y la votacion: el unico que pide el certificado
+      # electronico.
       - "${WEB_REG_PORT:-8444}:444"
     environment:
       DB_HOST: db
@@ -88,7 +88,7 @@ services:
       # URL publica del sitio, tal como la ven las participantes. Los enlaces
       # de los correos se construyen con ella, no con la cabecera Host.
       SITE_URL: ${SITE_URL:-https://localhost:${WEB_SSL_PORT:-8443}/}
-      # URL del registro, la unica que pide el certificado electronico (el
+      # URL del registro y la votacion, la unica que pide el certificado electronico (el
       # puerto 444 del contenedor; en produccion, p. ej. https://registro.dominio/).
       REGISTRATION_URL: ${REGISTRATION_URL:-https://localhost:${WEB_REG_PORT:-8444}/}
       # 0: error, 1: warn, 2: info, 3: debug. En produccion 0.
@@ -115,7 +115,7 @@ services:
       PARTICIPANT_HMAC_KEY: ${PARTICIPANT_HMAC_KEY:-6f7e874a8d9798107bc29aae835ffede3f922e03ad9c2d3f0631db3d87c6977e}
       # Antiguedad maxima de la hoja de servicios.
       PDF_MAX_AGE_DAYS: ${PDF_MAX_AGE_DAYS:-30}
-      # Certificado electronico al registrarse (ver .env.dev): lo pide el
+      # Certificado electronico al registrarse y al votar (ver .env.dev): lo pide el
       # HTTPS del contenedor. Con un proxy TLS delante, las cabeceras donde
       # lo pase.
       CLIENT_CERT_ENABLED: ${CLIENT_CERT_ENABLED:-true}
