@@ -294,13 +294,6 @@ abstract class RegistrationView extends View
                     <a href="<?= h($texts['back']); ?>">Usar otra dirección</a>
                 </p>
             <?php } ?>
-            <?php if (clientCertEnabled()) { ?>
-                <p class="ml-wizard-cert"><strong>Al final necesitarás tu certificado
-                        electrónico</strong>: el DNI electrónico (con su lector), el certificado de la
-                    FNMT, el de empleado/a público/a o cualquier otro certificado cualificado de
-                    persona física, instalado en el navegador. Te pedirá que lo elijas al enviar los
-                    documentos, y su DNI tiene que coincidir con el del documento que adjuntes.</p>
-            <?php } ?>
             <ol class="ml-wizard-progress" id="ml-wizard-progress">
                 <?php foreach ($steps as $n => $name) { ?>
                     <li data-step="<?= $n; ?>"><span class="ml-wizard-progress__num"><?= $n; ?></span>
@@ -483,10 +476,6 @@ abstract class RegistrationView extends View
                             value="1" id="acepto" required>
                         He leído la información sobre el tratamiento de los documentos y
                         consiento su tratamiento con la finalidad indicada.</label>
-                    <?php if (clientCertEnabled()) { ?>
-                        <p class="ml-wizard-help">Al pulsar «Enviar documentos» el navegador te pedirá
-                            que elijas tu certificado electrónico.</p>
-                    <?php } ?>
                     <div class="ml-participate-row">
                         <?= altchaWidgetHTML(); ?>
                         <button type="submit" class="button-3 ml-participate-btn"

@@ -227,9 +227,12 @@ no need to run `composer` by hand.
    certificate is self-signed, so the browser warns about it the first time; mount your own
    `server.crt` and `server.key` in the `ssl` volume (`/etc/ssl/mlsurvey`) for production.
    Plain HTTP (`WEB_PORT`, 8080) redirects to `SITE_URL` (see `HTTPS_REDIRECT`).
-   The final submit of the registration wizard goes to `https://localhost:8444`
+   The registration page («Regístrate») is served at `https://localhost:8444`
    (`WEB_REG_PORT`, `REGISTRATION_URL`), the only port that asks for the client
-   certificate: the browser asks for it when the document and the email address are sent. It only offers the
+   certificate: the browser asks for it when the page is opened, before the wizard is shown.
+   «Regístrate» on the site first warns in a dialog that a personal certificate will be asked
+   for, whose DNI must match the one of the document, and goes there if accepted.
+   Without a valid certificate the page shows an error and goes back to the site. It only offers the
    certificates it has installed (Firefox: Settings → Certificates; Chrome/Edge: the ones of
    the system) and, for the DNIe, its reader and driver must be installed.
 

@@ -9,11 +9,19 @@ require_once 'ifaces/registrationview.php';
 require_once 'utils/dbutils.php';
 require_once 'include/mlmailer.php';
 require_once 'utils/crypt.php';
+require_once 'utils/clientcert.php';
+require_once 'utils/host.php';
 
 class Register extends RegistrationView
 {
 
     private const PAGE = "register";
+    /* Segundos que se muestra el error del certificado antes de volver al sitio. */
+    private const CERT_ERROR_DELAY = 8;
+
+    /* Motivo por el que no vale el certificado electrónico, o null si vale
+       (o no se pide). */
+    private ?string $certerror = null;
 
     function getMenuGroup()
     {
@@ -24,13 +32,74 @@ class Register extends RegistrationView
        certificado electrónico: allí se genera su token y su CAPTCHA, y allí
        llega su envío con la misma sesión. Si se mandara desde el sitio, el
        navegador podría no enviar a la URL del registro (otro puerto) la
-       cookie de sesión del sitio. */
+       cookie de sesión del sitio. Desde el sitio no se va directamente: antes
+       se avisa de que se pedirá el certificado (ver showCertNotice). */
     public function doInit()
     {
-        if ($_SERVER['REQUEST_METHOD'] === 'GET' && $this->mustGoToRegistration()) {
-            header("Location: " . $this->registrationAction(self::PAGE), true, 302);
-            exit;
+        /* En la URL del registro: sin un certificado válido no se puede
+           registrar, así que se avisa y se vuelve al sitio (el que no pide
+           certificado). */
+        if (clientCertEnabled() && !$this->mustGoToRegistration()) {
+            try {
+                getClientCertDni();
+            } catch (ClientCertException $e) {
+                $this->certerror = $e->getMessage();
+                $site = $this->siteURL();
+                if ($site !== null)
+                    header("Refresh: " . self::CERT_ERROR_DELAY . "; url=" . $site);
+            }
         }
+    }
+
+    /* URL del sitio, sin certificado, o null si no está configurada. */
+    private function siteURL(): ?string
+    {
+        try {
+            return getURL();
+        } catch (Exception $e) {
+            logMessage(LOGGER_ERROR, $e->getMessage());
+            return null;
+        }
+    }
+
+    /* En el sitio, antes de ir a la URL del registro: avisa en un diálogo
+       de que el navegador pedirá el certificado electrónico, y va allí si
+       se acepta o a la página principal si no. Sin JavaScript queda el
+       mismo aviso con un enlace. */
+    private function showCertNotice()
+    {
+        $title = "Se te pedirá tu certificado electrónico";
+        $message = "Para registrarte, el navegador te pedirá que selecciones tu certificado " .
+            "electrónico personal (DNI electrónico, certificado de la FNMT, de empleado/a " .
+            "público/a...). El DNI del certificado debe coincidir con el del documento que aportes.";
+        $target = $this->registrationAction(self::PAGE);
+        $site = $this->siteURL() ?? ".";
+    ?>
+        <section class="ml-participate-card">
+            <h3>Regístrate</h3>
+            <p><strong><?= h($title); ?></strong></p>
+            <p><?= h($message); ?></p>
+            <p><a class="button-3" href="<?= h($target); ?>">Continuar</a></p>
+        </section>
+        <script>
+            mlDialog.confirm({
+                title: <?= json_encode($title); ?>,
+                message: <?= json_encode($message); ?>,
+                confirmText: "Continuar"
+            }).then(function(ok) {
+                window.location.href = ok ? <?= json_encode($target); ?> : <?= json_encode($site); ?>;
+            });
+        </script>
+    <?php
+    }
+
+    private function showCertError()
+    {
+        echo ("<p><strong>Para registrarte debes aportar un certificado digital válido.</strong></p>");
+        echo ("<p>" . h($this->certerror) . "</p>");
+        $site = $this->siteURL();
+        if ($site !== null)
+            echo ("<p>En unos segundos volverás a la <a href='" . h($site) . "'>página principal</a>.</p>");
     }
 
     /**
@@ -44,6 +113,14 @@ class Register extends RegistrationView
      */
     public function show()
     {
+        if ($this->certerror !== null) {
+            $this->showCertError();
+            return;
+        }
+        if (!$this->isDocsSubmit() && $this->mustGoToRegistration()) {
+            $this->showCertNotice();
+            return;
+        }
         if ($this->isDocsSubmit()) {
             /* El envío va a la URL del registro, que pide el certificado. */
             if ($this->mustGoToRegistration()) {
