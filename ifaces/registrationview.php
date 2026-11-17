@@ -142,11 +142,10 @@ abstract class RegistrationView extends View
         return clientCertEnabled() && !isRegistrationHost();
     }
 
-    /* Destino del envío final del asistente de documentos: la página $page
-       en la URL del registro. El asistente se muestra en el sitio, sin
-       certificado; el navegador lo pide al enviar el documento y el correo,
-       al conectar con la URL del registro. El token y el CAPTCHA valen allí
-       porque la sesión es la misma (ver sessionCookieDomain). */
+    /* La página $page en la URL del registro, la que pide el certificado
+       electrónico. El asistente de documentos se muestra y se envía allí
+       (ver Register::doInit): el token y el CAPTCHA se generan y se
+       comprueban con la misma sesión. */
     protected function registrationAction(string $page): string
     {
         return clientCertEnabled() && getRegistrationURL() != "" ? getRegistrationURL() . $page : $page;

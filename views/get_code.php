@@ -46,8 +46,13 @@ class GetCode extends RegistrationView
     public function show()
     {
         if ($this->isSubmit()) {
+            /* El registro con documentos se hace solo en «Regístrate». */
+            if ($this->isDocsSubmit()) {
+                $this->notRegistered();
+                return;
+            }
             if ($this->checkSubmit())
-                $this->generateCode($this->isDocsSubmit());
+                $this->generateCode();
             return;
         }
 
@@ -83,15 +88,10 @@ class GetCode extends RegistrationView
                 'action' => self::PAGE,
                 'title' => "Participar en la consulta",
                 'infotitle' => "Cómo participar",
-                'info' => "Indica tu dirección de correo.\n\n" .
-                    "SI YA HAS PARTICIPADO en otra consulta, recibirás directamente un mensaje " .
-                    "con un enlace personal para participar, que caduca en una hora.\n\n" .
-                    "SI ES LA PRIMERA VEZ, a continuación te preguntaremos tu situación y te " .
-                    "pediremos uno o dos documentos firmados electrónicamente. Si son válidos " .
-                    "recibirás el mensaje con el enlace.\n" .
-                    "Los documentos solo se usan para comprobar que son válidos y, si son dos, " .
-                    "que son de la misma persona. Con el DNI que figura en ellos se evita " .
-                    "que una misma persona participe dos veces. Los ficheros no se guardan.\n\n" .
+                'info' => "Indica la dirección de correo con la que te registraste. Recibirás " .
+                    "un mensaje con un enlace personal para participar, que caduca en una hora.\n\n" .
+                    "SI AÚN NO TE HAS REGISTRADO, tienes que hacerlo antes en «Regístrate»: " .
+                    "acreditarás que eres docente con tu certificado electrónico y un documento.\n\n" .
                     "Si quieres pensarte las respuestas antes de enviar tus datos, puedes " .
                     "verlas en «Ver las preguntas de la consulta», debajo de este recuadro.",
                 'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
@@ -112,36 +112,26 @@ class GetCode extends RegistrationView
     }
 
     /**
-     * Called with $withdocs false from the email form and true from the documents one.
-     * In the first case, if the email address is not in Participants table the method
-     * only shows the documents form, whose submit goes to the URL that asks for the client
-     * certificate (registration_url).
+     * Called from the email form. If the email address is not in Participants table
+     * the method only shows that it isn't registered, with a link to the registration
+     * page: registering is only done there.
      *
-     * In the second case the documents are checked and the participant is looked for
-     * or inserted in Participants table by RegistrationView::registerWithDocs.
-     *
-     * Then, if the participant hasn't participated in the survey, the method
+     * Otherwise, if the participant hasn't participated in the survey, the method
      * generates a random 256bit key, encrypts the email address with this key
      * and stores the key (hashed), the encrypted address and the
      * survey ID in the Participation table. Then it sends this information to the email address
      * formatted as an URL.
      */
-    private function generateCode(bool $withdocs)
+    private function generateCode()
     {
         $surveyid = $_REQUEST['surveyid'] ?? null;
         if (!is_string($surveyid) || !ctype_digit($surveyid)) {
             echo ("<p><strong>Imposible acceder a la consulta seleccionada.</strong></p>");
             return;
         }
-        if ($withdocs && !$this->checkConsent("participar"))
-            return;
         $email = $this->getEmail();
         if ($email === null)
             return;
-        if ($withdocs && $this->mustGoToRegistration()) {
-            $this->notRegistrationHost();
-            return;
-        }
         $start_time = microtime(true);
         $surveyname = "";
         try {
@@ -162,35 +152,18 @@ class GetCode extends RegistrationView
                 return;
             }
             $hashemail = participantHash($email);
-            /* Primer paso con una dirección que aún no está registrada: antes
-               de enviarle el enlace tiene que acreditarse con los documentos. */
-            $back = getURL() . self::PAGE . "?responseid=" . (int) $surveyid;
-            if (!$withdocs && $this->getParticipantId($db, $hashemail) === null) {
-                if (showSurveyHeader($db, $surveyid, true))
-                    $this->showDocsForm($surveyid, $email, [
-                        'action' => self::PAGE,
-                        'back' => $back,
-                        'title' => "Primera vez: acredita que eres docente",
-                        'intro' => "no ha participado antes. Sigue estos pasos para acreditarte y te " .
-                            "enviaremos a esa dirección un enlace para participar.",
-                    ]);
+            /* Una dirección que aún no está registrada tiene que registrarse
+               antes, en «Regístrate». */
+            if ($this->getParticipantId($db, $hashemail) === null) {
+                $this->notRegistered();
                 return;
             }
-            if ($withdocs) {
-                $reserved = $this->registerWithDocs(
-                    $db,
-                    $email,
-                    fn($participantid) =>
-                    $this->reserveParticipation($db, $email, $hashemail, $participantid, $surveyid)
-                );
-            } else {
-                if (!$this->lockEmail($db, $hashemail))
-                    return;
-                try {
-                    $reserved = $this->reserveCodeEmail($db, $email, $hashemail, $surveyid);
-                } finally {
-                    unlockParticipant($db, $hashemail);
-                }
+            if (!$this->lockEmail($db, $hashemail))
+                return;
+            try {
+                $reserved = $this->reserveCodeEmail($db, $email, $hashemail, $surveyid);
+            } finally {
+                unlockParticipant($db, $hashemail);
             }
             if ($reserved === null)
                 return;
@@ -207,6 +180,15 @@ class GetCode extends RegistrationView
             echo ("<p><strong>Error generando código para la consulta <em>{$surveyname}</em></strong></p>");
             logMessage(LOGGER_ERROR, "Error {$e} when generating code for survey");
         }
+    }
+
+    /* Respuesta a una dirección que no está registrada: el registro se hace
+       en su página, en la URL que pide el certificado electrónico. */
+    private function notRegistered()
+    {
+        echo ("<p><strong>La dirección de correo indicada no está registrada.</strong></p>" .
+            "<p>Para participar en las consultas tienes que registrarte antes: " .
+            "<a href='" . h($this->registrationAction("register")) . "'>Regístrate</a>.</p>");
     }
 
     /* Guarda la petición de código de una dirección ya registrada. Se llama
