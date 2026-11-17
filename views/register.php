@@ -101,25 +101,69 @@ class Register extends RegistrationView
         $this->showPendingVerification();
     }
 
+    /* Cuenta registrada sin verificar. Si el último enlace se envió hace
+       menos de VERIFY_WAIT_MINUTES solo se recuerda que lo abra; si no, se
+       muestra el formulario para pedir otro. */
     private function showPendingVerification()
     {
+        try {
+            $wait = secondsUntilResend(dbConn(), (int) $this->dniparticipant['participantid']);
+        } catch (Exception $e) {
+            logMessage(LOGGER_ERROR, "Error {$e} checking when the link can be resent");
+            $wait = 0;
+        }
         echo ("<p><strong>Ya te has registrado con el DNI de tu certificado electrónico, pero tu " .
-            "cuenta aún no está verificada: abre el enlace que te enviamos por correo.</strong></p>");
+            "cuenta aún no está activada.</strong></p>");
+        if ($wait > 0) {
+            $this->showEmailSent($wait);
+            return;
+        }
+        echo ("<p>Para activarla tienes que pinchar en el enlace que te enviamos por correo " .
+            "(mira también en la carpeta de correo no deseado).</p>");
+        echo ("<p>Si no te ha llegado, o ya ha caducado (vale " . VERIFY_MINUTES . " minutos), " .
+            "escribe aquí tu dirección de correo y te enviaremos un enlace nuevo; el anterior " .
+            "dejará de funcionar. Si al registrarte te equivocaste al escribir la dirección, " .
+            "escribe la correcta: sustituirá a la anterior.</p>");
         $this->showEmailForm(null, [
             'action' => self::PAGE,
-            'title' => "Activa tu cuenta",
-            'infotitle' => "Activar la cuenta",
-            'info' => "Para poder votar tienes que abrir el enlace que te enviamos al registrarte. " .
-                "Mira también en la carpeta de correo no deseado.\n\n" .
-                "Si no te ha llegado o ha caducado (vale " . VERIFY_MINUTES . " minutos), indica tu " .
-                "dirección de correo y te enviaremos uno nuevo; el anterior deja de funcionar. " .
-                "Entre un envío y el siguiente tienen que pasar " . VERIFY_WAIT_MINUTES . " minutos.\n\n" .
-                "Si al registrarte te equivocaste al escribir la dirección, indica la correcta: " .
-                "sustituirá a la anterior.",
+            'title' => "Volver a enviar el enlace de activación",
+            'infotitle' => "Volver a enviar el enlace",
+            'info' => "Usa este formulario solo si no te ha llegado el correo con el enlace para " .
+                "activar tu cuenta o si ya ha caducado (vale " . VERIFY_MINUTES . " minutos).\n\n" .
+                "Te enviaremos un enlace nuevo a la dirección que indiques y el anterior dejará " .
+                "de funcionar. Si es distinta de la que diste al registrarte, la sustituirá.\n\n" .
+                "Después de cada envío tendrás que esperar " . VERIFY_WAIT_MINUTES .
+                " minutos para poder pedir otro.",
             'emailinfo' => "Revísala bien antes de enviar: ahí recibirás el enlace.",
-            'emailhint' => "Ahí recibirás el enlace para activar tu cuenta.",
-            'button' => "Enviar el enlace",
+            'emailhint' => "Ahí te enviaremos el nuevo enlace para activar tu cuenta.",
+            'button' => "Enviar de nuevo el enlace",
         ]);
+    }
+
+    /* Aviso de que el enlace ya está enviado y hay que abrirlo. Durante
+       $wait segundos no se puede pedir otro: pasados, la página se recarga
+       y muestra el formulario para pedirlo (ver showPendingVerification). */
+    private function showEmailSent(int $wait, ?string $email = null)
+    {
+        $minutes = max(1, (int) ceil($wait / 60));
+        $to = $email === null ? "" : " a <strong>" . h($email) . "</strong>";
+    ?>
+        <section class="ml-participate-card">
+            <h3>Revisa tu correo</h3>
+            <p>Te hemos enviado un email<?= $to; ?> con un enlace para activar tu cuenta, que caduca
+                en <?= VERIFY_MINUTES; ?> minutos. <strong>Pincha en el enlace para verificarla</strong>;
+                hasta entonces no podrás votar. Mira también en la carpeta de correo no deseado.</p>
+            <p>Si no te llega en <?= VERIFY_WAIT_MINUTES; ?> minutos, podrás volver a solicitar que
+                te lo enviemos a tu dirección de correo (o a otra, si te equivocaste al escribirla).
+                Podrás hacerlo dentro de <?= $minutes; ?> <?= $minutes == 1 ? "minuto" : "minutos"; ?>:
+                esta página te mostrará entonces el formulario.</p>
+        </section>
+        <script>
+            setTimeout(function() {
+                window.location.href = <?= json_encode(self::PAGE); ?>;
+            }, <?= ($wait + 2) * 1000; ?>);
+        </script>
+    <?php
     }
 
     /* URL del sitio, sin certificado, o null si no está configurada. */
@@ -362,10 +406,8 @@ class Register extends RegistrationView
 
         /* Otra dirección. Sin esperar entre envíos se podría mandar el
            enlace a una dirección tras otra. */
-        if (verificationRecentlySent($db, $participantid)) {
-            $this->waitToResend();
-            return null;
-        }
+        if (verificationRecentlySent($db, $participantid))
+            return null; /* show() muestra que ya está enviado (showPendingVerification). */
         $other = $this->getParticipantId($db, $hashemail);
         if ($other !== null) {
             if (!isExpiredUnverified($db, $other)) {
@@ -393,35 +435,29 @@ class Register extends RegistrationView
     private function sendVerificationEmail(PDO $db, int $participantid, string $email, string $done)
     {
         $code = newVerificationCode($db, $participantid);
+        if ($done !== "")
+            echo ("<p><strong>" . h($done) . "</strong></p>");
         if ($code === null) {
-            if ($done !== "")
-                echo ("<p><strong>" . h($done) . "</strong></p>");
-            $this->waitToResend();
+            if (isVerified($db, $participantid)) {
+                echo ("<p><strong>Tu cuenta ya está verificada.</strong></p>");
+                $this->showSurveysLink();
+                return;
+            }
+            $this->showEmailSent(secondsUntilResend($db, $participantid));
             return;
         }
         try {
             $mailer = new MlMailer();
             $mailer->configure();
             $mailer->sendVerification($email, url_base64_encode($code), VERIFY_MINUTES);
-            echo ("<p><strong>" . h($done === "" ? "" : $done . " ") .
-                "Te hemos enviado a " . h($email) . " un enlace para activar tu cuenta, que " .
-                "caduca en " . VERIFY_MINUTES . " minutos.</strong></p>");
-            echo ("<p>Hasta que no lo abras no podrás votar. Si no te llega, mira en la carpeta " .
-                "de correo no deseado o vuelve a «Regístrate» para pedir otro.</p>");
+            $this->showEmailSent(VERIFY_WAIT_MINUTES * 60, $email);
         } catch (Exception $e) {
-            echo ("<p><strong>" . h($done === "" ? "" : $done . " ") .
-                "No se ha podido enviar el mensaje con el enlace para activar tu cuenta.</strong></p>");
+            echo ("<p><strong>No se ha podido enviar el mensaje con el enlace para activar tu " .
+                "cuenta.</strong></p>");
             echo ("<p>Vuelve a «Regístrate» dentro de " . VERIFY_WAIT_MINUTES .
                 " minutos para pedir otro.</p>");
             logMessage(LOGGER_ERROR, "Error {$e} sending verification email");
         }
-    }
-
-    private function waitToResend()
-    {
-        echo ("<p><strong>Ya te hemos enviado un enlace hace menos de " . VERIFY_WAIT_MINUTES .
-            " minutos.</strong> Mira en tu correo (también en la carpeta de correo no deseado) o " .
-            "espera para pedir otro.</p>");
     }
 
     private function alreadyRegistered()
