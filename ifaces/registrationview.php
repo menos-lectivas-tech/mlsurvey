@@ -827,6 +827,19 @@ abstract class RegistrationView extends View
         return $participantid === false ? null : (int) $participantid;
     }
 
+    /* Id de la participante registrada con ese DNI, o null si no hay. */
+    protected function getParticipantIdByDni(PDO $db, string $hashdni): ?int
+    {
+        $participants = $db->prepare("SELECT participantid
+            FROM {Participants}
+            WHERE dnihashed = :dni LIMIT 1");
+        $participants->bindParam(":dni", $hashdni, PDO::PARAM_STR);
+        $participants->execute();
+        $participantid = $participants->fetchColumn();
+        $participants->closeCursor();
+        return $participantid === false ? null : (int) $participantid;
+    }
+
     /* Busca a la participante con ese DNI y esa dirección y, si no existe,
        la crea. Se llama con los bloqueos del DNI y del correo cogidos.
        Devuelve su id, o null (con el motivo ya mostrado) si el DNI o el

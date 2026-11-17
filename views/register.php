@@ -22,6 +22,8 @@ class Register extends RegistrationView
     /* Motivo por el que no vale el certificado electrónico, o null si vale
        (o no se pide). */
     private ?string $certerror = null;
+    /* true si el DNI del certificado ya está registrado. */
+    private bool $dniregistered = false;
 
     function getMenuGroup()
     {
@@ -41,7 +43,7 @@ class Register extends RegistrationView
            certificado). */
         if (clientCertEnabled() && !$this->mustGoToRegistration()) {
             try {
-                getClientCertDni();
+                $this->dniregistered = $this->isDniRegistered(getClientCertDni());
             } catch (ClientCertException $e) {
                 $this->certerror = $e->getMessage();
                 $site = $this->siteURL();
@@ -49,6 +51,25 @@ class Register extends RegistrationView
                     header("Refresh: " . self::CERT_ERROR_DELAY . "; url=" . $site);
             }
         }
+    }
+
+    /* true si ya hay una participante registrada con ese DNI. Si falla la
+       consulta se deja seguir: el registro lo vuelve a comprobar. */
+    private function isDniRegistered(string $dni): bool
+    {
+        try {
+            return $this->getParticipantIdByDni(dbConn(), participantHash($dni)) !== null;
+        } catch (Exception $e) {
+            logMessage(LOGGER_ERROR, "Error {$e} checking if the DNI is registered");
+            return false;
+        }
+    }
+
+    private function showDniRegistered()
+    {
+        echo ("<p><strong>Ya hay un usuario registrado con el DNI de tu certificado " .
+            "electrónico.</strong></p>");
+        $this->showSurveysLink();
     }
 
     /* URL del sitio, sin certificado, o null si no está configurada. */
@@ -115,6 +136,10 @@ class Register extends RegistrationView
     {
         if ($this->certerror !== null) {
             $this->showCertError();
+            return;
+        }
+        if ($this->dniregistered) {
+            $this->showDniRegistered();
             return;
         }
         if (!$this->isDocsSubmit() && $this->mustGoToRegistration()) {
