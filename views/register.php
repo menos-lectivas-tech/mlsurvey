@@ -96,6 +96,7 @@ class Register extends RegistrationView
             echo ("<p><strong>Ya estás registrado/a con el DNI de tu certificado electrónico " .
                 "y tu cuenta está verificada.</strong></p>");
             $this->showSurveysLink();
+            $this->showUnregister();
             return;
         }
         $this->showPendingVerification();
