@@ -267,14 +267,14 @@ class Register extends RegistrationView
     {
         $selected = [];
         if ($retry) {
-            foreach (['regimen', 'tipo', 'email'] as $field)
+            foreach (['tipo', 'email'] as $field)
                 if (isset($_REQUEST[$field]) && is_string($_REQUEST[$field]))
                     $selected[$field] = trim($_REQUEST[$field]);
         }
         $this->showDocsForm(null, null, [
             'action' => self::PAGE,
             'title' => "Regístrate",
-            'intro' => "Acredita que eres docente de la enseñanza pública en tres pasos. " .
+            'intro' => "Acredita que eres docente de la enseñanza pública en dos pasos. " .
                 "Al final indicarás tu dirección de correo y te enviaremos un enlace para " .
                 "activar tu cuenta. Una vez activada, para participar en una consulta solo " .
                 "tendrás que identificarte con tu certificado electrónico.",
