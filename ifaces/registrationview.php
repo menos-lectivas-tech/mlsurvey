@@ -31,9 +31,6 @@ abstract class RegistrationView extends View
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
     private const KIND_NOMINA = "nomina";
-    /* Situación que se elige en el primer paso del asistente de documentos. */
-    private const REGIME_INTERIM = "interino";
-    private const REGIME_CAREER = "carrera";
     private const PRIVACY_POLICY_FILE = "privacypolicy.html";
     private array $docs = array();
 
@@ -41,21 +38,34 @@ abstract class RegistrationView extends View
     {
         if (isset(Config::PARAMS["pdf_max_age_days"]))
             $this->maxage = Config::PARAMS["pdf_max_age_days"];
-        /* Documentos con los que se puede acreditar cada situación, en el
-           orden en que se ofrecen. label y desc son los de la tarjeta del
-           segundo paso del asistente; name, info, where y url los del
-           fichero que se adjunta en el tercero. wait indica si hay que
+        /* Documentos con los que se puede acreditar, en el orden en que se
+           ofrecen. label y desc son los de la tarjeta del primer paso del
+           asistente; name, info, where y url los del fichero que se adjunta
+           en el segundo. wait indica si hay que
            pedirlo (y puede tardar) en lugar de descargarlo al momento; tag
            sustituye a la etiqueta "Al momento" de los que no hay que pedir. */
         $centro = "Si aún no la tienes, pídela cuanto antes en la secretaría: puede " .
             "tardar unos días en llegarte.";
         $this->docs = [
+            self::KIND_NOMINA => [
+                'label' => "Nómina",
+                'desc' => "Tu última nómina de la Consejería de Educación.",
+                'name' => "Nómina",
+                'where' => "La que descargas cada mes del portal del empleado.",
+                'url' => "https://gestiona.comunidad.madrid/ases_webapp_inter/#!",
+                'info' => "Nómina de la Consejería de Educación de un cuerpo docente (maestros, " .
+                    "profesores o catedráticos).\n\n" .
+                    "Adjunta el PDF tal como lo descargaste. Tiene que ser del mes en curso o del " .
+                    "mes anterior.",
+                'wait' => false,
+                'tag' => "Se obtiene al momento (certificado)",
+            ],
             self::KIND_INTERIM => [
                 'label' => "Nombramiento",
-                'desc' => "Lo recibiste por correo electrónico al principio de curso.",
-                'regimes' => [self::REGIME_INTERIM],
+                'desc' => "Si eres interino/a, lo recibiste por correo electrónico al principio de " .
+                    "curso. Tiene que ser el de este curso.",
                 'name' => "Nombramiento",
-                'where' => "El PDF que recibiste por correo electrónico al principio de curso.",
+                'where' => "El PDF de este curso que recibiste por correo electrónico al principio de curso.",
                 'url' => "",
                 'info' => "Acuerdo de nombramiento y toma de posesión de la Comunidad de Madrid, " .
                     "firmado electrónicamente o a mano.\n\n" .
@@ -64,41 +74,26 @@ abstract class RegistrationView extends View
                 'wait' => false,
                 'tag' => "En tu email",
             ],
-            self::KIND_CREDENCIAL => [
-                'label' => "Credencial docente",
-                'desc' => $centro,
-                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
-                'name' => "Credencial docente",
-                'where' => "La que te dieron en la secretaría de tu centro.",
-                'url' => "",
-                'info' => "Credencial de nombramiento para puesto docente.\n\n" .
-                    "Debe estar firmada (electrónicamente o a mano) y corresponder al curso actual.",
-                'wait' => true,
-            ],
             self::KIND_HOJASERVICIOS => [
                 'label' => "Hoja de servicios",
-                'desc' => $centro,
-                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
+                'desc' => "Tiene que ser de este curso y expedida en los últimos {$this->maxage} días. " .
+                    $centro,
                 'name' => "Hoja de servicios",
-                'where' => "La que te dieron en la secretaría de tu centro.",
+                'where' => "La de este curso que te dieron en la secretaría de tu centro.",
                 'url' => "",
                 'info' => "Una hoja de servicios del curso actual expedida y firmada " .
                     "(electrónicamente o a mano) en los últimos {$this->maxage} días.",
                 'wait' => true,
             ],
-            self::KIND_NOMINA => [
-                'label' => "Nómina",
-                'desc' => "Tu última nómina de la Consejería de Educación.",
-                'regimes' => [self::REGIME_INTERIM, self::REGIME_CAREER],
-                'name' => "Nómina",
-                'where' => "La que descargas cada mes del portal del empleado.",
+            self::KIND_CREDENCIAL => [
+                'label' => "Credencial docente",
+                'desc' => "Tiene que ser de este curso. " . $centro,
+                'name' => "Credencial docente",
+                'where' => "La de este curso que te dieron en la secretaría de tu centro.",
                 'url' => "",
-                'info' => "Nómina de la Consejería de Educación de un cuerpo docente (maestros, " .
-                    "profesores o catedráticos).\n\n" .
-                    "Adjunta el PDF tal como lo descargaste. Tiene que ser del mes en curso o del " .
-                    "mes anterior.",
-                'wait' => false,
-                'tag' => "Se obtiene al momento (certificado)",
+                'info' => "Credencial de nombramiento para puesto docente.\n\n" .
+                    "Debe estar firmada (electrónicamente o a mano) y corresponder al curso actual.",
+                'wait' => true,
             ],
         ];
     }
@@ -257,9 +252,8 @@ abstract class RegistrationView extends View
     }
 
     /* Segundo paso, solo para direcciones que aún no están registradas: un
-       asistente en tres pasos que pide la situación (interino/a o de
-       carrera), el documento con el que se acredita y, por último, los
-       ficheros. Los pasos se cambian en el navegador: al servidor solo llega
+       asistente en dos pasos que pide el documento con el que se acredita
+       y, después, los ficheros. Los pasos se cambian en el navegador: al servidor solo llega
        el envío final, con el tipo de documento en «tipo». La dirección ya
        comprobada en el primer paso viaja en el formulario y se vuelve a
        comprobar al recibirlo.
@@ -268,22 +262,12 @@ abstract class RegistrationView extends View
        Textos de $texts: action (la página que recibe el envío, que va a
        la URL del registro: registrationAction), title e intro; back con $email, y
        emailinfo y emailhint sin él.
-       $selected (regimen, tipo, email) es lo elegido en un envío anterior
+       $selected (tipo, email) es lo elegido en un envío anterior
        que no ha valido: se vuelve al último paso con ello marcado. */
     protected function showDocsForm($surveyid, ?string $email, array $texts, array $selected = [])
     {
         $askemail = $email === null;
-        $regimes = [
-            self::REGIME_INTERIM => [
-                'label' => "Interino/a",
-                'desc' => "Tienes nombramiento como docente interino/a en este curso.",
-            ],
-            self::REGIME_CAREER => [
-                'label' => "Funcionario/a de carrera o en prácticas",
-                'desc' => "Has aprobado la oposición, aunque estés todavía en el curso de prácticas.",
-            ],
-        ];
-        $steps = [1 => "Tu situación", 2 => "Documento", 3 => $askemail ? "Correo y documentos" : "Adjuntar"];
+        $steps = [1 => "Documento", 2 => $askemail ? "Correo y documentos" : "Adjuntar"];
     ?>
         <section class="ml-participate-card ml-wizard">
             <h3><?= h($texts['title']); ?></h3>
@@ -313,35 +297,13 @@ abstract class RegistrationView extends View
                 <?php } ?>
 
                 <fieldset class="ml-wizard-step" data-step="1">
-                    <legend class="ml-wizard-title" tabindex="-1">¿Cuál es tu situación?</legend>
-                    <p class="ml-wizard-help">Según tu situación te propondremos los documentos con
-                        los que puedes acreditar que eres docente de la enseñanza pública.</p>
-                    <div class="ml-choices">
-                        <?php foreach ($regimes as $regime => $r) { ?>
-                            <label class="ml-choice">
-                                <input type="radio" name="regimen" value="<?= $regime; ?>"
-                                    <?= ($selected['regimen'] ?? null) === $regime ? "checked" : ""; ?>>
-                                <span class="ml-choice__body">
-                                    <span class="ml-choice__title"><?= h($r['label']); ?></span>
-                                    <span class="ml-choice__desc"><?= h($r['desc']); ?></span>
-                                </span>
-                            </label>
-                        <?php } ?>
-                    </div>
-                    <div class="ml-wizard-nav">
-                        <button type="button" class="button-3 ml-participate-btn" data-next
-                            disabled>Continuar</button>
-                    </div>
-                </fieldset>
-
-                <fieldset class="ml-wizard-step" data-step="2" hidden>
                     <legend class="ml-wizard-title" tabindex="-1">¿Con qué documento quieres
                         acreditarte?</legend>
                     <p class="ml-wizard-help">Elige el que tengas a mano. Adjunta el PDF tal como lo
                         recibiste o descargaste; si el documento está firmado a mano, escanéalo en PDF.</p>
                     <div class="ml-choices">
                         <?php foreach ($this->docs as $kind => $d) { ?>
-                            <div class="ml-choice" data-regimes="<?= h(implode(" ", $d['regimes'])); ?>">
+                            <div class="ml-choice">
                                 <label class="ml-choice__label">
                                     <input type="radio" name="tipo" value="<?= $kind; ?>"
                                         data-label="<?= h($d['label']); ?>"
@@ -365,13 +327,12 @@ abstract class RegistrationView extends View
                         <?php } ?>
                     </div>
                     <div class="ml-wizard-nav">
-                        <button type="button" class="button-3 is-secondary ml-wizard-back" data-back>Atrás</button>
                         <button type="button" class="button-3 ml-participate-btn" data-next
                             disabled>Continuar</button>
                     </div>
                 </fieldset>
 
-                <div class="ml-wizard-step" data-step="3" hidden>
+                <div class="ml-wizard-step" data-step="2" hidden>
                     <h4 class="ml-wizard-title" tabindex="-1"><?= $askemail ?
                                                                     "Indica tu correo y adjunta tus documentos" : "Adjunta tus documentos"; ?></h4>
                     <p class="ml-wizard-help">Vas a acreditarte con:
@@ -422,14 +383,9 @@ abstract class RegistrationView extends View
                                         (el nombramiento, la credencial y la hoja de servicios pueden
                                         estar firmados digitalmente o a mano; la nómina no lleva
                                         firma):</p>
-                                    <ul>
-                                        <li>Si eres interino/a: tu nombramiento del curso actual, tu
-                                            credencial docente, tu hoja de servicios actualizada o tu
-                                            última nómina.</li>
-                                        <li>Si eres funcionario/a de carrera o en prácticas: tu
-                                            credencial docente, tu hoja de servicios actualizada o tu
-                                            última nómina.</li>
-                                    </ul>
+                                    <p>Tu última nómina, tu nombramiento del curso actual (si eres
+                                        interino/a), tu hoja de servicios actualizada o tu credencial
+                                        docente.</p>
                                     <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
                                         para comprobar su autenticidad y que
                                         figuras en servicio activo en la Consejería de Educación. Se procesan en
@@ -498,7 +454,6 @@ abstract class RegistrationView extends View
                 var form = document.getElementById("getcodedocs");
                 var steps = form.querySelectorAll(".ml-wizard-step");
                 var progress = document.querySelectorAll("#ml-wizard-progress li");
-                var choices = form.querySelectorAll(".ml-choice[data-regimes]");
                 var file = document.getElementById("documento");
                 var info = document.getElementById("documento-info");
                 var url = document.getElementById("documento-url");
@@ -535,20 +490,7 @@ abstract class RegistrationView extends View
                     }
                 }
 
-                /* En el segundo paso solo se ofrecen los documentos de la
-                   situación elegida; si el marcado no es de ella, se desmarca. */
-                function filterDocs() {
-                    var regime = checked("regimen");
-                    choices.forEach(function(choice) {
-                        var ok = regime && choice.dataset.regimes.split(" ").indexOf(regime.value) >= 0;
-                        choice.hidden = !ok;
-                        var radio = choice.querySelector('input[name="tipo"]');
-                        if (!ok && radio.checked)
-                            radio.checked = false;
-                    });
-                }
-
-                /* El tercer paso pide los ficheros del documento elegido. */
+                /* El segundo paso pide los ficheros del documento elegido. */
                 function showDocument(clear) {
                     var kind = checked("tipo");
                     if (!kind)
@@ -569,16 +511,9 @@ abstract class RegistrationView extends View
 
                 /* «Continuar» solo se activa cuando hay algo elegido en el paso. */
                 function updateButtons() {
-                    steps[0].querySelector("[data-next]").disabled = !checked("regimen");
-                    steps[1].querySelector("[data-next]").disabled = !checked("tipo");
+                    steps[0].querySelector("[data-next]").disabled = !checked("tipo");
                 }
 
-                form.querySelectorAll('input[name="regimen"]').forEach(function(radio) {
-                    radio.addEventListener("change", function() {
-                        filterDocs();
-                        updateButtons();
-                    });
-                });
                 form.querySelectorAll('input[name="tipo"]').forEach(function(radio) {
                     radio.addEventListener("change", function() {
                         showDocument(true);
@@ -624,10 +559,9 @@ abstract class RegistrationView extends View
                 /* Al volver a la página el navegador puede conservar lo elegido:
                    se continúa desde el último paso completado. */
                 function restore() {
-                    filterDocs();
                     showDocument(false);
                     updateButtons();
-                    go(checked("tipo") ? 3 : checked("regimen") ? 2 : 1, false);
+                    go(checked("tipo") ? 2 : 1, false);
                 }
                 restore();
                 window.addEventListener("pageshow", restore);
