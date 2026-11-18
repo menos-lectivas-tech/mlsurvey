@@ -27,6 +27,8 @@ abstract class RegistrationView extends View
     private const ACTION = "Solicitar";
     /* Segundo paso: envío de los documentos de quien aún no está registrado. */
     private const ACTION_DOCS = "Documentos";
+    /* Baja de quien ya está registrado: se identifica con el certificado. */
+    private const ACTION_UNREGISTER = "Baja";
     private const KIND_INTERIM = "interino";
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
@@ -121,6 +123,12 @@ abstract class RegistrationView extends View
     protected function isSubmit(): bool
     {
         return $this->isDocsSubmit() || isset($_REQUEST[self::ACTION]);
+    }
+
+    /* true si es el envío del botón para darse de baja. */
+    protected function isUnregisterSubmit(): bool
+    {
+        return isset($_REQUEST[self::ACTION_UNREGISTER]);
     }
 
     /* true si es el envío del segundo formulario, el de los documentos. */
@@ -842,36 +850,47 @@ abstract class RegistrationView extends View
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
     }
-    /* Formulario para darse de baja: solo para quien ya está registrado. */
-    protected function showUnregister()
+    /* Botón para darse de baja: solo para quien ya está registrado. Se
+       identifica con el DNI del certificado electrónico, así que no hace
+       falta pedir el correo ni confirmar por correo. $action es la página
+       que procesa la baja, en la URL que pide el certificado. */
+    protected function showUnregister(string $action)
     {
     ?>
         <section class="ml-participate-card" id="unregister">
-            <form name="unregisterform" method="POST" action="unsubscribe">
+            <form name="unregisterform" id="unregisterform" method="POST" action="<?= h($action); ?>">
                 <?= setTokenHTML(); ?>
+                <input type="hidden" name="<?= self::ACTION_UNREGISTER; ?>" value="1">
                 <h3>Date de baja</h3>
-                <p>Date de baja indicando tu dirección de correo.</p>
-                <p><strong>El proceso se puede alargar hasta 30 días para que no puedas repetir tu participación
-                        en ninguna consulta.</strong>
-                </p>
-                <p>
-                    Una vez solicitada la baja recibiras un mensaje de correo con un enlace para confirmarla.
-                    Para finalizar el proceso debes pulsar en ese enlace, de otra forma no causarás baja.
-                </p>
-                <div class="ml-participate-doc">
-                    <label for="email">Dirección de correo</label>
-
-                    <small>Debe coindidir con la que proporcionaste al registrarte.</small>
-                </div>
+                <p>Si te das de baja no podrás participar en ninguna consulta.
+                    <strong>En un plazo máximo de 30 días se eliminarán tus datos.</strong></p>
                 <div class="ml-participate-row">
-                    <input type="email" name="email" id="email" required>
-                    <?= altchaWidgetHTML(); ?>
-                    <button type="submit" class="button-3 ml-participate-btn"
-                        name="<?= self::ACTION; ?>" value="<?= self::ACTION; ?>">
-                        <?= self::ACTION; ?></button>
+                    <button type="submit" class="button-3 ml-participate-btn">Darme de baja</button>
                 </div>
             </form>
         </section>
+        <script>
+            (function() {
+                var form = document.getElementById("unregisterform");
+                var confirmed = false;
+                form.addEventListener("submit", function(e) {
+                    if (confirmed || typeof mlDialog === "undefined")
+                        return;
+                    e.preventDefault();
+                    mlDialog.confirm({
+                        title: "Darte de baja",
+                        message: "No podrás participar en ninguna consulta y tus datos se " +
+                            "eliminarán en un plazo máximo de 30 días. ¿Quieres darte de baja?",
+                        confirmText: "Darme de baja"
+                    }).then(function(ok) {
+                        if (ok) {
+                            confirmed = true;
+                            form.submit();
+                        }
+                    });
+                });
+            })();
+        </script>
 <?php
     }
 }

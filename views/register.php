@@ -93,10 +93,20 @@ class Register extends RegistrationView
             return;
         }
         if ($verified) {
+            try {
+                $unsubscribed = checkUnsubscribe(dbConn(), (int) $this->dniparticipant['participantid']);
+            } catch (Exception $e) {
+                logMessage(LOGGER_ERROR, "Error {$e} checking if the participant is unsubscribed");
+                $unsubscribed = false;
+            }
+            if ($unsubscribed) {
+                $this->showUnsubscribed();
+                return;
+            }
             echo ("<p><strong>Ya estás registrado/a con el DNI de tu certificado electrónico " .
                 "y tu cuenta está verificada.</strong></p>");
             $this->showSurveysLink();
-            $this->showUnregister();
+            $this->showUnregister(self::PAGE);
             return;
         }
         $this->showPendingVerification();
@@ -234,6 +244,11 @@ class Register extends RegistrationView
             return;
         }
         if ($this->dniparticipant !== null) {
+            /* El botón para darse de baja. */
+            if ($this->isUnregisterSubmit()) {
+                $this->unregister();
+                return;
+            }
             /* El formulario para volver a enviar el enlace. */
             if ($this->isSubmit() && !$this->isDocsSubmit()) {
                 if (!$this->checkSubmit() || !$this->resendVerification())
@@ -459,6 +474,40 @@ class Register extends RegistrationView
                 " minutos para pedir otro.</p>");
             logMessage(LOGGER_ERROR, "Error {$e} sending verification email");
         }
+    }
+
+    /* Da de baja a la participante del DNI del certificado: el certificado
+       ya la identifica, así que la baja queda confirmada sin más. Solo se
+       puede darse de baja con la cuenta verificada (si no, no puede votar). */
+    private function unregister()
+    {
+        if (!checkToken()) {
+            tokenError();
+            return;
+        }
+        try {
+            $db = dbConn();
+            $participantid = (int) $this->dniparticipant['participantid'];
+            if (!isVerified($db, $participantid)) {
+                $this->showDniRegistered();
+                return;
+            }
+            unsubscribe($db, $participantid);
+            logMessage(LOGGER_INFO, "Participant unsubscribed.");
+        } catch (Exception $e) {
+            echo ("<p><strong>Ha ocurrido un error tratando de procesar tu baja del registro " .
+                "de participantes.</strong></p>");
+            logMessage(LOGGER_ERROR, "Error {$e} when unsubscribing");
+            return;
+        }
+        $this->showUnsubscribed();
+    }
+
+    private function showUnsubscribed()
+    {
+        echo ("<p><strong>Te has dado de baja del registro de participantes. En un plazo " .
+            "máximo de 30 días todos tus datos serán eliminados.</strong></p>");
+        echo ("<p>Hasta entonces no podrás participar en ninguna consulta.</p>");
     }
 
     private function alreadyRegistered()
