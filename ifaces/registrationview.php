@@ -445,10 +445,6 @@ abstract class RegistrationView extends View
                 </div>
             </form>
         </section>
-        <?php
-        if (empty($selected))
-            $this->showUnregister();
-        ?>
         <script>
             (function() {
                 var form = document.getElementById("getcodedocs");
@@ -523,21 +519,11 @@ abstract class RegistrationView extends View
                 form.querySelectorAll("[data-next]").forEach(function(button) {
                     button.addEventListener("click", function() {
                         go(current + 1, true);
-                        if (current > 1) {
-                            const unregister = document.getElementById("unregister");
-                            if (unregister != null)
-                                unregister.style.display = "none";
-                        }
                     });
                 });
                 form.querySelectorAll("[data-back]").forEach(function(button) {
                     button.addEventListener("click", function() {
                         go(current - 1, true);
-                        if (current == 1) {
-                            const unregister = document.getElementById("unregister");
-                            if (unregister != null)
-                                unregister.style.display = "block";
-                        }
                     });
                 });
 
@@ -856,7 +842,8 @@ abstract class RegistrationView extends View
         echo ("<p><strong>La dirección de correo proporcionada no es de un dominio autorizado.</strong></p>");
         return false;
     }
-    private function showUnregister()
+    /* Formulario para darse de baja: solo para quien ya está registrado. */
+    protected function showUnregister()
     {
     ?>
         <section class="ml-participate-card" id="unregister">
