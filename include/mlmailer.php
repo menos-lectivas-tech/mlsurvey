@@ -115,20 +115,4 @@ class MLMailer extends PHPMailer {
             throw new Exception("Error {$this->ErrorInfo} sending verification email.");
         }
     }
-
-    public function sendUnsubscribe (
-        #[\SensitiveParameter] string $recipient,
-        int $pid,
-        #[\SensitiveParameter] string $code
-    ) {
-        $theurl = rtrim(getURL(), "/") . "/unsubscribe?uid=" . $pid . "&auth=" . $code;
-        $this->setFrom($this->m_from);
-        $this->addAddress($recipient);
-        $this->Subject = "Baja de ". Config::$sitename;
-        $this->Body = "Para darte de baja de ". Config::$sitename . 
-            "Haz click en el siguiente enlace:\n{$theurl}";
-        if (!$this->send()) {
-            throw new Exception("Error {$this->ErrorInfo} sending code email.");
-        }
-    }
 }

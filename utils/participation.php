@@ -45,6 +45,23 @@ function checkUnsubscribe (PDO $db, int $participantid):bool {
 }
 
 /**
+ * Stores the confirmed unsubscription of a participant. There is no need to
+ * confirm it by email: the participant is identified with the DNI of the
+ * client certificate. Does nothing if it was already stored.
+ *
+ * @param PDO $db The PDO database object.
+ * @param int $participantid
+ */
+function unsubscribe (PDO $db, int $participantid) {
+    if (checkUnsubscribe ($db, $participantid))
+        return;
+    $query = $db->prepare("INSERT INTO {Unsubscriptions} (participantid, confirmkey, confirmed)
+        VALUES (:pid, '', 1)");
+    $query->bindParam(":pid", $participantid, PDO::PARAM_INT);
+    $query->execute();
+}
+
+/**
  * Checks if a participant has a valid code.
  * Does not work as Participation table has changed and does not have a participantid column
  * By now it's not posible to know if an email addres has a code, as all stored info is
