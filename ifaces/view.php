@@ -138,6 +138,8 @@ class MainView extends View {
      
     else
         echo ("<h1>Este es el contenido de main</h1>\n");
+
+    echo ("<figure class=\"main-image\"><img src=\"img/huelga.jpg\" alt=\"Huelga\" /></figure>\n");
     }
 }
 
