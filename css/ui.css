@@ -1119,3 +1119,21 @@ footer .row {
         margin-top: 0;
     }
 }
+
+/* ------------------------------------------------------------------
+   Imagen de la página principal (bajo el contenido de la BD)
+   ------------------------------------------------------------------ */
+.main-image {
+    margin: 1.5rem auto;
+    text-align: center;
+}
+
+.main-image img {
+    display: inline-block;
+    width: auto;
+    height: auto;
+    /* Se ajusta al ancho disponible y a la altura de la pantalla. */
+    max-width: min(100%, 720px);
+    max-height: 85vh;
+    border-radius: 6px;
+}
