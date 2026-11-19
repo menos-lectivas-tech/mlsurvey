@@ -114,7 +114,7 @@ $view->doInit();
 							if (!empty(Config::$icon)) {
 								$iconfile = FileParams::ICON_DIR . rawurlencode(Config::$icon);
 								?>
-									<img src="<?= h($iconfile); ?>" alt="">
+									<img class="ml-brand-icon" src="<?= h($iconfile); ?>" alt="">
 								<?php
 							} else if (!empty(Config::PARAMS["use_default_icon"])) { ?>
 									<span class="ml-brand-mark" aria-hidden="true">ml</span>
