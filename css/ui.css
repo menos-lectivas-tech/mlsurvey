@@ -200,6 +200,17 @@ header .navbar .container {
     box-shadow: var(--ml-shadow-accent);
 }
 
+/* Icono del sistema subido por el administrador: siempre a la altura de la
+   barra, sea cual sea el tamaño original de la imagen. */
+.navbar-brand .ml-brand-icon {
+    display: block;
+    flex: none;
+    height: 34px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+}
+
 header .navbar-collapse {
     border: 0;
     box-shadow: none;
