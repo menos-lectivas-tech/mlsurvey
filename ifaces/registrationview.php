@@ -29,6 +29,8 @@ abstract class RegistrationView extends View
     private const ACTION_DOCS = "Documentos";
     /* Baja de quien ya está registrado: se identifica con el certificado. */
     private const ACTION_UNREGISTER = "Baja";
+    /* Cancelación de la baja, también identificándose con el certificado. */
+    private const ACTION_CANCEL_UNREGISTER = "CancelarBaja";
     private const KIND_INTERIM = "interino";
     private const KIND_HOJASERVICIOS = "hojaserv";
     private const KIND_CREDENCIAL = "credencial";
@@ -129,6 +131,12 @@ abstract class RegistrationView extends View
     protected function isUnregisterSubmit(): bool
     {
         return isset($_REQUEST[self::ACTION_UNREGISTER]);
+    }
+
+    /* true si es el envío del botón para cancelar la baja. */
+    protected function isCancelUnregisterSubmit(): bool
+    {
+        return isset($_REQUEST[self::ACTION_CANCEL_UNREGISTER]);
     }
 
     /* true si es el envío del segundo formulario, el de los documentos. */
@@ -853,19 +861,21 @@ abstract class RegistrationView extends View
     /* Botón para darse de baja: solo para quien ya está registrado. Se
        identifica con el DNI del certificado electrónico, así que no hace
        falta pedir el correo ni confirmar por correo. $action es la página
-       que procesa la baja, en la URL que pide el certificado. */
+       que procesa la baja, en la URL que pide el certificado. En rojo: es
+       una acción peligrosa. */
     protected function showUnregister(string $action)
     {
     ?>
-        <section class="ml-participate-card" id="unregister">
+        <section class="ml-participate-card is-danger" id="unregister">
             <form name="unregisterform" id="unregisterform" method="POST" action="<?= h($action); ?>">
                 <?= setTokenHTML(); ?>
                 <input type="hidden" name="<?= self::ACTION_UNREGISTER; ?>" value="1">
                 <h3>Date de baja</h3>
                 <p>Si te das de baja no podrás participar en ninguna consulta.
-                    <strong>En un plazo máximo de 30 días se eliminarán tus datos.</strong></p>
+                    <strong>En un plazo máximo de 30 días se eliminarán tus datos.</strong>
+                    Hasta entonces podrás cancelar la baja desde esta página.</p>
                 <div class="ml-participate-row">
-                    <button type="submit" class="button-3 ml-participate-btn">Darme de baja</button>
+                    <button type="submit" class="button-3 is-danger ml-participate-btn">Darme de baja</button>
                 </div>
             </form>
         </section>
@@ -881,7 +891,8 @@ abstract class RegistrationView extends View
                         title: "Darte de baja",
                         message: "No podrás participar en ninguna consulta y tus datos se " +
                             "eliminarán en un plazo máximo de 30 días. ¿Quieres darte de baja?",
-                        confirmText: "Darme de baja"
+                        confirmText: "Darme de baja",
+                        danger: true
                     }).then(function(ok) {
                         if (ok) {
                             confirmed = true;
@@ -891,6 +902,28 @@ abstract class RegistrationView extends View
                 });
             })();
         </script>
+    <?php
+    }
+
+    /* Botón para cancelar la baja de quien la ha solicitado y aún no se han
+       eliminado sus datos. Como la baja, se identifica con el certificado.
+       $action es la página que procesa la cancelación. */
+    protected function showCancelUnregister(string $action)
+    {
+    ?>
+        <section class="ml-participate-card" id="cancelunregister">
+            <form name="cancelunregisterform" method="POST" action="<?= h($action); ?>">
+                <?= setTokenHTML(); ?>
+                <input type="hidden" name="<?= self::ACTION_CANCEL_UNREGISTER; ?>" value="1">
+                <h3>Cancelar la baja</h3>
+                <p>Si cancelas la baja tu cuenta seguirá registrada y verificada, y podrás
+                    volver a participar en las consultas. Más adelante podrás volver a darte
+                    de baja si quieres.</p>
+                <div class="ml-participate-row">
+                    <button type="submit" class="button-3 ml-participate-btn">Cancelar la baja</button>
+                </div>
+            </form>
+        </section>
 <?php
     }
 }

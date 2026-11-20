@@ -62,6 +62,37 @@ function unsubscribe (PDO $db, int $participantid) {
 }
 
 /**
+ * Date when the confirmed unsubscription of a participant was requested, or
+ * null if there isn't one.
+ *
+ * @param PDO $db The PDO database object.
+ * @param int $participantid
+ */
+function unsubscribeDate (PDO $db, int $participantid): ?DateTime {
+    $query = $db->prepare("SELECT MIN(unregisterdate) FROM {Unsubscriptions} WHERE
+        participantid = :pid AND confirmed > 0");
+    $query->bindParam(":pid", $participantid, PDO::PARAM_INT);
+    $query->execute();
+    $date = $query->fetchColumn();
+    $query->closeCursor();
+    return ($date === false || $date === null) ? null : new DateTime($date);
+}
+
+/**
+ * Cancels the unsubscription of a participant, so that they can participate
+ * again (and request it again later). Removes every request, also the old
+ * ones by email still not confirmed.
+ *
+ * @param PDO $db The PDO database object.
+ * @param int $participantid
+ */
+function cancelUnsubscribe (PDO $db, int $participantid) {
+    $query = $db->prepare("DELETE FROM {Unsubscriptions} WHERE participantid = :pid");
+    $query->bindParam(":pid", $participantid, PDO::PARAM_INT);
+    $query->execute();
+}
+
+/**
  * Checks if a participant has a valid code.
  * Does not work as Participation table has changed and does not have a participantid column
  * By now it's not posible to know if an email addres has a code, as all stored info is
