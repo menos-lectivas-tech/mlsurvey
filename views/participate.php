@@ -115,6 +115,8 @@ class Participate extends View {
             if (checkUnsubscribe ($db, $participantid)){
                 echo "<p><strong>No puedes participar en la consulta porque has confirmado
                     la solicitud de baja del registro de participantes.</strong></p>";
+                echo "<p>Si quieres volver a participar puedes cancelar la baja en
+                    <a href='register'>Regístrate</a>.</p>";
                 return;
             }
             $formid = $this->saveParticipation ($surveyid, $participantid);

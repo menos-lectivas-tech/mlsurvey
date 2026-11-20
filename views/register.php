@@ -249,6 +249,11 @@ class Register extends RegistrationView
                 $this->unregister();
                 return;
             }
+            /* El botón para cancelar la baja. */
+            if ($this->isCancelUnregisterSubmit()) {
+                $this->cancelUnregister();
+                return;
+            }
             /* El formulario para volver a enviar el enlace. */
             if ($this->isSubmit() && !$this->isDocsSubmit()) {
                 if (!$this->checkSubmit() || !$this->resendVerification())
@@ -503,11 +508,47 @@ class Register extends RegistrationView
         $this->showUnsubscribed();
     }
 
+    /* Cancela la baja de la participante del DNI del certificado: vuelve a
+       poder votar y, si quiere, a darse de baja. */
+    private function cancelUnregister()
+    {
+        if (!checkToken()) {
+            tokenError();
+            return;
+        }
+        try {
+            $db = dbConn();
+            $participantid = (int) $this->dniparticipant['participantid'];
+            if (checkUnsubscribe($db, $participantid)) {
+                cancelUnsubscribe($db, $participantid);
+                logMessage(LOGGER_INFO, "Participant unsubscription cancelled.");
+                echo ("<p><strong>Has cancelado la baja. Vuelves a estar en el registro de " .
+                    "participantes.</strong></p>");
+            }
+        } catch (Exception $e) {
+            echo ("<p><strong>Ha ocurrido un error tratando de cancelar tu baja del registro " .
+                "de participantes.</strong></p>");
+            logMessage(LOGGER_ERROR, "Error {$e} when cancelling the unsubscription");
+            return;
+        }
+        $this->showDniRegistered();
+    }
+
+    /* La participante está de baja: cuándo la pidió, qué supone y el panel
+       para cancelarla. */
     private function showUnsubscribed()
     {
-        echo ("<p><strong>Te has dado de baja del registro de participantes. En un plazo " .
-            "máximo de 30 días todos tus datos serán eliminados.</strong></p>");
-        echo ("<p>Hasta entonces no podrás participar en ninguna consulta.</p>");
+        try {
+            $date = unsubscribeDate(dbConn(), (int) $this->dniparticipant['participantid']);
+        } catch (Exception $e) {
+            logMessage(LOGGER_ERROR, "Error {$e} getting the unsubscription date");
+            $date = null;
+        }
+        $when = $date === null ? "" : " el " . $date->format("d/m/Y");
+        echo ("<p><strong>Solicitaste la baja del registro de participantes{$when}. En un " .
+            "plazo máximo de 30 días desde entonces todos tus datos serán eliminados.</strong></p>");
+        echo ("<p>Mientras estés de baja no podrás participar en ninguna consulta.</p>");
+        $this->showCancelUnregister(self::PAGE);
     }
 
     private function alreadyRegistered()

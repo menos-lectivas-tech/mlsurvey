@@ -150,6 +150,16 @@
     margin: 24px 0;
 }
 
+/* Tarjeta de una acción peligrosa (darse de baja). */
+.ml-participate-card.is-danger {
+    background: var(--ml-danger-soft);
+    border-color: var(--ml-danger);
+}
+
+.ml-participate-card.is-danger > h3 {
+    color: var(--ml-danger);
+}
+
 .ml-participate-subcard {
     background: var(--ml-accent-soft);
     /*border: 1px solid var(--ml-accent);*/
