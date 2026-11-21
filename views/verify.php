@@ -52,7 +52,7 @@ class Verify extends View
                 "'>Votar en la consulta</a></p>");
             return;
         }
-        echo ("<p>Ya puedes participar en las <a href='surveys'>consultas activas</a> " .
+        echo ("<p>Ya puedes participar en las <a href='.'>consultas activas</a> " .
             "identificándote con tu certificado electrónico.</p>");
     }
 
