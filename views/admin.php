@@ -33,7 +33,7 @@ class Admin extends View {
                 <p>Esta sección es solo para las personas que administran el sitio:
                     crean y gestionan las consultas y las usuarias.</p>
                 <p>Si quieres participar en una consulta no necesitas entrar aquí: ve a
-                    <a href="surveys">Consultas activas</a>.</p>
+                    <a href=".">Consultas activas</a>.</p>
             </div>
             <?php
             $login = new Login;

@@ -612,7 +612,7 @@ class Register extends RegistrationView
             $this->showVoteLink();
             return;
         }
-        echo ("<p>Para participar en las <a href='" . h(($this->siteURL() ?? "") . "surveys") . "'>consultas " .
+        echo ("<p>Para participar en las <a href='" . h($this->siteURL() ?? ".") . "'>consultas " .
             "activas</a> entra en cada una e identifícate con tu certificado electrónico.</p>");
     }
 }
