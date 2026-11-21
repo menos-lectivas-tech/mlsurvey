@@ -131,7 +131,16 @@ function showView ($view){
  * This is the class for the main page.
  */
 class MainView extends View {
+    public function loadStyles (){
+        ?>
+        <link href="css/home.css" rel="stylesheet" />
+        <?php
+    }
+
     function show (){
+    require_once 'utils/surveycards.php';
+    echo ("<h1 class=\"ml-home-title\">Consultas para la huelga educativa de Madrid 26-27</h1>\n");
+    showActiveSurveyCards ();
 
     if (Config::$maincontent != "")
         echo (sanitizeHtml (Config::$maincontent));
@@ -147,6 +156,5 @@ class MainView extends View {
  * Creates a Main View object and shows it
  */
 function showMain (){
-    $main = new MainView;
-    $main->show ();
+    showView (new MainView);
 }
