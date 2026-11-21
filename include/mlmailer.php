@@ -95,12 +95,15 @@ class MLMailer extends PHPMailer {
      * @param string $recipient Recipient's mail address
      * @param string $code url_base64 code of the link.
      * @param int $minutes How long the link is valid, in minutes.
+     * @param int|null $surveyid Survey the participant was going to vote in, if any:
+     * the page of the link offers to go on voting in it.
      *
      * @throws Exception with the error info.
      */
     public function sendVerification (#[\SensitiveParameter] string $recipient,
-        #[\SensitiveParameter] string $code, int $minutes){
-        $theurl = rtrim (getURL (), "/") . "/verify?code=" . $code;
+        #[\SensitiveParameter] string $code, int $minutes, ?int $surveyid = null){
+        $theurl = rtrim (getURL (), "/") . "/verify?code=" . $code .
+            ($surveyid === null ? "" : "&sid=" . $surveyid);
         $sitename = Config::$sitename != "" ? Config::$sitename : "mlsurvey";
         $this->setFrom ($this->m_from);
         $this->addAddress ($recipient);
