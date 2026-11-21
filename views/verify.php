@@ -44,15 +44,32 @@ class Verify extends View
             return;
         }
         echo ("<p><strong>Tu cuenta está verificada.</strong></p>");
+        /* Se registró al ir a votar: se le devuelve a esa consulta. */
+        $surveyid = $this->surveyId();
+        if ($surveyid !== null) {
+            echo ("<p>Ya puedes votar. El navegador te pedirá tu certificado electrónico.</p>");
+            echo ("<p><a class='button-3' href='" . h(certURL("participate?sid={$surveyid}")) .
+                "'>Votar en la consulta</a></p>");
+            return;
+        }
         echo ("<p>Ya puedes participar en las <a href='surveys'>consultas activas</a> " .
             "identificándote con tu certificado electrónico.</p>");
     }
 
+    /* Consulta a la que iba a votar, si el enlace la lleva. */
+    private function surveyId(): ?int
+    {
+        $sid = $_GET['sid'] ?? null;
+        return is_string($sid) && ctype_digit($sid) ? (int) $sid : null;
+    }
+
     private function invalidLink()
     {
+        $surveyid = $this->surveyId();
+        $register = "register" . ($surveyid === null ? "" : "?surveyid={$surveyid}");
         echo ("<p><strong>El enlace no es válido, ya se ha usado o ha caducado.</strong></p>");
         echo ("<p>Si tu cuenta aún no está verificada, puedes pedir un enlace nuevo en " .
-            "<a href='" . h(certURL("register")) . "'>Regístrate</a>, identificándote con tu " .
+            "<a href='" . h(certURL($register)) . "'>Regístrate</a>, identificándote con tu " .
             "certificado electrónico. Los enlaces caducan en " . VERIFY_MINUTES . " minutos.</p>");
     }
 }

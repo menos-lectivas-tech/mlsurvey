@@ -45,6 +45,44 @@ class Participate extends View {
         <?php
     }
 
+    /* Quien entra a votar sin estar registrado va directamente al asistente
+       de registro, que recuerda la consulta. Aquí, antes de generar la página,
+       porque es una redirección. Si algo falla, show() da el motivo. */
+    public function doInit (){
+        $surveyid = $_GET[self::SID] ?? null;
+        if (isset ($_REQUEST[self::ACTION]) || !is_string ($surveyid) || !ctype_digit ($surveyid)
+                || mustGoToCertHost ())
+            return;
+        $dni = $this->requestDni ();
+        if ($dni === null)
+            return;
+        try {
+            $db = dbConn ();
+            if ($this->isActive ($db, (int) $surveyid) && $this->participantByDni ($db, $dni) === null){
+                header ("Location: register?surveyid=" . (int) $surveyid);
+                exit;
+            }
+        }
+        catch (Exception $e){
+            logMessage (LOGGER_ERROR, "Error {$e} checking if the voter is registered.");
+        }
+    }
+
+    /* DNI de la petición, sin mostrar nada: el del certificado o, sin
+       client_cert_enabled, el del formulario de desarrollo. */
+    private function requestDni (): ?string {
+        if (clientCertEnabled ()){
+            try {
+                return getClientCertDni ();
+            }
+            catch (ClientCertException $e){
+                return null;
+            }
+        }
+        $dni = isset ($_GET['dni']) && is_string ($_GET['dni']) ? strtoupper (trim ($_GET['dni'])) : "";
+        return $dni !== "" && pdfValidDni ($dni) ? $dni : null;
+    }
+
     /**
      * Depending on the request parameters, this method takes different actions.
      * - If it's the submit of the survey form, stores the vote.
@@ -98,14 +136,14 @@ class Participate extends View {
                 echo ("<p><strong>No hay ninguna cuenta registrada con el DNI de tu " .
                     "certificado electrónico.</strong></p>");
                 echo ("<p>Para participar en las consultas tienes que registrarte antes: " .
-                    "<a href='register'>Regístrate</a>.</p>");
+                    "<a href='register?surveyid={$surveyid}'>Regístrate</a>.</p>");
                 return;
             }
             if (!isVerified ($db, $participantid)){
                 echo ("<p><strong>Tu cuenta aún no está verificada.</strong></p>");
                 echo ("<p>Abre el enlace que te enviamos por correo al registrarte (mira también " .
                     "en la carpeta de correo no deseado). Si no te ha llegado o ha caducado, " .
-                    "puedes pedir otro en <a href='register'>Regístrate</a>.</p>");
+                    "puedes pedir otro en <a href='register?surveyid={$surveyid}'>Regístrate</a>.</p>");
                 return;
             }
             if (hasParticipated ($db, $participantid, $surveyid)){
@@ -116,7 +154,7 @@ class Participate extends View {
                 echo "<p><strong>No puedes participar en la consulta porque has confirmado
                     la solicitud de baja del registro de participantes.</strong></p>";
                 echo "<p>Si quieres volver a participar puedes cancelar la baja en
-                    <a href='register'>Regístrate</a>.</p>";
+                    <a href='register?surveyid={$surveyid}'>Regístrate</a>.</p>";
                 return;
             }
             $formid = $this->saveParticipation ($surveyid, $participantid);

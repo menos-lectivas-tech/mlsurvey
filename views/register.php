@@ -28,6 +28,10 @@ class Register extends RegistrationView
     /* Participante ya registrada con el DNI del certificado (participantid,
        participant), o null si no hay. */
     private ?array $dniparticipant = null;
+    /* Consulta abierta a la que iba a votar quien llega al registro desde
+       ella, y su nombre: al terminar se le devuelve allí. */
+    private ?int $surveyid = null;
+    private ?string $surveyname = null;
 
     function getMenuGroup()
     {
@@ -42,6 +46,7 @@ class Register extends RegistrationView
        se avisa de que se pedirá el certificado (ver showCertNotice). */
     public function doInit()
     {
+        $this->loadSurvey();
         /* En la URL del registro: sin un certificado válido no se puede
            registrar, así que se avisa y se vuelve al sitio (el que no pide
            certificado). */
@@ -56,6 +61,42 @@ class Register extends RegistrationView
                     header("Refresh: " . self::CERT_ERROR_DELAY . "; url=" . $site);
             }
         }
+    }
+
+    /* La consulta de la petición, si existe y está abierta. Si no, se sigue
+       con el registro normal. */
+    private function loadSurvey()
+    {
+        $surveyid = $_REQUEST['surveyid'] ?? null;
+        if (!is_string($surveyid) || !ctype_digit($surveyid))
+            return;
+        try {
+            $query = dbConn()->prepare("SELECT surveyname FROM {Surveys} WHERE surveyid = :sid " .
+                "AND startdate < NOW() AND enddate > NOW()");
+            $query->bindValue(":sid", (int) $surveyid, PDO::PARAM_INT);
+            $query->execute();
+            $name = $query->fetchColumn();
+            $query->closeCursor();
+            if ($name !== false) {
+                $this->surveyid = (int) $surveyid;
+                $this->surveyname = $name;
+            }
+        } catch (Exception $e) {
+            logMessage(LOGGER_ERROR, "Error {$e} getting the survey of the registration");
+        }
+    }
+
+    /* Esta página, conservando la consulta. */
+    private function page(): string
+    {
+        return self::PAGE . ($this->surveyid === null ? "" : "?surveyid={$this->surveyid}");
+    }
+
+    /* Botón para ir a votar en la consulta de la que viene. */
+    private function showVoteLink()
+    {
+        echo ("<p><a class='button-3' href='" . h(certURL("participate?sid={$this->surveyid}")) .
+            "'>Votar en «" . h($this->surveyname) . "»</a></p>");
     }
 
     /* La participante registrada con ese DNI, o null si no hay. Si falla la
@@ -106,7 +147,7 @@ class Register extends RegistrationView
             echo ("<p><strong>Ya estás registrado/a con el DNI de tu certificado electrónico " .
                 "y tu cuenta está verificada.</strong></p>");
             $this->showSurveysLink();
-            $this->showUnregister(self::PAGE);
+            $this->showUnregister($this->page());
             return;
         }
         $this->showPendingVerification();
@@ -135,7 +176,7 @@ class Register extends RegistrationView
             "escribe aquí tu dirección de correo y te enviaremos un enlace nuevo; el anterior " .
             "dejará de funcionar. Si al registrarte te equivocaste al escribir la dirección, " .
             "escribe la correcta: sustituirá a la anterior.</p>");
-        $this->showEmailForm(null, [
+        $this->showEmailForm($this->surveyid, [
             'action' => self::PAGE,
             'title' => "Volver a enviar el enlace de activación",
             'infotitle' => "Volver a enviar el enlace",
@@ -168,10 +209,13 @@ class Register extends RegistrationView
                 te lo enviemos a tu dirección de correo (o a otra, si te equivocaste al escribirla).
                 Podrás hacerlo dentro de <?= $minutes; ?> <?= $minutes == 1 ? "minuto" : "minutos"; ?>:
                 esta página te mostrará entonces el formulario.</p>
+            <?php if ($this->surveyid !== null) { ?>
+                <p>Al abrir el enlace podrás votar en <strong><?= h($this->surveyname); ?></strong>.</p>
+            <?php } ?>
         </section>
         <script>
             setTimeout(function() {
-                window.location.href = <?= json_encode(self::PAGE); ?>;
+                window.location.href = <?= json_encode($this->page()); ?>;
             }, <?= ($wait + 2) * 1000; ?>);
         </script>
     <?php
@@ -198,7 +242,7 @@ class Register extends RegistrationView
         $message = "Para registrarte, el navegador te pedirá que selecciones tu certificado " .
             "electrónico personal (DNI electrónico, certificado de la FNMT, de empleado/a " .
             "público/a...). El DNI del certificado debe coincidir con el del documento que aportes.";
-        $target = $this->registrationAction(self::PAGE);
+        $target = $this->registrationAction($this->page());
         $site = $this->siteURL() ?? ".";
     ?>
         <section class="ml-participate-card">
@@ -292,13 +336,18 @@ class Register extends RegistrationView
                 if (isset($_REQUEST[$field]) && is_string($_REQUEST[$field]))
                     $selected[$field] = trim($_REQUEST[$field]);
         }
-        $this->showDocsForm(null, null, [
+        $intro = "Acredita que eres docente de la enseñanza pública en dos pasos. " .
+            "Al final indicarás tu dirección de correo y te enviaremos un enlace para " .
+            "activar tu cuenta. ";
+        $intro .= $this->surveyid !== null ?
+            "Para votar en «{$this->surveyname}» necesitas estar registrado/a: al abrir el " .
+            "enlace podrás hacerlo." :
+            "Una vez activada, para participar en una consulta solo tendrás que " .
+            "identificarte con tu certificado electrónico.";
+        $this->showDocsForm($this->surveyid, null, [
             'action' => self::PAGE,
-            'title' => "Regístrate",
-            'intro' => "Acredita que eres docente de la enseñanza pública en dos pasos. " .
-                "Al final indicarás tu dirección de correo y te enviaremos un enlace para " .
-                "activar tu cuenta. Una vez activada, para participar en una consulta solo " .
-                "tendrás que identificarte con tu certificado electrónico.",
+            'title' => $this->surveyid !== null ? "Regístrate para votar" : "Regístrate",
+            'intro' => $intro,
             'emailinfo' => "Revísala bien antes de enviar: si la tecleas mal no recibirás " .
                 "el enlace para activar tu cuenta.",
             'emailhint' => "Revísala bien: ahí recibirás el enlace para activar tu cuenta.",
@@ -470,7 +519,7 @@ class Register extends RegistrationView
         try {
             $mailer = new MlMailer();
             $mailer->configure();
-            $mailer->sendVerification($email, url_base64_encode($code), VERIFY_MINUTES);
+            $mailer->sendVerification($email, url_base64_encode($code), VERIFY_MINUTES, $this->surveyid);
             $this->showEmailSent(VERIFY_WAIT_MINUTES * 60, $email);
         } catch (Exception $e) {
             echo ("<p><strong>No se ha podido enviar el mensaje con el enlace para activar tu " .
@@ -548,7 +597,7 @@ class Register extends RegistrationView
         echo ("<p><strong>Solicitaste la baja del registro de participantes{$when}. En un " .
             "plazo máximo de 30 días desde entonces todos tus datos serán eliminados.</strong></p>");
         echo ("<p>Mientras estés de baja no podrás participar en ninguna consulta.</p>");
-        $this->showCancelUnregister(self::PAGE);
+        $this->showCancelUnregister($this->page());
     }
 
     private function alreadyRegistered()
@@ -559,6 +608,10 @@ class Register extends RegistrationView
 
     private function showSurveysLink()
     {
+        if ($this->surveyid !== null) {
+            $this->showVoteLink();
+            return;
+        }
         echo ("<p>Para participar en las <a href='" . h(($this->siteURL() ?? "") . "surveys") . "'>consultas " .
             "activas</a> entra en cada una e identifícate con tu certificado electrónico.</p>");
     }

@@ -92,8 +92,8 @@ class GetCode extends View
                     Tiene que ser el del DNI con el que te registraste, y tu cuenta tiene que estar
                     verificada con el enlace que te enviamos por correo.</p>
             <?php } ?>
-            <p>Si aún no te has registrado, hazlo antes en
-                <a href="<?= h(certURL("register")); ?>">Regístrate</a>.</p>
+            <p>Si aún no te has registrado, al continuar te guiaremos para hacerlo y después
+                podrás votar en esta consulta.</p>
             <p>Si quieres pensarte el voto antes, puedes leer las preguntas en «Ver las preguntas
                 de la consulta», debajo de este recuadro.</p>
             <p><a class="button-3" href="<?= h($target); ?>">Participar en la consulta</a></p>

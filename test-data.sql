@@ -82,23 +82,6 @@ INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
     (3, 2, 2, 'No'),
     (3, 2, 3, 'Me es indiferente');
 
-/* 4: Formacion permanente del profesorado */
-INSERT INTO Surveys (surveyid, surveyname, surveydesc, surveyfile, startdate, enddate, createdby, modifiedby) VALUES
-    (4, 'Formacion permanente del profesorado', '<p>Consulta <strong>abierta</strong> y aun sin respuestas: se puede participar mientras este en plazo.</p>', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 20 DAY), 1, 1);
-INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
-    (4, 1, '<p>&iquest;Que modalidad de formacion prefieres?</p>', 0, 0, NULL);
-INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
-    (4, 1, 1, 'Presencial'),
-    (4, 1, 2, 'En linea'),
-    (4, 1, 3, 'Mixta');
-INSERT INTO Questions (surveyid, questionid, questiondesc, optional, multiple, file) VALUES
-    (4, 2, '<p>&iquest;Sobre que temas te gustaria formarte? <em>(puedes elegir varias)</em></p>', 1, 1, NULL);
-INSERT INTO Options (surveyid, questionid, optionid, optiondesc) VALUES
-    (4, 2, 1, 'Competencia digital'),
-    (4, 2, 2, 'Atencion a la diversidad'),
-    (4, 2, 3, 'Convivencia'),
-    (4, 2, 4, 'Idiomas');
-
 /* ---------- Participantes ---------- */
 /* participant = HMAC-SHA256(sha256(correo)) con PARTICIPANT_HMAC_KEY=cambiame
    (.env.dev): con otra clave estas participantes no se reconocen. */
