@@ -200,6 +200,7 @@ class Participate extends View {
                 echo ("<p><strong>Para votar tienes que identificarte con un certificado " .
                     "electrónico válido.</strong></p>");
                 echo ("<p>" . h ($e->getMessage ()) . "</p>");
+                echo (clientCertHelp ($e));
                 return null;
             }
         }

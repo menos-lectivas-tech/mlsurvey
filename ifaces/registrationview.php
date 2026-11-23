@@ -714,6 +714,7 @@ abstract class RegistrationView extends View
                 $certdni = getClientCertDni();
             } catch (ClientCertException $e) {
                 echo ("<p><strong>Certificado digital: " . h($e->getMessage()) . "</strong></p>");
+                echo (clientCertHelp($e));
                 return null;
             }
         }
