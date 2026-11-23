@@ -23,6 +23,8 @@ class Register extends RegistrationView
     /* Motivo por el que no vale el certificado electrónico, o null si vale
        (o no se pide). */
     private ?string $certerror = null;
+    /* Ayuda (HTML) para configurar el certificado, si hace falta. */
+    private string $certhelp = "";
     /* DNI del certificado electrónico, si se pide y es válido. */
     private ?string $certdni = null;
     /* Participante ya registrada con el DNI del certificado (participantid,
@@ -56,8 +58,10 @@ class Register extends RegistrationView
                 $this->dniparticipant = $this->findByDni($this->certdni);
             } catch (ClientCertException $e) {
                 $this->certerror = $e->getMessage();
+                $this->certhelp = clientCertHelp($e);
                 $site = $this->siteURL();
-                if ($site !== null)
+                /* Con la ayuda no se redirige: hace falta tiempo para leerla. */
+                if ($site !== null && $this->certhelp === "")
                     header("Refresh: " . self::CERT_ERROR_DELAY . "; url=" . $site);
             }
         }
@@ -267,8 +271,11 @@ class Register extends RegistrationView
     {
         echo ("<p><strong>Para registrarte debes aportar un certificado digital válido.</strong></p>");
         echo ("<p>" . h($this->certerror) . "</p>");
+        echo ($this->certhelp);
         $site = $this->siteURL();
-        if ($site !== null)
+        if ($site !== null && $this->certhelp !== "")
+            echo ("<p><a href='" . h($site) . "'>Volver a la página principal</a></p>");
+        elseif ($site !== null)
             echo ("<p>En unos segundos volverás a la <a href='" . h($site) . "'>página principal</a>.</p>");
     }
 

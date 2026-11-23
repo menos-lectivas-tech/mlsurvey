@@ -27,6 +27,74 @@ require_once 'utils/host.php';
 class ClientCertException extends Exception {}
 
 /**
+ * The browser sent no certificate: the participant can fix it by following
+ * clientCertHelp.
+ */
+class ClientCertMissingException extends ClientCertException {}
+
+/**
+ * HTML explaining what a digital certificate is and how to set it up in the
+ * browser, if that is what $e needs; "" otherwise.
+ */
+function clientCertHelp (ClientCertException $e): string {
+    if (!($e instanceof ClientCertMissingException))
+        return "";
+    return <<<'HTML'
+    <section class="ml-participate-card">
+        <h3>¿Qué es un certificado electrónico?</h3>
+        <p>Es un documento digital personal, emitido por una entidad autorizada, que acredita tu
+            identidad en Internet, como el DNI en persona. Se guarda en tu ordenador o en la tarjeta
+            del DNI electrónico. Lo usamos solo para leer tu DNI o NIE. Cl@ve no es un certificado
+            y aquí no sirve.</p>
+        <h3>Cómo solucionarlo</h3>
+        <ol>
+            <li><strong>Comprueba que tienes un certificado.</strong> Si no, puedes solicitar
+                gratis el de persona física en la
+                <a href="https://www.sede.fnmt.gob.es/certificados/persona-fisica" target="_blank"
+                rel="noopener noreferrer">sede de la FNMT</a>, o usar tu DNI electrónico.</li>
+            <li><strong>Instálalo en este navegador</strong>, siguiendo las indicaciones de abajo.
+                Si lo obtuviste en otro equipo o navegador, necesitas su copia de seguridad
+                (fichero <code>.pfx</code> o <code>.p12</code>) y la contraseña que le pusiste.</li>
+            <li><strong>Cierra todas las ventanas del navegador</strong> y vuelve a abrirlo. Si no,
+                recuerda que antes no elegiste ningún certificado y no volverá a preguntar.</li>
+            <li><strong>Vuelve a entrar y selecciona tu certificado</strong> en la ventana que
+                abrirá el navegador. No la canceles.</li>
+        </ol>
+        <details>
+            <summary>Chrome o Edge en Windows</summary>
+            <p>Usan los certificados de Windows. Haz doble clic en el fichero <code>.pfx</code> o
+                <code>.p12</code> y sigue el asistente. Para comprobarlo, busca «Administrar
+                certificados de usuario» en el menú Inicio y mira en «Personal».</p>
+        </details>
+        <details>
+            <summary>Safari o Chrome en Mac</summary>
+            <p>Usan el Llavero. Haz doble clic en el fichero <code>.pfx</code> o <code>.p12</code>
+                y añádelo al llavero «Inicio de sesión».</p>
+        </details>
+        <details>
+            <summary>Firefox</summary>
+            <p>Tiene sus propios certificados. Ve a Ajustes, «Privacidad &amp; Seguridad»,
+                «Certificados», «Ver certificados», pestaña «Sus certificados», e impórtalo con
+                «Importar».</p>
+        </details>
+        <details>
+            <summary>Chrome en Linux</summary>
+            <p>Ve a Configuración, «Privacidad y seguridad», «Seguridad», «Gestionar certificados»,
+                e importa el fichero en tus certificados.</p>
+        </details>
+        <details>
+            <summary>DNI electrónico</summary>
+            <p>Necesitas un lector de tarjetas, el software de
+                <a href="https://www.dnielectronico.es" target="_blank"
+                rel="noopener noreferrer">dnielectronico.es</a> y el PIN del DNI. Conecta el lector
+                e inserta el DNI antes de abrir el navegador. En Firefox hay que cargar además el
+                módulo del DNIe en «Dispositivos de seguridad».</p>
+        </details>
+    </section>
+    HTML;
+}
+
+/**
  * true if registering requires the client certificate (client_cert_enabled).
  */
 function clientCertEnabled (): bool {
@@ -81,10 +149,12 @@ function getClientCertDni (): string {
     }
     if ($verify === "" || $verify === "NONE" || $pem === "" || $pem === "(null)"){
         logMessage (LOGGER_INFO, "Registration without client certificate.");
-        throw new ClientCertException ("No se ha recibido tu certificado electrónico. Tienes " .
-            "que identificarte con él (DNI electrónico, certificado de la FNMT, " .
-            "de empleado/a público/a...): cierra el navegador, vuelve a abrir la página y elige tu " .
-            "certificado cuando te lo pida. Con el DNI electrónico, conecta antes el lector.");
+        throw new ClientCertMissingException ("Tu navegador no nos ha enviado ningún certificado " .
+            "electrónico, así que no podemos comprobar tu identidad. Si no te ha aparecido ninguna " .
+            "ventana para elegir certificado, es que no hay ninguno configurado en este " .
+            "navegador (o, con el DNI electrónico, que el lector o la tarjeta no están " .
+            "conectados): sigue los pasos de abajo. Si te apareció y la cancelaste, cierra " .
+            "todas las ventanas del navegador y vuelve a entrar.");
     }
     if ($verify !== "SUCCESS"){
         logMessage (LOGGER_WARN, "Client certificate rejected by the server: {$verify}.");
