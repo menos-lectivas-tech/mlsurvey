@@ -16,6 +16,6 @@ class StaticPage extends View {
             return;
         }
 
-        echo (file_get_contents($file));
+        include $file;
     }
 }
