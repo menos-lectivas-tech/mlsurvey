@@ -133,7 +133,8 @@ class Register extends RegistrationView
         try {
             $verified = isVerified(dbConn(), (int) $this->dniparticipant['participantid']);
         } catch (Exception $e) {
-            echo ("<p><strong>Error al consultar tu registro.</strong></p>");
+            echo ("<p><strong>Error al consultar tu registro.</strong></p>" .
+            "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} checking if the account is verified");
             return;
         }
@@ -271,7 +272,8 @@ class Register extends RegistrationView
     {
         echo ("<p><strong>Para registrarte debes aportar un certificado digital válido.</strong></p>");
         echo ("<p>" . h($this->certerror) . "</p>");
-        echo ($this->certhelp);
+        echo ("<p>" . $this->certhelp . "</p>" .
+            "<p>(" . date("Ymd H:i:s") . ")</p>");
         $site = $this->siteURL();
         if ($site !== null && $this->certhelp !== "")
             echo ("<p><a href='" . h($site) . "'>Volver a la página principal</a></p>");
@@ -406,7 +408,8 @@ class Register extends RegistrationView
             $this->sendVerificationEmail($db, $participantid, $email,
                 "Te has registrado correctamente.");
         } catch (Exception $e) {
-            echo ("<p><strong>Error al registrar la dirección de correo.</strong></p>");
+            echo ("<p><strong>Error al registrar la dirección de correo.</strong></p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} when registering participant");
             return false;
         }
@@ -454,7 +457,8 @@ class Register extends RegistrationView
                 return false;
             $this->sendVerificationEmail($db, $participantid, $email, "");
         } catch (Exception $e) {
-            echo ("<p><strong>Error al enviar el enlace para activar la cuenta.</strong></p>");
+            echo ("<p><strong>Error al enviar el enlace para activar la cuenta.</strong></p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} resending verification");
             return false;
         }
@@ -532,7 +536,8 @@ class Register extends RegistrationView
             echo ("<p><strong>No se ha podido enviar el mensaje con el enlace para activar tu " .
                 "cuenta.</strong></p>");
             echo ("<p>Vuelve a «Regístrate» dentro de " . VERIFY_WAIT_MINUTES .
-                " minutos para pedir otro.</p>");
+                " minutos para pedir otro.</p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} sending verification email");
         }
     }
@@ -557,7 +562,8 @@ class Register extends RegistrationView
             logMessage(LOGGER_INFO, "Participant unsubscribed.");
         } catch (Exception $e) {
             echo ("<p><strong>Ha ocurrido un error tratando de procesar tu baja del registro " .
-                "de participantes.</strong></p>");
+                "de participantes.</strong></p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} when unsubscribing");
             return;
         }
@@ -583,7 +589,8 @@ class Register extends RegistrationView
             }
         } catch (Exception $e) {
             echo ("<p><strong>Ha ocurrido un error tratando de cancelar tu baja del registro " .
-                "de participantes.</strong></p>");
+                "de participantes.</strong></p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} when cancelling the unsubscription");
             return;
         }

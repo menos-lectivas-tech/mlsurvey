@@ -714,7 +714,8 @@ abstract class RegistrationView extends View
                 $certdni = getClientCertDni();
             } catch (ClientCertException $e) {
                 echo ("<p><strong>Certificado digital: " . h($e->getMessage()) . "</strong></p>");
-                echo (clientCertHelp($e));
+                echo (clientCertHelp($e) .
+                    "<p>(" . date("Ymd H:i:s") . ")</p>");
                 return null;
             }
         }
@@ -737,7 +738,8 @@ abstract class RegistrationView extends View
             else if ($kind == self::KIND_NOMINA)
                 $dni = getNominaNIF($document);
         } catch (PdfSignException $e) {
-            echo ("<p><strong>" . ucfirst($docname) . ": " . h($e->getMessage()) . "</strong></p>");
+            echo ("<p><strong>" . ucfirst($docname) . ": " . h($e->getMessage()) . "</strong></p>" .
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             return null;
         }
         if ($dni === "")

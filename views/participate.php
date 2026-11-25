@@ -199,7 +199,8 @@ class Participate extends View {
             catch (ClientCertException $e){
                 echo ("<p><strong>Para votar tienes que identificarte con un certificado " .
                     "electrónico válido.</strong></p>");
-                echo ("<p>" . h ($e->getMessage ()) . "</p>");
+                echo ("<p>" . h ($e->getMessage ()) . "</p>" .
+                    "<p>(" . date("Ymd H:i:s") . ")</p>");
                 echo (clientCertHelp ($e));
                 return null;
             }
