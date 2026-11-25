@@ -356,29 +356,38 @@ function getHojaServiciosNIF(string $path): string
         throw new PdfSignException("No se ha podido leer la fecha de expedición de la Hoja de Servicios.");
     pdfCheckIssueDate($date[1], $date[2], $date[3]);
 
-    /* Tiene que haber un servicio de este curso, es decir, que haya empezado
-       o terminado a partir del 1 de septiembre. Cada servicio es
-       "<función> <causa cese> <posesión> [<cese>]", con la función en 7 cifras
-       (0590007) y las fechas en dd/mm/aaaa. */
-    $date = '(\d\d)\/(\d\d)\/(\d{4})';
-    preg_match_all("/\\b\\d{7}\\b .{0,60}?\\b$date\\b(?: $date\\b)?/u", $text, $services, PREG_SET_ORDER);
-    if (empty($services)) {
+    /* Tiene que haber algún servicio vigente. No se depende del formato de
+       cada fila (el código de función puede llevar letras, 0597FI, y el OCR
+       lo puede leer mal): solo de sus fechas, en dd/mm/aaaa, con la de cese
+       justo detrás de la de posesión. Vale si:
+       - alguna fecha es de este curso o posterior (un servicio que ha
+         empezado o terminado a partir del 1 de septiembre, o que termina
+         más adelante), o
+       - la última fecha del documento va sola: es la toma de posesión del
+         último servicio, que no tiene cese y sigue vigente. */
+    preg_match_all('/\b(\d\d)\/(\d\d)\/(\d{4})\b/u', $text, $dates, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+    if (empty($dates)) {
         logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no services found in it.");
         throw new PdfSignException("No se han podido leer los servicios de la Hoja de Servicios.");
     }
     $current = false;
-    foreach ($services as $service) {
-        /* Grupos 1-3: posesión; 4-6: cese, si lo hay. */
-        foreach ([1, 4] as $i) {
-            if (!isset($service[$i + 2]) || $service[$i + 2] === "")
-                continue;
-            [$day, $month, $year] = array_map('intval', array_slice($service, $i, 3));
-            if (checkdate($month, $day, $year) &&
-                    (new DateTimeImmutable("today"))->setDate($year, $month, $day) >= pdfCourseStart()) {
-                $current = true;
-                break 2;
-            }
+    foreach ($dates as $date) {
+        [$day, $month, $year] = array_map(fn ($group) => (int) $group[0], array_slice($date, 1, 3));
+        if (checkdate($month, $day, $year) &&
+                (new DateTimeImmutable("today"))->setDate($year, $month, $day) >= pdfCourseStart()) {
+            $current = true;
+            break;
         }
+    }
+    $last = end($dates);
+    $previous = count($dates) > 1 ? $dates[count($dates) - 2][0] : null;
+    if (!$current && ($previous === null ||
+            trim(substr($text, $previous[1] + strlen($previous[0]), $last[0][1] - $previous[1] -
+                strlen($previous[0]))) !== "")) {
+        [$day, $month, $year] = array_map(fn ($group) => (int) $group[0], array_slice($last, 1, 3));
+        $current = checkdate($month, $day, $year) &&
+            (new DateTimeImmutable("today"))->setDate($year, $month, $day) <=
+                (new DateTimeImmutable("today"))->modify("+1 day");
     }
     if (!$current) {
         logMessage(LOGGER_WARN, "Hoja de Servicios rejected: no service started or ended this course.");
