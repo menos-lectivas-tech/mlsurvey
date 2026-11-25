@@ -2,7 +2,8 @@
 With this project we are trying to develop an online voting system based on the following:
 * Discriminate partitipats by email address domain.
 * Identify participants by official PDFs, so each person can vote only once. Interim
-  teachers can upload the appointment (_nombramiento_) of the current school year. Both
+  teachers, and those appointed to any post (director, head of studies, secretary...),
+  can upload the appointment (_nombramiento_) of the current school year. Both
   interim teachers and career civil servants can use the teaching credential (_credencial
   docente_), the service record (_hoja de servicios_) or a payslip (_nómina_) of a teaching
   body (maestros, profesores or catedráticos) of the current or previous month. The
