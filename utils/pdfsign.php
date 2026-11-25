@@ -25,8 +25,14 @@ const PDF_CMD_TIMEOUT = 20;
    página tarda unos segundos. */
 const PDF_OCR_PAGES = 3;
 const PDF_OCR_DPI = 300;
-const PDF_NOMBRAMIENTO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
+const PDF_NOMBRAMIENTO_INTERINO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
     'FUNCIONARIO INTERINO/iu';
+/* Nombramiento para un cargo, cualquiera (director/a, jefe/a de estudios,
+   secretario/a, coordinador/a...), con su diligencia de toma de posesión. */
+const PDF_NOMBRAMIENTO_CARGO_MARK = '/DILIGENCIA: Para hacer constar que .{0,300}?ha tomado posesi[óo]n ' .
+    '(?:de su|del) cargo\\b/iu';
+const PDF_NOMBRAMIENTO_MARK = '/ACUERDO DE NOMBRAMIENTO Y FORMALIZACI[ÓO]N DE LA TOMA DE POSESI[ÓO]N DE ' .
+    'FUNCIONARIO INTERINO|DILIGENCIA: Para hacer constar que .{0,300}?ha tomado posesi[óo]n (?:de su|del) cargo\\b/iu';
 const PDF_DNI = '([0-9XYZ][0-9]{7}[A-Z])\b';
 const PDF_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
     "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -219,11 +225,15 @@ function pdfCheckIssueDate (string $day, string $month, string $year){
  * current school year and gets the holder's DNI/NIE from it. Its signature
  * is not checked: it may be signed digitally or by hand.
  *
- * There are two formats:
+ * There are three formats:
  * - Scanned: the body is an image and the only text with the data is the PDF
  *   title, "<name> <DNI with a leading zero> <form> <kind> <yyyy mm dd>".
  * - Text: the body is text, with the heading of the appointment, the NIF in
  *   "I. DATOS DEL FUNCIONARIO/A" and "FECHA DE NOMBRAMIENTO: dd/mm/yyyy".
+ * - Any post (director/a, jefe/a de estudios, secretario/a...): the
+ *   appointment and a "DILIGENCIA" of taking office "con efectos
+ *   administrativos de dd de <month> de yyyy", with "(D.N.I.: <DNI>)". Posts
+ *   are taken from July 1st on, so for them the course starts then.
  *
  * @param string $path PDF file.
  *
@@ -237,10 +247,17 @@ function getNombramientoDni (string $path): string {
         throw new Exception ("pdfinfo failed ({$code}): " . trim ($err));
 
     $data = pdfNombramientoFromTitle ($info);
+    $start = pdfCourseStart ();
     if ($data === null){
         /* El cuerpo en texto, o en una foto si no lo está. */
         $body = pdfDocumentText ($path, PDF_NOMBRAMIENTO_MARK);
         $data = pdfNombramientoFromText ($body);
+        if ($data === null){
+            $data = pdfNombramientoCargoFromText ($body);
+            /* Los cargos se toman a partir del 1 de julio (los directivos,
+               ese día). */
+            $start = $start->modify ("-2 months");
+        }
     }
     if ($data === null){
         logMessage (LOGGER_WARN, "PDF rejected: it is not an appointment.");
@@ -259,7 +276,7 @@ function getNombramientoDni (string $path): string {
     if (!checkdate ($month, $day, $year))
         throw new PdfSignException ("No se ha podido leer la fecha del nombramiento.");
     $date = (new DateTimeImmutable ("today"))->setDate ($year, $month, $day);
-    if ($date < pdfCourseStart ()){
+    if ($date < $start){
         logMessage (LOGGER_WARN, "Appointment rejected: dated {$date->format ('Y-m-d')}.");
         throw new PdfSignException ("El nombramiento tiene que ser del curso actual.");
     }
@@ -294,7 +311,7 @@ function pdfNombramientoFromTitle (string $info): ?array {
  *     appointment or the NIF or the date are not there exactly once.
  */
 function pdfNombramientoFromText (string $text): ?array {
-    if (!preg_match (PDF_NOMBRAMIENTO_MARK, $text))
+    if (!preg_match (PDF_NOMBRAMIENTO_INTERINO_MARK, $text))
         return null;
     /* El NIF del funcionario, no otro que pueda salir en el documento. El
        OCR puede leer la I como l o 1. */
@@ -306,6 +323,34 @@ function pdfNombramientoFromText (string $text): ?array {
     if (count ($dnis) != 1 || count ($dates) != 1)
         return null;
     return [reset ($dnis), (int) $date[0][3], (int) $date[0][2], (int) $date[0][1]];
+}
+
+/**
+ * Data of an appointment to a post, whichever, whose body is text, or read
+ * with OCR: the date is the one of taking office.
+ *
+ * @param string $text Text of the PDF with the whitespace collapsed.
+ *
+ * @return array|null [DNI/NIE, year, month, day], or null if it is not such
+ *     an appointment or the DNI or the date are not there exactly once.
+ */
+function pdfNombramientoCargoFromText (string $text): ?array {
+    if (!preg_match (PDF_NOMBRAMIENTO_CARGO_MARK, $text))
+        return null;
+    /* La diligencia: "con efectos administrativos de 01 de julio de 2026 ...
+       ha tomado posesión de su cargo como ... (D.N.I.: 80064946Z)". El OCR
+       puede leer la I como l o 1. */
+    preg_match_all ('/DILIGENCIA: Para hacer constar que .{0,300}?con efectos administrativos de (\d\d?) de ' .
+        '(\p{L}+) de (\d{4})\b.{0,300}?ha tomado posesi[óo]n (?:de su|del) cargo\\b.{1,300}?\(D\.?N\.?[Il1]\.?:?\s*' .
+        PDF_DNI . '\)/iu', $text, $matches, PREG_SET_ORDER);
+    $found = array_unique (array_map (fn ($m) => strtoupper ("{$m[4]} {$m[1]} {$m[2]} {$m[3]}"), $matches));
+    if (count ($found) != 1)
+        return null;
+    [, $day, $month, $year, $dni] = $matches[0];
+    $monthnumber = array_search (strtolower ($month), PDF_MONTHS, true);
+    if ($monthnumber === false)
+        return null;
+    return [strtoupper ($dni), (int) $year, $monthnumber + 1, (int) $day];
 }
 
 /**
