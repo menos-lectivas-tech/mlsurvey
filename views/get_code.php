@@ -29,10 +29,10 @@ class GetCode extends View
 
     public function loadStyles()
     {
-    ?>
+?>
         <link href="css/button3.css" rel="stylesheet" />
         <link href="css/questions.css" rel="stylesheet" />
-    <?php
+        <?php
     }
 
     /**
@@ -84,21 +84,30 @@ class GetCode extends View
     {
         $target = certURL("participate?sid=" . $surveyid);
         ?>
-        <section class="ml-participate-card">
-            <h3>Participar en la consulta</h3>
-            <?php if (clientCertEnabled()) { ?>
-                <p>Para votar, el navegador te pedirá que selecciones tu certificado electrónico
-                    personal (DNI electrónico, certificado de la FNMT, de empleado/a público/a...).
-                    Tiene que ser el del DNI con el que te registraste, y tu cuenta tiene que estar
-                    verificada con el enlace que te enviamos por correo.</p>
-            <?php } ?>
-            <p>Si aún no te has registrado, al continuar te guiaremos para hacerlo y después
-                podrás votar en esta consulta.</p>
-            <p>Si quieres pensarte el voto antes, puedes leer las preguntas en «Ver las preguntas
-                de la consulta», debajo de este recuadro.</p>
-            <p><a class="button-3" href="<?= h($target); ?>">Participar en la consulta</a></p>
-        </section>
-        <?php
+        <form method="POST" action="<?= h($target); ?>">
+            <section class="ml-participate-card">
+                <h3>Participar en la consulta</h3>
+                <?php if (clientCertEnabled()) { ?>
+                    <p>Para votar, el navegador te pedirá que selecciones tu certificado electrónico
+                        personal (DNI electrónico, certificado de la FNMT, de empleado/a público/a...).
+                        Tiene que ser el del DNI con el que te registraste, y tu cuenta tiene que estar
+                        verificada con el enlace que te enviamos por correo.</p>
+                <?php } ?>
+                <p>Si aún no te has registrado, al continuar te guiaremos para hacerlo y después
+                    podrás votar en esta consulta.</p>
+                <p>Si quieres pensarte el voto antes, puedes leer las preguntas en «Ver las preguntas
+                    de la consulta», debajo de este recuadro.</p>
+                <p>Pero antes de continuar debes leer la <a href="/static_page?page=privacypolicy" target="_blank">
+                        política de protección de datos
+                    </a> (se abre en una ventana nueva).</p>
+                <p><label for="accept_pp"> <input type="checkbox" name="accept_pp" required>
+                        <strong>He leído y acepto la política de protección de datos.
+                        </strong></label></p>
+                <!--<p><a class="button-3" href="<?= h($target); ?>">Participar en la consulta</a></p>-->
+                <p><input type="submit" class="button-3" value="Participar en la consulta"></p>
+            </section>
+        </form>
+<?php
     }
 
     protected function getSurveyName($db, $sid): ?string
