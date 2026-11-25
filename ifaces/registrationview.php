@@ -378,77 +378,7 @@ abstract class RegistrationView extends View
                         <input type="file" name="documento" id="documento" required
                             accept="application/pdf,.pdf">
                     </div>
-                    <p class="ml-participate-legal-link">Antes de enviarlos, lee
-                        <button type="button" class="ml-link" id="ml-legal-open"
-                            aria-haspopup="dialog">cómo tratamos tus documentos y la información
-                            sobre protección de datos</button>.
-                    </p>
-                    <dialog class="ml-dialog ml-legal-dialog" id="ml-legal"
-                        aria-labelledby="ml-legal-title">
-                        <div class="ml-dialog__form">
-                            <?php if (
-                                !file_exists(self::PRIVACY_POLICY_FILE) ||
-                                !is_file(self::PRIVACY_POLICY_FILE)
-                            ) {
-                            ?>
-                                <h2 class="ml-dialog__title" id="ml-legal-title">Verificación de tu
-                                    condición de docente de la enseñanza pública</h2>
-                                <div class="ml-legal-body" tabindex="0">
-                                    <p>Para comprobar que eres docente en activo en un centro público de la
-                                        Comunidad de Madrid necesitamos algún documento probatorio
-                                        (el nombramiento, la credencial y la hoja de servicios pueden
-                                        estar firmados digitalmente o a mano; la nómina no lleva
-                                        firma):</p>
-                                    <p>Tu última nómina, tu nombramiento del curso actual (si eres
-                                        interino/a), tu hoja de servicios actualizada o tu credencial
-                                        docente.</p>
-                                    <p><strong>Qué hacemos con ellos.</strong> Los leemos de forma automática
-                                        para comprobar su autenticidad y que
-                                        figuras en servicio activo en la Consejería de Educación. Se procesan en
-                                        memoria y se eliminan en cuanto termina la comprobación. No guardamos los
-                                        documentos ni ningún dato extraído de ellos.</p>
-                                    <p>Para comprobar que el documento es tuyo, lo comparamos con el
-                                        DNI del certificado digital con el que te identificas, que
-                                        tampoco guardamos.</p>
-                                    <p>Lo único que conservamos es tu NIF transformado con una función
-                                        criptográfica y una clave secreta que se custodia aparte, de modo que sin
-                                        esa clave no es posible conocerlo. Solo sirve para impedir que una misma
-                                        persona tenga más de una cuenta.</p>
-                                    <p><strong>Datos que no usamos.</strong> Estos documentos contienen más
-                                        información de la necesaria, como tu domicilio, tu puesto de trabajo, tus
-                                        retribuciones y datos bancarios en la nómina. No la leemos
-                                        ni la conservamos.</p>
-                                    <h5>Información básica sobre protección de datos</h5>
-                                    <ul>
-                                        <li><strong>Finalidad:</strong> verificar tu condición de docente en
-                                            activo de la enseñanza pública y evitar cuentas duplicadas.</li>
-                                        <li><strong>Base jurídica:</strong> tu consentimiento, que puedes retirar
-                                            en cualquier momento.</li>
-                                        <li><strong>Destinatarios:</strong> no se ceden datos a terceros. El
-                                            servicio se aloja en la Unión Europea.</li>
-                                        <li><strong>Derechos:</strong> acceso, rectificación, supresión,
-                                            oposición, limitación y portabilidad, escribiendo a datos@huelga14o.org.
-                                            También puedes reclamar ante la Agencia Española de
-                                            Protección de Datos (<a href="https://www.aepd.es" target="_blank"
-                                                rel="noopener noreferrer">aepd.es</a>).</li>
-                                    </ul>
-                                    <p>Si la verificación no se supera, te indicaremos el motivo y no quedará
-                                        ningún registro de tu intento. Puedes volver a intentarlo cuando quieras
-                                        con otros documentos.</p>
-                                </div>
-                            <?php } else {
-                                echo file_get_contents(self::PRIVACY_POLICY_FILE);
-                            } ?>
-                            <div class="ml-dialog__actions">
-                                <button type="button" class="button-3" id="ml-legal-close">
-                                    Cerrar</button>
-                            </div>
-                        </div>
-                    </dialog>
-                    <label class="ml-participate-consent"><input type="checkbox" name="acepto"
-                            value="1" id="acepto" required>
-                        He leído la información sobre el tratamiento de los documentos y
-                        consiento su tratamiento con la finalidad indicada.</label>
+                    
                     <div class="ml-participate-row">
                         <?= altchaWidgetHTML(); ?>
                         <button type="submit" class="button-3 ml-participate-btn"

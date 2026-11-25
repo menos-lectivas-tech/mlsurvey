@@ -134,7 +134,7 @@ class Register extends RegistrationView
             $verified = isVerified(dbConn(), (int) $this->dniparticipant['participantid']);
         } catch (Exception $e) {
             echo ("<p><strong>Error al consultar tu registro.</strong></p>" .
-            "<p>(" . date("Ymd H:i:s") . ")</p>");
+                "<p>(" . date("Ymd H:i:s") . ")</p>");
             logMessage(LOGGER_ERROR, "Error {$e} checking if the account is verified");
             return;
         }
@@ -204,7 +204,7 @@ class Register extends RegistrationView
     {
         $minutes = max(1, (int) ceil($wait / 60));
         $to = $email === null ? "" : " a <strong>" . h($email) . "</strong>";
-    ?>
+?>
         <section class="ml-participate-card">
             <h3>Revisa tu correo</h3>
             <p>Te hemos enviado un email<?= $to; ?> con un enlace para activar tu cuenta, que caduca
@@ -244,28 +244,29 @@ class Register extends RegistrationView
     private function showCertNotice()
     {
         $title = "Se te pedirá tu certificado electrónico";
-        $message = "Para registrarte, el navegador te pedirá que selecciones tu certificado " .
+        $message = "Para registrarte el navegador te pedirá que selecciones tu certificado " .
             "electrónico personal (DNI electrónico, certificado de la FNMT, de empleado/a " .
             "público/a...). El DNI del certificado debe coincidir con el del documento que aportes.";
         $target = $this->registrationAction($this->page());
         $site = $this->siteURL() ?? ".";
     ?>
-        <section class="ml-participate-card">
-            <h3>Regístrate</h3>
-            <p><strong><?= h($title); ?></strong></p>
-            <p><?= h($message); ?></p>
-            <p><a class="button-3" href="<?= h($target); ?>">Continuar</a></p>
-        </section>
-        <script>
-            mlDialog.confirm({
-                title: <?= json_encode($title); ?>,
-                message: <?= json_encode($message); ?>,
-                confirmText: "Continuar"
-            }).then(function(ok) {
-                window.location.href = ok ? <?= json_encode($target); ?> : <?= json_encode($site); ?>;
-            });
-        </script>
-    <?php
+        <form method="POST" action="<?= h($target); ?>">
+            <section class="ml-participate-card">
+                <h3>Regístrate</h3>
+                <p><strong><?= h($title); ?></strong></p>
+                <p><?= h($message); ?></p>
+                <p>Antes de continuar debes leer la <a href="/static_page?page=privacypolicy" target="_blank">
+                        política de protección de datos
+                    </a> (se abre en una ventana nueva).</p>
+                <p><label for="accept_pp"> <input type="checkbox" name="accept_pp" required>
+                        <strong>He leído y acepto la política de protección de datos.
+                        </strong></label></p>
+                <!--<p><a class="button-3" href="<?= h($target); ?>">Continuar</a></p>-->
+                <p><input type="submit" class="button-3" value="Continuar"></p>
+            </section>
+        </form>
+
+<?php
     }
 
     private function showCertError()
@@ -375,8 +376,8 @@ class Register extends RegistrationView
      */
     private function register(): bool
     {
-        if (!$this->checkConsent("registrarse"))
-            return false;
+        /*if (!$this->checkConsent("registrarse"))
+            return false;*/
         $email = $this->getEmail();
         if ($email === null)
             return false;
@@ -392,11 +393,14 @@ class Register extends RegistrationView
                 return true;
             }
             $participantid = null;
-            $created = $this->registerWithDocs($db, $email,
+            $created = $this->registerWithDocs(
+                $db,
+                $email,
                 function ($id, $created) use (&$participantid) {
                     $participantid = $id;
                     return $created;
-                });
+                }
+            );
             if ($created === null)
                 return false;
             if (!$created) {
@@ -405,8 +409,12 @@ class Register extends RegistrationView
             }
             /* El registro ya está hecho: si falla el correo se puede pedir
                otro enlace volviendo a «Regístrate». */
-            $this->sendVerificationEmail($db, $participantid, $email,
-                "Te has registrado correctamente.");
+            $this->sendVerificationEmail(
+                $db,
+                $participantid,
+                $email,
+                "Te has registrado correctamente."
+            );
         } catch (Exception $e) {
             echo ("<p><strong>Error al registrar la dirección de correo.</strong></p>" .
                 "<p>(" . date("Ymd H:i:s") . ")</p>");
