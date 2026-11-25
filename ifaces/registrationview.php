@@ -67,12 +67,14 @@ abstract class RegistrationView extends View
             self::KIND_INTERIM => [
                 'label' => "Nombramiento",
                 'desc' => "Si eres interino/a, lo recibiste por correo electrónico al principio de " .
-                    "curso. Tiene que ser el de este curso.",
+                    "curso. Tiene que ser el de este curso. También vale el de cualquier cargo " .
+                    "(dirección, jefatura de estudios, secretaría...) de este curso.",
                 'name' => "Nombramiento",
                 'where' => "El PDF de este curso que recibiste por correo electrónico al principio de curso.",
                 'url' => "",
                 'info' => "Acuerdo de nombramiento y toma de posesión de la Comunidad de Madrid, " .
-                    "firmado electrónicamente o a mano.\n\n" .
+                    "firmado electrónicamente o a mano, como funcionario/a interino/a o para un " .
+                    "cargo (con la diligencia de toma de posesión).\n\n" .
                     "Adjunta el PDF tal como lo recibiste, o escaneado si está firmado a mano. " .
                     "Tiene que ser del curso actual y estar en vigor.",
                 'wait' => false,
