@@ -80,7 +80,10 @@
         confirmBtn.className = "button-3" + (opts.danger ? " is-danger" : "");
 
         cancelBtn.textContent = opts.cancelText || "Cancelar";
-        cancelBtn.hidden = !opts.confirm;
+        if (!opts.confirm){
+            cancelBtn.style.display = 'none';
+        }
+        //cancelBtn.hidden = !opts.confirm;
 
         dialog.returnValue = "";
 
