@@ -243,10 +243,11 @@ class Register extends RegistrationView
        mismo aviso con un enlace. */
     private function showCertNotice()
     {
-        $title = "Se te pedirá tu certificado electrónico";
+        $title = "Registro exclusivo para docentes de la Educación Pública de la Comunidad de Madrid.
+            Se te pedirá tu certificado digital";
         $message = "Para registrarte el navegador te pedirá que selecciones tu certificado " .
             "electrónico personal (DNI electrónico, certificado de la FNMT, de empleado/a " .
-            "público/a...). El DNI del certificado debe coincidir con el del documento que aportes.";
+            "público/a...). El número de documento del certificado debe coincidir con el del documento que aportes.";
         $target = $this->registrationAction($this->page());
         $site = $this->siteURL() ?? ".";
     ?>

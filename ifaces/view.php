@@ -139,7 +139,8 @@ class MainView extends View {
 
     function show (){
     require_once 'utils/surveycards.php';
-    echo ("<h1 class=\"ml-home-title\">Consultas para la huelga educativa de Madrid 26-27</h1>\n");
+    echo ("<h1 class=\"ml-home-title\">Consultas del Comité de Huelga Mixto para la huelga educativa de Madrid 26-27</h1>\n");
+    echo ("<figure class=\"main-image\"><img src=\"img/faldon.png\" alt=\"Lista organizaciones\" /></figure>\n");
     showActiveSurveyCards ();
 
     if (Config::$maincontent != "")
