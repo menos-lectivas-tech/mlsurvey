@@ -86,7 +86,7 @@ class StaticManage extends View
         } else
             echo "<h1>Creando una página estática</h1>";
     ?>
-        <form id='staticm' name='staticm'>
+        <form id='staticm' name='staticm' method='POST' action='static_manage'>
             <?= setTokenHTML(); ?>
             <p><label for="page">Archivo de la página:<br>
                     <small>(no se permiten los espacios, tildes ni los caracteres
