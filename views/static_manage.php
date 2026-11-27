@@ -136,8 +136,13 @@ class StaticManage extends View
             $(document).ready(function() {
                 hugerte.init(mlHugerte.options({
                     selector: '.pagecontent',
-                    plugins: 'link autolink lists',
-                    toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist'
+                    plugins: 'link autolink lists code',
+                    toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist | code',
+                    /* Las páginas estáticas las escribe un administrador:
+                       se conserva cualquier etiqueta y atributo que meta
+                       desde el editor de código. */
+                    valid_elements: '*[*]',
+                    valid_children: '+body[style]'
                 }));
             });
 
