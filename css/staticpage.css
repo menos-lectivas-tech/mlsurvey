@@ -1,0 +1,68 @@
+.staticpage details {
+    border: 1px solid #d9d9d9;
+    border-radius: 8px;
+    margin: 0 0 12px;
+    padding: 0 18px;
+    background: var(--ml-surface);
+}
+
+.staticpage summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.15rem;
+    padding: 14px 0;
+    list-style-position: outside;
+    color: var(--ml-accent-text);
+}
+
+.staticpage details[open] summary {
+    border-bottom: 1px solid #e5e5e5;
+    margin-bottom: 12px
+}
+
+.staticpage p,
+.staticpage li,
+.staticpage td,
+.staticpage th {
+    color: inherit
+}
+
+.staticpage ul,
+.staticpage ol {
+    padding-left: 1.4em;
+    margin: 0 0 1em
+}
+
+.staticpage li {
+    margin: .25em 0
+}
+
+.staticpage table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 0 1em;
+    font-size: .95rem
+}
+
+.staticpage th,
+.staticpage td {
+    border: 1px solid #d9d9d9;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top
+}
+
+.staticpage th {
+    background: #f3f3f3;
+    font-weight: 700
+}
+
+.staticpage h2.staticpage-titulo {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0 0 20px
+}
+
+.staticpage a {
+    text-decoration: underline
+}

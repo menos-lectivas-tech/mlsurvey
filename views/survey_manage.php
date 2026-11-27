@@ -601,8 +601,30 @@ class SurveyManage extends View
                     $(document).ready(function() {
                         hugerte.init(mlHugerte.options({
                             selector: '.description',
-                            plugins: 'link autolink lists',
-                            toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist'
+                            <?php if (isAdmin()) { ?>
+                                plugins: 'link autolink lists \
+                                code accordion table',
+                                toolbar_mode: 'wrap',
+                                toolbar: 'undo redo | styles | bold italic | link | \
+                                indent outdent | bullist numlist | \
+                                table | \
+                                accordion accordiontoggle accordionremove | code ',
+                                /* Las páginas estáticas las escribe un administrador:
+                                   se conserva cualquier etiqueta y atributo que meta
+                                   desde el editor de código. */
+                                valid_elements: '*[*]',
+                                valid_children: '+body[style]'
+                            <?php
+                            } else { ?>
+                                plugins: 'link autolink lists \
+                                accordion table',
+                                toolbar_mode: 'wrap',
+                                toolbar: 'undo redo | styles | bold italic | link | \
+                                indent outdent | bullist numlist | \
+                                table | \
+                                accordion accordiontoggle accordionremove'
+                            <?php
+                            } ?>
                         }));
                     });
                 </script>
@@ -865,8 +887,31 @@ class SurveyManage extends View
                         let position = document.getElementById("q-" + questionid);
                         position.insertAdjacentHTML("afterend", newquestion);
                         const newed = new hugerte.Editor('desc-q-' + nextquestionid, mlHugerte.options({
-                            plugins: 'link autolink lists',
-                            toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist'
+                            selector: '.description',
+                            <?php if (isAdmin()) { ?>
+                                plugins: 'link autolink lists \
+                                code accordion table',
+                                toolbar_mode: 'wrap',
+                                toolbar: 'undo redo | styles | bold italic | link | \
+                                indent outdent | bullist numlist | \
+                                table | \
+                                accordion accordiontoggle accordionremove | code ',
+                                /* Las páginas estáticas las escribe un administrador:
+                                   se conserva cualquier etiqueta y atributo que meta
+                                   desde el editor de código. */
+                                valid_elements: '*[*]',
+                                valid_children: '+body[style]'
+                            <?php
+                            } else { ?>
+                                plugins: 'link autolink lists \
+                                accordion table',
+                                toolbar_mode: 'wrap',
+                                toolbar: 'undo redo | styles | bold italic | link | \
+                                indent outdent | bullist numlist | \
+                                table | \
+                                accordion accordiontoggle accordionremove'
+                            <?php
+                            } ?>
                         }), hugerte.EditorManager);
                         newed.render();
                     }
@@ -1336,13 +1381,13 @@ class SurveyManage extends View
                         </div>
                         <p><input id="add-q-<?= $qid; ?>" type="button" class="button-3"
                                 onclick="addquestion(<?= $qid; ?>)" value="Añadir pregunta">
-                        <?php
-                        if ($qid != 1){
-                        ?>
-                        <input id="del-q-<?= $qid; ?>" type="button" class="button-3"
-                            onclick="delquestion (<?= $qid; ?>);" value="Eliminar pregunta">
-                        <?php
-                        }?>
+                            <?php
+                            if ($qid != 1) {
+                            ?>
+                                <input id="del-q-<?= $qid; ?>" type="button" class="button-3"
+                                    onclick="delquestion (<?= $qid; ?>);" value="Eliminar pregunta">
+                            <?php
+                            } ?>
                         </p>
                     </div>
                     <?php

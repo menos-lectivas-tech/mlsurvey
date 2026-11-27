@@ -15,6 +15,8 @@ class StaticManage extends View
         <!-- Viste el marco del editor con el tema; el JS se ocupa del iframe. -->
         <link href="css/hugerte-theme.css" rel="stylesheet" />
         <script src="js/hugerte-theme.js"></script>
+
+        <link href="css/staticpage.css" rel="stylesheet" />
     <?php
     }
 
@@ -136,8 +138,13 @@ class StaticManage extends View
             $(document).ready(function() {
                 hugerte.init(mlHugerte.options({
                     selector: '.pagecontent',
-                    plugins: 'link autolink lists code',
-                    toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist | code',
+                    plugins: 'link autolink lists \
+                        code accordion table',
+                    toolbar_mode: 'wrap',
+                    toolbar: 'undo redo | styles | bold italic | link | \
+                        indent outdent | bullist numlist | \
+                        table | \
+                        accordion accordiontoggle accordionremove | code ',
                     /* Las páginas estáticas las escribe un administrador:
                        se conserva cualquier etiqueta y atributo que meta
                        desde el editor de código. */

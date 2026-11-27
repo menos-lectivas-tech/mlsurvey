@@ -25,6 +25,7 @@ class SystemManage extends View
     {
 ?>
         <link href="css/questions.css" rel="stylesheet" />
+        
     <?php
     }
     function addHead()
@@ -96,11 +97,11 @@ class SystemManage extends View
         $maincontent = $row["maincontent"];
         $contact = $row["contact"];
         $icon = $row["icon"];
-        $socialmedia = array ();
-        foreach (Config::SOCIALMEDIA as $sm){
+        $socialmedia = array();
+        foreach (Config::SOCIALMEDIA as $sm) {
             $socialmedia[$sm] = $row[$sm];
         }
-        
+
         $allowediconstxt = "";
         $allowediconsaccept = "";
         foreach (self::SUPPORTED_IMAGES as $key => $value) {
@@ -246,8 +247,18 @@ class SystemManage extends View
 
                 hugerte.init(mlHugerte.options({
                     selector: '.description',
-                    plugins: 'link autolink lists',
-                    toolbar: 'undo redo | styles | bold italic | link | indent outdent | bullist numlist'
+                        plugins: 'link autolink lists \
+                                code accordion table',
+                        toolbar_mode: 'wrap',
+                        toolbar: 'undo redo | styles | bold italic | link | \
+                                indent outdent | bullist numlist | \
+                                table | \
+                                accordion accordiontoggle accordionremove | code ',
+                        /* La configuración de sistema la edita un administrador:
+                           se conserva cualquier etiqueta y atributo que meta
+                           desde el editor de código. */
+                        valid_elements: '*[*]',
+                        valid_children: '+body[style]'
                 }));
                 <?= empty($icon) ? "" : "addFile (" . json_encode($icon) . ");"; ?>
             });
@@ -293,15 +304,15 @@ class SystemManage extends View
                 <details class="ml-survey-preview">
                     <summary>Redes sociales <small>(pulsa para desplegar)</small></summary>
                     <p></p>
-                <?php
-                foreach (Config::SOCIALMEDIA as $sm){
-                    ?>
-                    <p><label for="<?= $sm; ?>"><?= $sm; ?></label>
-                    <input type="text" id="<?= $sm; ?>" name="<?= $sm; ?>" value="<?= htmlspecialchars ($socialmedia[$sm] ?? ""); ?>">
-                    </p>
                     <?php
-                }
-                ?>
+                    foreach (Config::SOCIALMEDIA as $sm) {
+                    ?>
+                        <p><label for="<?= $sm; ?>"><?= $sm; ?></label>
+                            <input type="text" id="<?= $sm; ?>" name="<?= $sm; ?>" value="<?= htmlspecialchars($socialmedia[$sm] ?? ""); ?>">
+                        </p>
+                    <?php
+                    }
+                    ?>
                 </details>
                 <div class="option" id="mailtest" style="display: none;">
                     <p><label for="sendtest">Enviar mensaje de prueba:</label>
@@ -354,17 +365,17 @@ class SystemManage extends View
            podría participar. */
         $domainraw = is_string($_REQUEST['alloweddomains'] ?? null) ? $_REQUEST['alloweddomains'] : "";
         $domainlist = preg_split('/\s+/', strtolower(trim($domainraw)), -1, PREG_SPLIT_NO_EMPTY);
-        foreach ($domainlist as $d){
-            if (!preg_match('/^[a-z0-9]+([\-.][a-z0-9]+)*\.[a-z]{2,}$/', $d)){
+        foreach ($domainlist as $d) {
+            if (!preg_match('/^[a-z0-9]+([\-.][a-z0-9]+)*\.[a-z]{2,}$/', $d)) {
                 echo ("<p><strong>El dominio «" . h($d) . "» no es válido. Escribe los dominios " .
                     "separados por espacios (por ejemplo: educa.madrid.org example.org).</strong></p>");
                 return;
             }
         }
         $domains = implode(" ", $domainlist);
-        $socialmediaarray = array ();
-        foreach (Config::SOCIALMEDIA as $sm){
-            $socialmediaarray[] = $sm . "=:" .$sm;
+        $socialmediaarray = array();
+        foreach (Config::SOCIALMEDIA as $sm) {
+            $socialmediaarray[] = $sm . "=:" . $sm;
         }
         $socialmediaupdate = implode(",", $socialmediaarray);
         $query = $dbconn->prepare("UPDATE {SystemConfig} SET
@@ -401,10 +412,11 @@ class SystemManage extends View
             PDO::PARAM_STR
         );
         $query->bindParam(
-            ":uid", 
-            $_SESSION["userid"], 
-            PDO::PARAM_INT);
-        foreach (Config::SOCIALMEDIA as $sm){
+            ":uid",
+            $_SESSION["userid"],
+            PDO::PARAM_INT
+        );
+        foreach (Config::SOCIALMEDIA as $sm) {
             $query->bindParam(":{$sm}", $_REQUEST[$sm], PDO::PARAM_STR);
         }
         /* saveFile() devuelve false cuando el icono no vale (no == null): con
